@@ -3,7 +3,7 @@ import type { DisplayMode, DocumentInfo, PixelSample, TileRequest } from "./type
 
 const TILE_SIZE = 256;
 const MAX_IN_FLIGHT = 8;
-const MAX_TEXTURES = 192;
+const DEFAULT_MAX_TEXTURES = 192;
 const KEEP_VISIBLE = 24;
 
 interface DisplaySettings {
@@ -81,9 +81,7 @@ function createProgram(gl: WebGL2RenderingContext): WebGLProgram {
 export class RawViewport {
   private readonly container: HTMLElement;
   private readonly canvas: HTMLCanvasElement;
-  private readonly overlay: HTMLCanvasElement;
   private readonly gl: WebGL2RenderingContext;
-  private readonly overlayContext: CanvasRenderingContext2D;
   private readonly callbacks: ViewportCallbacks;
   private readonly program: WebGLProgram;
   private readonly rectLocation: WebGLUniformLocation;
@@ -111,7 +109,8 @@ export class RawViewport {
   private dragY = 0;
   private dragCameraX = 0;
   private dragCameraY = 0;
-  private overlayEnabled = true;
+  private maxTextures = DEFAULT_MAX_TEXTURES;
+  private wheelSensitivity = 0.0015;
   private animationFrame = 0;
   private sampleTimer = 0;
   private lastSampleKey = "";
@@ -121,12 +120,9 @@ export class RawViewport {
     this.container = container;
     this.callbacks = callbacks;
     this.canvas = container.querySelector<HTMLCanvasElement>(".raw-canvas")!;
-    this.overlay = container.querySelector<HTMLCanvasElement>(".overlay-canvas")!;
     const gl = this.canvas.getContext("webgl2", { alpha: true, antialias: false, premultipliedAlpha: false });
-    const overlayContext = this.overlay.getContext("2d");
-    if (!gl || !overlayContext) throw new Error("当前 WebView2 不支持 eRAW 所需的 WebGL2 画布");
+    if (!gl) throw new Error("当前 WebView2 不支持 eRAW 所需的 WebGL2 画布");
     this.gl = gl;
-    this.overlayContext = overlayContext;
     this.program = createProgram(gl);
     this.rectLocation = this.requireUniform("u_rect");
     this.viewportLocation = this.requireUniform("u_viewport");
@@ -232,9 +228,10 @@ export class RawViewport {
     this.requestDraw();
   }
 
-  setOverlayEnabled(enabled: boolean): void {
-    this.overlayEnabled = enabled;
-    this.requestDraw();
+  setPreferences(preferences: { wheelSensitivity: number; maxTextures: number }): void {
+    this.wheelSensitivity = Math.max(0.0005, Math.min(0.004, preferences.wheelSensitivity));
+    this.maxTextures = Math.max(64, Math.min(512, Math.trunc(preferences.maxTextures)));
+    this.evictTextures();
   }
 
   fit(): void {
@@ -277,13 +274,8 @@ export class RawViewport {
     if (this.canvas.width !== pixelWidth || this.canvas.height !== pixelHeight) {
       this.canvas.width = pixelWidth;
       this.canvas.height = pixelHeight;
-      this.overlay.width = pixelWidth;
-      this.overlay.height = pixelHeight;
       this.canvas.style.width = `${this.width}px`;
       this.canvas.style.height = `${this.height}px`;
-      this.overlay.style.width = `${this.width}px`;
-      this.overlay.style.height = `${this.height}px`;
-      this.overlayContext.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     if (this.document) {
       this.constrainCamera();
@@ -301,7 +293,7 @@ export class RawViewport {
     const pointerY = event.clientY - rect.top;
     const imageX = (pointerX - this.cameraX) / this.zoom;
     const imageY = (pointerY - this.cameraY) / this.zoom;
-    const factor = Math.exp(-event.deltaY * 0.0015);
+    const factor = Math.exp(-event.deltaY * this.wheelSensitivity);
     const minZoom = Math.max(this.fitScale * 0.08, 0.0005);
     const newZoom = Math.max(minZoom, Math.min(64, this.zoom * factor));
     this.cameraX = pointerX - imageX * newZoom;
@@ -422,7 +414,6 @@ export class RawViewport {
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    this.overlayContext.clearRect(0, 0, this.width, this.height);
     if (!this.document) {
       this.updateScrollbars();
       return;
@@ -447,7 +438,6 @@ export class RawViewport {
       gl.uniform4f(this.rectLocation, tile.x * TILE_SIZE * scale, tile.y * TILE_SIZE * scale, TILE_SIZE * scale, TILE_SIZE * scale);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
-    this.drawOverlay();
     this.updateScrollbars();
     this.callbacks.onRenderStats(level, visible.filter((tile) => this.textures.has(this.tileKey(level, tile.x, tile.y))).length, this.inFlight.size);
   }
@@ -489,9 +479,9 @@ export class RawViewport {
   }
 
   private evictTextures(): void {
-    if (this.textures.size <= MAX_TEXTURES) return;
+    if (this.textures.size <= this.maxTextures) return;
     const entries = [...this.textures.entries()].sort((a, b) => a[1].lastUsed - b[1].lastUsed);
-    for (const [key, entry] of entries.slice(0, this.textures.size - MAX_TEXTURES)) {
+    for (const [key, entry] of entries.slice(0, this.textures.size - this.maxTextures)) {
       this.gl.deleteTexture(entry.texture);
       this.textures.delete(key);
     }
@@ -501,104 +491,6 @@ export class RawViewport {
     for (const entry of this.textures.values()) this.gl.deleteTexture(entry.texture);
     this.textures.clear();
     this.inFlight.clear();
-  }
-
-  private drawOverlay(): void {
-    if (!this.document || !this.overlayEnabled) return;
-    const context = this.overlayContext;
-    const descriptor = this.document.descriptor;
-    const layout = this.document.layout;
-    const x = this.cameraX;
-    const y = this.cameraY;
-    const imageWidth = descriptor.width * this.zoom;
-    const imageHeight = descriptor.height * this.zoom;
-    const rowRatio = layout.rowBytes > 0 ? Math.max(1, Math.min(2, layout.rowStride / layout.rowBytes)) : 1;
-    const frameRatio = layout.frameBytes > 0 ? Math.max(1, Math.min(2, layout.frameStride / layout.frameBytes)) : 1;
-    const alignedWidth = imageWidth * rowRatio;
-    const alignedHeight = imageHeight * frameRatio;
-
-    context.save();
-    context.lineWidth = 1;
-    if (alignedWidth > imageWidth + 1) {
-      context.fillStyle = "rgba(27, 172, 225, 0.08)";
-      context.fillRect(x + imageWidth, y, alignedWidth - imageWidth, imageHeight);
-      this.drawHatch(x + imageWidth, y, alignedWidth - imageWidth, imageHeight, "rgba(70, 201, 245, .20)");
-    }
-    if (alignedHeight > imageHeight + 1) {
-      context.fillStyle = "rgba(121, 94, 255, 0.08)";
-      context.fillRect(x, y + imageHeight, alignedWidth, alignedHeight - imageHeight);
-      this.drawHatch(x, y + imageHeight, alignedWidth, alignedHeight - imageHeight, "rgba(148, 120, 255, .18)");
-    }
-    context.strokeStyle = "rgba(122, 219, 255, .72)";
-    context.strokeRect(x - 0.5, y - 0.5, imageWidth + 1, imageHeight + 1);
-    if (alignedWidth > imageWidth + 1 || alignedHeight > imageHeight + 1) {
-      context.strokeStyle = "rgba(111, 137, 164, .48)";
-      context.setLineDash([5, 5]);
-      context.strokeRect(x - 0.5, y - 0.5, alignedWidth + 1, alignedHeight + 1);
-      context.setLineDash([]);
-    }
-    this.drawDimensionLabels(x, y, imageWidth, imageHeight, alignedWidth, alignedHeight);
-    if (this.zoom >= 12) this.drawPixelGrid(x, y, imageWidth, imageHeight);
-    context.restore();
-  }
-
-  private drawHatch(x: number, y: number, width: number, height: number, color: string): void {
-    const context = this.overlayContext;
-    context.save();
-    context.beginPath();
-    context.rect(x, y, width, height);
-    context.clip();
-    context.strokeStyle = color;
-    context.lineWidth = 1;
-    for (let offset = -height; offset < width; offset += 9) {
-      context.beginPath();
-      context.moveTo(x + offset, y + height);
-      context.lineTo(x + offset + height, y);
-      context.stroke();
-    }
-    context.restore();
-  }
-
-  private drawDimensionLabels(x: number, y: number, width: number, height: number, alignedWidth: number, alignedHeight: number): void {
-    if (!this.document) return;
-    const context = this.overlayContext;
-    context.font = "11px 'Segoe UI Variable', sans-serif";
-    context.textBaseline = "middle";
-    const topY = Math.max(18, y - 18);
-    context.strokeStyle = "rgba(124, 205, 235, .72)";
-    context.fillStyle = "rgba(181, 224, 242, .92)";
-    context.beginPath(); context.moveTo(x, topY); context.lineTo(x + width, topY); context.stroke();
-    context.textAlign = "center";
-    context.fillText(`width ${this.document.descriptor.width}px · ${this.document.layout.rowBytes}B`, x + width / 2, topY - 7);
-    if (alignedWidth > width + 16) {
-      context.fillStyle = "rgba(107, 201, 237, .82)";
-      context.fillText(`row padding ${this.document.layout.rowStride - this.document.layout.rowBytes}B`, x + width + (alignedWidth - width) / 2, topY - 7);
-    }
-    const leftX = Math.max(12, x - 18);
-    context.save();
-    context.translate(leftX, y + height / 2);
-    context.rotate(-Math.PI / 2);
-    context.fillStyle = "rgba(181, 224, 242, .92)";
-    context.fillText(`height ${this.document.descriptor.height}px`, 0, 0);
-    context.restore();
-    if (alignedHeight > height + 18) {
-      context.fillStyle = "rgba(166, 148, 255, .82)";
-      context.fillText(`frame padding ${this.document.layout.frameStride - this.document.layout.frameBytes}B`, x + Math.min(alignedWidth, this.width) / 2, y + height + (alignedHeight - height) / 2);
-    }
-  }
-
-  private drawPixelGrid(x: number, y: number, width: number, height: number): void {
-    const context = this.overlayContext;
-    const startX = Math.max(0, Math.floor(-x / this.zoom));
-    const startY = Math.max(0, Math.floor(-y / this.zoom));
-    const endX = Math.min(this.document!.descriptor.width, Math.ceil((this.width - x) / this.zoom));
-    const endY = Math.min(this.document!.descriptor.height, Math.ceil((this.height - y) / this.zoom));
-    context.strokeStyle = "rgba(183, 219, 233, .16)";
-    context.lineWidth = 1;
-    context.beginPath();
-    for (let px = startX; px <= endX; px += 1) { const sx = x + px * this.zoom; context.moveTo(sx, Math.max(0, y)); context.lineTo(sx, Math.min(this.height, y + height)); }
-    for (let py = startY; py <= endY; py += 1) { const sy = y + py * this.zoom; context.moveTo(Math.max(0, x), sy); context.lineTo(Math.min(this.width, x + width), sy); }
-    context.stroke();
   }
 
   private updateScrollbars(): void {

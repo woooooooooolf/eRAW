@@ -27,7 +27,7 @@ const icons = {
   export: icon("M13 3v8.2l2.6-2.6L17 10l-5 5-5-5 1.4-1.4 2.6 2.6V3h2Zm-9 14h2v2h12v-2h2v4H4v-4Z"),
   fit: icon("M4 9V4h5v2H6v3H4Zm11-5h5v5h-2V6h-3V4ZM4 15h2v3h3v2H4v-5Zm14 0h2v5h-5v-2h3v-3Z"),
   actual: icon("M4 4h16v16H4V4Zm2 2v12h12V6H6Zm2 2h2v2H8V8Zm6 6h2v2h-2v-2Z"),
-  overlay: icon("M3 5h18v14H3V5Zm2 2v10h14V7H5Zm2 2h4v2H7V9Zm0 4h7v2H7v-2Z"),
+  settings: icon("M19.4 13a7.9 7.9 0 0 0 .1-1 7.9 7.9 0 0 0-.1-1l2.1-1.6-2-3.4-2.5 1a7.3 7.3 0 0 0-1.7-1L15 3.3h-4L10.7 6A7.3 7.3 0 0 0 9 7L6.5 6l-2 3.4L6.6 11a7.9 7.9 0 0 0-.1 1 7.9 7.9 0 0 0 .1 1l-2.1 1.6 2 3.4L9 17a7.3 7.3 0 0 0 1.7 1l.3 2.7h4l.3-2.7a7.3 7.3 0 0 0 1.7-1l2.5 1 2-3.4L19.4 13ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"),
   about: icon("M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm-1 7h2v6h-2v-6Zm0-4h2v2h-2V7Z"),
   panel: icon("M3 4h18v16H3V4Zm2 2v12h4V6H5Zm6 0v12h8V6h-8Z"),
   warning: icon("M12 3 2 21h20L12 3Zm0 4 6.6 12H5.4L12 7Zm-1 3v5h2v-5h-2Zm0 6.5v2h2v-2h-2Z"),
@@ -57,7 +57,6 @@ export class ErawApp {
   private document: DocumentInfo | null = null;
   private frame = 0;
   private displayMode: DisplayMode = "bayer";
-  private overlayEnabled = true;
   private committing = false;
   private fullscreen = false;
   private toastTimer = 0;
@@ -86,7 +85,6 @@ export class ErawApp {
     return `
       <div class="app-shell">
         <header class="topbar">
-          <div class="app-brand"><img src="${erawIconUrl}" alt=""/><div><strong>eRAW</strong><small>RAW SENSOR LAB</small></div></div>
           <div class="toolbar primary-actions">
             <button id="open-button" class="tool-button accent">${icons.open}<span>打开</span><kbd>Ctrl O</kbd></button>
             <button id="export-button" class="tool-button" disabled>${icons.export}<span>导出</span><kbd>Ctrl E</kbd></button>
@@ -104,8 +102,8 @@ export class ErawApp {
           <div class="toolbar view-actions">
             <button id="fit-button" class="icon-button" title="适应窗口 (Ctrl+0)">${icons.fit}</button>
             <button id="actual-button" class="icon-button" title="实际像素 (Ctrl+1)">${icons.actual}</button>
-            <button id="overlay-button" class="icon-button active" title="尺寸与对齐叠加层">${icons.overlay}</button>
             <button id="panel-button" class="icon-button active" title="显示或隐藏参数面板">${icons.panel}</button>
+            <button id="settings-button" class="icon-button" title="设置">${icons.settings}</button>
             <button id="about-button" class="icon-button" title="关于 eRAW">${icons.about}</button>
           </div>
         </header>
@@ -166,7 +164,7 @@ export class ErawApp {
 
           <main class="canvas-area">
             <div class="viewport" id="viewport">
-              <canvas class="raw-canvas"></canvas><canvas class="overlay-canvas"></canvas>
+              <canvas class="raw-canvas"></canvas>
               <div class="empty-state" id="empty-state">
                 <div class="empty-grid"><span></span><span></span><span></span><span></span></div>
                 <h1>查看传感器的真实输出</h1>
@@ -176,7 +174,6 @@ export class ErawApp {
               </div>
               <div class="image-scrollbar horizontal"><div class="scroll-thumb"></div></div>
               <div class="image-scrollbar vertical"><div class="scroll-thumb"></div></div>
-              <div class="canvas-badge" id="canvas-badge">NO DOCUMENT</div>
             </div>
             <div class="frame-strip" id="frame-strip">
               <button id="first-frame" title="第一帧">|‹</button><button id="previous-frame" title="上一帧">‹</button>
@@ -242,11 +239,6 @@ export class ErawApp {
     this.get<HTMLButtonElement>("export-button").addEventListener("click", () => this.openExportDialog());
     this.get("fit-button").addEventListener("click", () => this.viewport.fit());
     this.get("actual-button").addEventListener("click", () => this.viewport.actualSize());
-    this.get("overlay-button").addEventListener("click", () => {
-      this.overlayEnabled = !this.overlayEnabled;
-      this.get("overlay-button").classList.toggle("active", this.overlayEnabled);
-      this.viewport.setOverlayEnabled(this.overlayEnabled);
-    });
     this.get("panel-button").addEventListener("click", () => {
       this.root.querySelector(".app-shell")!.classList.toggle("panel-hidden");
       this.get("panel-button").classList.toggle("active");
@@ -349,7 +341,6 @@ export class ErawApp {
   private updateDocumentUi(): void {
     const info = this.document;
     this.get("empty-state").classList.toggle("hidden", Boolean(info));
-    this.get("canvas-badge").textContent = info ? `${info.descriptor.cfa} · ${info.descriptor.bitDepth} BIT` : "NO DOCUMENT";
     this.get<HTMLButtonElement>("export-button").disabled = !info;
     this.get("file-name").textContent = info?.name ?? "未打开图像";
     this.get("file-meta").textContent = info ? `${formatBytes(info.fileSize)} · ${info.descriptor.width} × ${info.descriptor.height}` : "请选择 *.raw 或 *.bin 文件";

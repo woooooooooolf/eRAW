@@ -62,12 +62,6 @@ svg { width: 17px; height: 17px; fill: currentColor; }
   background: linear-gradient(90deg, transparent, rgba(82, 202, 244, .5), transparent);
 }
 
-.app-brand { display: flex; align-items: center; gap: 9px; min-width: 140px; }
-.app-brand img { width: 34px; height: 34px; border-radius: 9px; filter: drop-shadow(0 4px 13px rgba(36, 170, 238, .2)); }
-.app-brand div { display: flex; flex-direction: column; }
-.app-brand strong { font-size: 17px; letter-spacing: .09em; font-weight: 620; line-height: 18px; }
-.app-brand small { color: #5f748a; font-size: 8px; font-weight: 650; letter-spacing: .17em; }
-
 .toolbar { display: flex; align-items: center; gap: 4px; }
 .primary-actions { padding-right: 14px; border-right: 1px solid var(--border); }
 .view-actions { margin-left: auto; }
@@ -252,10 +246,8 @@ input::-webkit-inner-spin-button { opacity: .3; }
   background-position: 0 0, 0 6px, 6px -6px, -6px 0, 0 0;
   background-size: 12px 12px, 12px 12px, 12px 12px, 12px 12px, 100% 100%;
 }
-.raw-canvas, .overlay-canvas { position: absolute; inset: 0; display: block; }
-.raw-canvas { z-index: 1; cursor: grab; touch-action: none; }
+.raw-canvas { position: absolute; inset: 0; z-index: 1; display: block; cursor: grab; touch-action: none; }
 .raw-canvas.dragging { cursor: grabbing; }
-.overlay-canvas { z-index: 2; pointer-events: none; }
 
 .empty-state {
   position: absolute;
@@ -280,8 +272,6 @@ input::-webkit-inner-spin-button { opacity: .3; }
 .empty-state button { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 15px; border: 1px solid rgba(69, 190, 236, .28); border-radius: 7px; color: #bdeeff; background: rgba(26, 134, 179, .14); pointer-events: auto; }
 .empty-state button:hover { border-color: rgba(92, 215, 255, .46); background: rgba(37, 158, 207, .2); }
 .empty-state small { margin-top: 17px; color: #3f505f; font-size: 9px; }
-
-.canvas-badge { position: absolute; z-index: 5; top: 10px; right: 11px; padding: 4px 7px; border: 1px solid var(--border); border-radius: 4px; color: #4e6275; background: rgba(8, 12, 17, .62); backdrop-filter: blur(7px); font-family: "Cascadia Mono", Consolas, monospace; font-size: 8px; letter-spacing: .08em; pointer-events: none; }
 
 .image-scrollbar { position: absolute; z-index: 8; opacity: 0; pointer-events: none; transition: opacity .15s ease; }
 .image-scrollbar.visible { opacity: 1; pointer-events: auto; }
@@ -372,9 +362,7 @@ input::-webkit-inner-spin-button { opacity: .3; }
 .ui-fullscreen { grid-template-rows: minmax(0, 1fr); }
 
 @media (max-width: 1120px) {
-  .app-brand { min-width: 105px; }
-  .app-brand small, .tool-button kbd { display: none; }
+  .tool-button kbd { display: none; }
   .display-modes > button { padding: 0 7px; }
   .channel-menu { display: none; }
 }
-
