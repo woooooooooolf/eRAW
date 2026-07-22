@@ -98,6 +98,8 @@ export class RawViewport {
   private settings: DisplaySettings = { mode: "bayer", displayMin: 0, displayMax: 0 };
   private textures = new Map<string, TextureEntry>();
   private inFlight = new Set<string>();
+  private failedTiles = new Set<string>();
+  private failureReported = false;
   private zoom = 1;
   private fitScale = 1;
   private cameraX = 0;
@@ -443,7 +445,7 @@ export class RawViewport {
   }
 
   private queueTile(key: string, level: number, tileX: number, tileY: number): void {
-    if (!this.document || this.inFlight.has(key) || this.inFlight.size >= MAX_IN_FLIGHT) return;
+    if (!this.document || this.inFlight.has(key) || this.failedTiles.has(key) || this.inFlight.size >= MAX_IN_FLIGHT) return;
     this.inFlight.add(key);
     const request: TileRequest = {
       generation: this.document.generation,
@@ -471,7 +473,14 @@ export class RawViewport {
       this.evictTextures();
     }).catch((error: unknown) => {
       const message = String(error);
-      if (!message.includes("stale_generation")) this.callbacks.onError(message);
+      const belongsToCurrentView = this.document && key === this.tileKey(level, tileX, tileY);
+      if (!message.includes("stale_generation") && belongsToCurrentView) {
+        this.failedTiles.add(key);
+        if (!this.failureReported) {
+          this.failureReported = true;
+          this.callbacks.onError(`部分瓦片渲染失败，已停止自动重试；修改参数、帧或显示模式后可重新尝试。\n${message}`);
+        }
+      }
     }).finally(() => {
       this.inFlight.delete(key);
       this.requestDraw();
@@ -491,6 +500,8 @@ export class RawViewport {
     for (const entry of this.textures.values()) this.gl.deleteTexture(entry.texture);
     this.textures.clear();
     this.inFlight.clear();
+    this.failedTiles.clear();
+    this.failureReported = false;
   }
 
   private updateScrollbars(): void {
