@@ -184,9 +184,7 @@ pub fn calculate_layout(
             format!("行步长 {row_stride} B 小于有效行最小大小 {row_bytes} B；相邻行可能重叠，仍将尝试显示"),
         ));
     }
-    let frame_bytes = row_stride
-        .checked_mul(u64::from(descriptor.height))
-        .unwrap_or(u64::MAX);
+    let frame_bytes = row_stride.saturating_mul(u64::from(descriptor.height));
     let frame_stride = if descriptor.frame_stride == 0 {
         align_up(frame_bytes, descriptor.frame_alignment).unwrap_or(u64::MAX)
     } else {
@@ -491,11 +489,11 @@ fn sampled_rgb(
     d: &RawDescriptor,
     l: &RawLayout,
     frame: u64,
-    x: u32,
-    y: u32,
+    point: (u32, u32),
     level: u8,
     mode: DisplayMode,
 ) -> Option<[u16; 3]> {
+    let (x, y) = point;
     let value = read_pixel(data, d, l, frame, x, y)?;
     if d.cfa == CfaPattern::Mono {
         return Some([value; 3]);
@@ -596,8 +594,7 @@ pub fn render_tile(
                 d,
                 l,
                 request.frame,
-                sx as u32,
-                sy as u32,
+                (sx as u32, sy as u32),
                 request.level,
                 request.mode,
             );
@@ -940,5 +937,52 @@ mod tests {
         assert_eq!(shifted_cfa(CfaPattern::Rggb, 1, 0), CfaPattern::Grbg);
         assert_eq!(shifted_cfa(CfaPattern::Rggb, 0, 1), CfaPattern::Gbrg);
         assert_eq!(shifted_cfa(CfaPattern::Rggb, 1, 1), CfaPattern::Bggr);
+    }
+
+    #[test]
+    fn reads_big_endian_msb_aligned_container() {
+        let d = RawDescriptor {
+            width: 2,
+            height: 1,
+            bit_depth: 10,
+            packing: Packing::Unpacked16,
+            endianness: Endianness::Big,
+            bit_alignment: BitAlignment::Msb,
+            ..RawDescriptor::default()
+        };
+        let bytes = [0xff, 0xc0, 0x55, 0x40];
+        let (layout, _) = calculate_layout(&d, bytes.len() as u64);
+        assert_eq!(read_pixel(&bytes, &d, &layout, 0, 0, 0), Some(0x3ff));
+        assert_eq!(read_pixel(&bytes, &d, &layout, 0, 1, 0), Some(0x155));
+    }
+
+    #[test]
+    fn tile_renderer_marks_missing_source_data() {
+        let d = RawDescriptor {
+            width: 64,
+            height: 64,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Mono,
+            ..RawDescriptor::default()
+        };
+        let bytes = vec![128u8; 32];
+        let (layout, _) = calculate_layout(&d, bytes.len() as u64);
+        let request = TileRequest {
+            generation: 1,
+            frame: 0,
+            level: 0,
+            tile_x: 0,
+            tile_y: 0,
+            tile_size: 64,
+            mode: DisplayMode::Raw,
+            display_min: 0,
+            display_max: 255,
+        };
+        let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
+        assert_eq!(&tile[0..4], &[128, 128, 128, 255]);
+        let missing = 40 * 4;
+        assert!(tile[missing] == 82 || tile[missing] == 48);
+        assert_eq!(tile.len(), 64 * 64 * 4);
     }
 }
