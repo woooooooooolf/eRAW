@@ -15,8 +15,35 @@ import type {
 } from "./types";
 import { DEFAULT_DESCRIPTOR } from "./types";
 
-const VERSION = "0.0.1";
+const VERSION = "0.0.2";
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
+const SETTINGS_KEY = "eraw.appSettings.v1";
+
+type UiFontSize = "standard" | "large" | "extraLarge";
+type OpenView = "fit" | "actual";
+type WheelSpeed = "gentle" | "standard" | "fast";
+type TileCache = "compact" | "balanced" | "large";
+type AppLanguage = "system" | "zh-CN";
+
+interface AppSettings {
+  uiFontSize: UiFontSize;
+  reduceMotion: boolean;
+  openView: OpenView;
+  rememberDescriptor: boolean;
+  wheelSpeed: WheelSpeed;
+  tileCache: TileCache;
+  language: AppLanguage;
+}
+
+const DEFAULT_SETTINGS: AppSettings = {
+  uiFontSize: "standard",
+  reduceMotion: false,
+  openView: "fit",
+  rememberDescriptor: true,
+  wheelSpeed: "standard",
+  tileCache: "balanced",
+  language: "system",
+};
 
 function icon(path: string): string {
   return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
@@ -42,7 +69,27 @@ function formatBytes(value: number): string {
   return `${size >= 100 || unit === 0 ? size.toFixed(0) : size.toFixed(2)} ${units[unit]}`;
 }
 
-function loadDescriptor(): RawDescriptor {
+function loadSettings(): AppSettings {
+  try {
+    const saved = localStorage.getItem(SETTINGS_KEY);
+    if (saved) {
+      const value = JSON.parse(saved) as Partial<AppSettings>;
+      return {
+        uiFontSize: ["standard", "large", "extraLarge"].includes(value.uiFontSize ?? "") ? value.uiFontSize as UiFontSize : DEFAULT_SETTINGS.uiFontSize,
+        reduceMotion: typeof value.reduceMotion === "boolean" ? value.reduceMotion : DEFAULT_SETTINGS.reduceMotion,
+        openView: ["fit", "actual"].includes(value.openView ?? "") ? value.openView as OpenView : DEFAULT_SETTINGS.openView,
+        rememberDescriptor: typeof value.rememberDescriptor === "boolean" ? value.rememberDescriptor : DEFAULT_SETTINGS.rememberDescriptor,
+        wheelSpeed: ["gentle", "standard", "fast"].includes(value.wheelSpeed ?? "") ? value.wheelSpeed as WheelSpeed : DEFAULT_SETTINGS.wheelSpeed,
+        tileCache: ["compact", "balanced", "large"].includes(value.tileCache ?? "") ? value.tileCache as TileCache : DEFAULT_SETTINGS.tileCache,
+        language: ["system", "zh-CN"].includes(value.language ?? "") ? value.language as AppLanguage : DEFAULT_SETTINGS.language,
+      };
+    }
+  } catch { /* 使用安全默认值 */ }
+  return { ...DEFAULT_SETTINGS };
+}
+
+function loadDescriptor(remember: boolean): RawDescriptor {
+  if (!remember) return { ...DEFAULT_DESCRIPTOR };
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) return { ...DEFAULT_DESCRIPTOR, ...JSON.parse(saved) as Partial<RawDescriptor> };
@@ -53,7 +100,8 @@ function loadDescriptor(): RawDescriptor {
 export class ErawApp {
   private readonly root: HTMLElement;
   private readonly viewport: RawViewport;
-  private descriptor = loadDescriptor();
+  private settings = loadSettings();
+  private descriptor = loadDescriptor(this.settings.rememberDescriptor);
   private document: DocumentInfo | null = null;
   private frame = 0;
   private displayMode: DisplayMode = "bayer";
@@ -71,6 +119,7 @@ export class ErawApp {
       onRenderStats: (level, loaded, pending) => { this.get("render-status").textContent = `L${level} · ${loaded} tiles${pending ? ` · ${pending} loading` : ""}`; },
       onError: (message) => this.showToast(message, "error"),
     });
+    this.applySettings();
     this.bindEvents();
     this.updateDocumentUi();
   }
@@ -191,6 +240,7 @@ export class ErawApp {
         <div class="toast" id="toast" role="status"></div>
 
         ${this.exportDialogTemplate()}
+        ${this.settingsDialogTemplate()}
         ${this.aboutDialogTemplate()}
       </div>`;
   }
@@ -233,6 +283,30 @@ export class ErawApp {
     </form></dialog>`;
   }
 
+  private settingsDialogTemplate(): string {
+    return `<dialog id="settings-dialog" class="modal settings-modal"><form method="dialog">
+      <header><div><small>APPLICATION PREFERENCES</small><h2>设置</h2></div><button value="cancel" class="dialog-close">×</button></header>
+      <div class="settings-body">
+        <section class="settings-group"><div class="settings-heading"><h3>外观</h3><p>调整界面文字与动态效果，不改变 RAW 图像的显示比例。</p></div>
+          <label class="settings-row"><div><strong>界面字号</strong><span>高分辨率显示器推荐使用“大”或“特大”</span></div><select id="setting-font-size"><option value="standard">标准</option><option value="large">大</option><option value="extraLarge">特大</option></select></label>
+          <label class="settings-row toggle-row"><div><strong>减少动态效果</strong><span>关闭面板、弹窗和提示的过渡动画</span></div><input id="setting-reduce-motion" type="checkbox"/></label>
+        </section>
+        <section class="settings-group"><div class="settings-heading"><h3>操作</h3><p>控制打开文件和画布交互的默认行为。</p></div>
+          <label class="settings-row"><div><strong>打开图像时</strong><span>决定新文件的初始缩放方式</span></div><select id="setting-open-view"><option value="fit">适应窗口</option><option value="actual">100% 实际像素</option></select></label>
+          <label class="settings-row"><div><strong>滚轮缩放速度</strong><span>缩放始终以鼠标指向的图像位置为中心</span></div><select id="setting-wheel-speed"><option value="gentle">柔和</option><option value="standard">标准</option><option value="fast">快速</option></select></label>
+          <label class="settings-row toggle-row"><div><strong>记住 RAW 参数</strong><span>下次启动时恢复尺寸、packing、CFA 和对齐配置</span></div><input id="setting-remember-descriptor" type="checkbox"/></label>
+        </section>
+        <section class="settings-group"><div class="settings-heading"><h3>性能</h3><p>更大的 GPU 缓存可减少超大图像来回拖动时的瓦片重载。</p></div>
+          <label class="settings-row"><div><strong>GPU 瓦片缓存</strong><span>只缓存预览纹理，不复制完整 RAW 文件</span></div><select id="setting-tile-cache"><option value="compact">32 MiB</option><option value="balanced">64 MiB（推荐）</option><option value="large">128 MiB</option></select></label>
+        </section>
+        <section class="settings-group"><div class="settings-heading"><h3>语言</h3><p>V0.0.2 内置简体中文；此入口将用于后续语言包与区域格式。</p></div>
+          <label class="settings-row"><div><strong>界面语言</strong><span>“跟随系统”在当前版本回退为简体中文</span></div><select id="setting-language"><option value="system">跟随系统</option><option value="zh-CN">简体中文</option></select></label>
+        </section>
+      </div>
+      <footer><button id="reset-settings" type="button" class="text-button">恢复默认设置</button><span class="footer-spacer"></span><button value="cancel" class="secondary-button">取消</button><button id="confirm-settings" type="button" class="primary-button">应用</button></footer>
+    </form></dialog>`;
+  }
+
   private bindEvents(): void {
     this.get("open-button").addEventListener("click", () => void this.openFile());
     this.get("empty-open-button").addEventListener("click", () => void this.openFile());
@@ -243,6 +317,7 @@ export class ErawApp {
       this.root.querySelector(".app-shell")!.classList.toggle("panel-hidden");
       this.get("panel-button").classList.toggle("active");
     });
+    this.get("settings-button").addEventListener("click", () => this.openSettingsDialog());
     this.get("about-button").addEventListener("click", () => this.get<HTMLDialogElement>("about-dialog").showModal());
     this.root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => button.addEventListener("click", () => this.setDisplayMode(button.dataset.mode as DisplayMode)));
     this.get<HTMLSelectElement>("channel-mode").addEventListener("change", (event) => this.setDisplayMode((event.currentTarget as HTMLSelectElement).value as DisplayMode));
@@ -270,6 +345,8 @@ export class ErawApp {
     this.get("last-frame").addEventListener("click", () => this.setFrame((this.document?.layout.frameCount ?? 1) - 1));
     this.get<HTMLInputElement>("frame-input").addEventListener("change", (event) => this.setFrame(Number((event.currentTarget as HTMLInputElement).value) - 1));
     this.get("confirm-export").addEventListener("click", (event) => { event.preventDefault(); void this.performExport(); });
+    this.get("confirm-settings").addEventListener("click", () => this.saveSettingsFromDialog());
+    this.get("reset-settings").addEventListener("click", () => this.writeSettingsForm(DEFAULT_SETTINGS));
     ["crop-x", "crop-y", "crop-width", "crop-height"].forEach((id) => this.get<HTMLInputElement>(id).addEventListener("input", () => this.updateExportPhase()));
     this.get<HTMLSelectElement>("export-packing").addEventListener("change", (event) => {
       const packing = (event.currentTarget as HTMLSelectElement).value;
@@ -289,6 +366,7 @@ export class ErawApp {
       this.descriptor = info.descriptor;
       this.frame = 0;
       this.viewport.setDocument(info);
+      if (this.settings.openView === "actual") this.viewport.actualSize();
       this.updateDocumentUi();
       this.showToast(`已打开 ${info.name}`, "success");
     } catch (error) {
@@ -320,7 +398,7 @@ export class ErawApp {
     if (this.committing) return;
     const descriptor = this.readDescriptor();
     this.descriptor = descriptor;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(descriptor));
+    if (this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(descriptor));
     if (!this.document) return;
     this.committing = true;
     try {
@@ -465,6 +543,47 @@ export class ErawApp {
   private async toggleFullscreen(): Promise<void> {
     this.fullscreen = !this.fullscreen;
     try { await getCurrentWindow().setFullscreen(this.fullscreen); } catch { this.root.querySelector(".app-shell")!.classList.toggle("ui-fullscreen", this.fullscreen); }
+  }
+
+  private openSettingsDialog(): void {
+    this.writeSettingsForm(this.settings);
+    this.get<HTMLDialogElement>("settings-dialog").showModal();
+  }
+
+  private writeSettingsForm(settings: AppSettings): void {
+    this.get<HTMLSelectElement>("setting-font-size").value = settings.uiFontSize;
+    this.get<HTMLInputElement>("setting-reduce-motion").checked = settings.reduceMotion;
+    this.get<HTMLSelectElement>("setting-open-view").value = settings.openView;
+    this.get<HTMLSelectElement>("setting-wheel-speed").value = settings.wheelSpeed;
+    this.get<HTMLInputElement>("setting-remember-descriptor").checked = settings.rememberDescriptor;
+    this.get<HTMLSelectElement>("setting-tile-cache").value = settings.tileCache;
+    this.get<HTMLSelectElement>("setting-language").value = settings.language;
+  }
+
+  private saveSettingsFromDialog(): void {
+    this.settings = {
+      uiFontSize: this.get<HTMLSelectElement>("setting-font-size").value as UiFontSize,
+      reduceMotion: this.get<HTMLInputElement>("setting-reduce-motion").checked,
+      openView: this.get<HTMLSelectElement>("setting-open-view").value as OpenView,
+      rememberDescriptor: this.get<HTMLInputElement>("setting-remember-descriptor").checked,
+      wheelSpeed: this.get<HTMLSelectElement>("setting-wheel-speed").value as WheelSpeed,
+      tileCache: this.get<HTMLSelectElement>("setting-tile-cache").value as TileCache,
+      language: this.get<HTMLSelectElement>("setting-language").value as AppLanguage,
+    };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
+    if (this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(this.descriptor));
+    else localStorage.removeItem(STORAGE_KEY);
+    this.applySettings();
+    this.get<HTMLDialogElement>("settings-dialog").close();
+    this.showToast("设置已保存", "success");
+  }
+
+  private applySettings(): void {
+    document.documentElement.dataset.uiSize = this.settings.uiFontSize;
+    document.documentElement.dataset.reduceMotion = String(this.settings.reduceMotion);
+    const wheelSensitivity: Record<WheelSpeed, number> = { gentle: 0.001, standard: 0.0015, fast: 0.0022 };
+    const maxTextures: Record<TileCache, number> = { compact: 128, balanced: 256, large: 512 };
+    this.viewport.setPreferences({ wheelSensitivity: wheelSensitivity[this.settings.wheelSpeed], maxTextures: maxTextures[this.settings.tileCache] });
   }
 
   private showToast(message: string, type: "success" | "error" | "busy", duration = 3200): void {
