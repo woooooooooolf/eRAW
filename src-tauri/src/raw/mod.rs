@@ -985,4 +985,47 @@ mod tests {
         assert!(tile[missing] == 82 || tile[missing] == 48);
         assert_eq!(tile.len(), 64 * 64 * 4);
     }
+
+    #[test]
+    fn normalize_tolerates_inverted_display_range() {
+        assert_eq!(normalize(99, 100, 50), 0);
+        assert_eq!(normalize(100, 100, 50), 0);
+        assert_eq!(normalize(101, 100, 50), 255);
+    }
+
+    #[test]
+    fn demosaic_renderer_tolerates_partial_last_frame() {
+        let d = RawDescriptor {
+            width: 640,
+            height: 480,
+            bit_depth: 10,
+            packing: Packing::MipiRaw10,
+            cfa: CfaPattern::Rggb,
+            frame_alignment: 1,
+            ..RawDescriptor::default()
+        };
+        // 一帧需要 384000 B；额外 1024 B 会被识别为可尝试显示的不完整末帧。
+        let bytes = vec![0x55u8; 385_024];
+        let (layout, warnings) = calculate_layout(&d, bytes.len() as u64);
+        assert_eq!(layout.frame_count, 2);
+        assert!(
+            warnings
+                .iter()
+                .any(|warning| warning.code == "partial_last_frame")
+        );
+        let request = TileRequest {
+            generation: 1,
+            frame: 1,
+            level: 0,
+            tile_x: 0,
+            tile_y: 0,
+            tile_size: 64,
+            mode: DisplayMode::Demosaic,
+            display_min: 0,
+            display_max: 1023,
+        };
+        let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
+        assert_eq!(tile.len(), 64 * 64 * 4);
+        assert!(tile.chunks_exact(4).any(|pixel| pixel[3] == 255));
+    }
 }
