@@ -760,6 +760,18 @@ fn encode_row(
     Ok(row)
 }
 
+fn write_zeroes(writer: &mut impl Write, mut count: usize, context: &str) -> Result<(), String> {
+    const ZEROES: [u8; 8192] = [0; 8192];
+    while count > 0 {
+        let length = count.min(ZEROES.len());
+        writer
+            .write_all(&ZEROES[..length])
+            .map_err(|error| format!("写入{context}失败：{error}"))?;
+        count -= length;
+    }
+    Ok(())
+}
+
 pub fn export_raw(
     data: &[u8],
     source: &RawDescriptor,
@@ -806,12 +818,6 @@ pub fn export_raw(
         align_up(frame_bytes as u64, request.frame_alignment).ok_or("输出帧对齐溢出")?,
     )
     .map_err(|_| "输出帧步长过大")?;
-    let padding = vec![
-        0u8;
-        row_stride
-            .saturating_sub(row_bytes)
-            .max(frame_stride.saturating_sub(frame_bytes))
-    ];
     let mut clipped = 0u64;
     let mut frames_written = 0u64;
     for frame in frame_range {
@@ -840,13 +846,9 @@ pub fn export_raw(
             writer
                 .write_all(&row)
                 .map_err(|e| format!("写入输出文件失败：{e}"))?;
-            writer
-                .write_all(&padding[..row_stride - row_bytes])
-                .map_err(|e| format!("写入行填充失败：{e}"))?;
+            write_zeroes(&mut writer, row_stride - row_bytes, "行填充")?;
         }
-        writer
-            .write_all(&padding[..frame_stride - frame_bytes])
-            .map_err(|e| format!("写入帧填充失败：{e}"))?;
+        write_zeroes(&mut writer, frame_stride - frame_bytes, "帧填充")?;
         frames_written += 1;
     }
     writer

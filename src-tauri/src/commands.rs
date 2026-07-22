@@ -125,7 +125,7 @@ pub fn close_document(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn render_raw_tile(
+pub async fn render_raw_tile(
     request: TileRequest,
     state: State<'_, AppState>,
 ) -> Result<Response, String> {
@@ -142,11 +142,15 @@ pub fn render_raw_tile(
     if request.generation != generation {
         return Err("stale_generation".into());
     }
-    let bytes: &[u8] = match map.as_ref() {
-        Some(value) => value.as_ref(),
-        None => &[],
-    };
-    render_tile(bytes, &descriptor, &layout, &request).map(Response::new)
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes: &[u8] = match map.as_ref() {
+            Some(value) => value.as_ref(),
+            None => &[],
+        };
+        render_tile(bytes, &descriptor, &layout, &request).map(Response::new)
+    })
+    .await
+    .map_err(|error| format!("瓦片渲染任务异常：{error}"))?
 }
 
 #[tauri::command]
@@ -178,7 +182,7 @@ pub fn sample_raw_pixel(
 }
 
 #[tauri::command]
-pub fn export_document(
+pub async fn export_document(
     request: ExportRequest,
     state: State<'_, AppState>,
 ) -> Result<ExportResult, String> {
@@ -191,9 +195,13 @@ pub fn export_document(
             document.layout,
         )
     };
-    let bytes: &[u8] = match map.as_ref() {
-        Some(value) => value.as_ref(),
-        None => &[],
-    };
-    export_raw(bytes, &descriptor, &layout, &request)
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes: &[u8] = match map.as_ref() {
+            Some(value) => value.as_ref(),
+            None => &[],
+        };
+        export_raw(bytes, &descriptor, &layout, &request)
+    })
+    .await
+    .map_err(|error| format!("RAW 导出任务异常：{error}"))?
 }
