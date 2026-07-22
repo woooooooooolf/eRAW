@@ -9,6 +9,7 @@
     "allowImportingTsExtensions": false,
     "isolatedModules": true,
     "moduleDetection": "force",
+    "types": ["vite/client"],
     "noEmit": true,
     "strict": true,
     "noUnusedLocals": true,
@@ -17,4 +18,3 @@
   },
   "include": ["src"]
 }
-

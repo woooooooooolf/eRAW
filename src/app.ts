@@ -1,0 +1,486 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import erawIconUrl from "./assets/eraw-icon.svg";
+import { chooseExportFile, chooseRawFile, exportDocument, openDocument, updateDescriptor } from "./api";
+import { RawViewport } from "./viewport";
+import type {
+  BitAlignment,
+  CfaPattern,
+  DisplayMode,
+  DocumentInfo,
+  Endianness,
+  ExportRequest,
+  Packing,
+  PixelSample,
+  RawDescriptor,
+} from "./types";
+import { DEFAULT_DESCRIPTOR } from "./types";
+
+const VERSION = "0.0.1";
+const STORAGE_KEY = "eraw.rawDescriptor.v1";
+
+function icon(path: string): string {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
+}
+
+const icons = {
+  open: icon("M4 5h6l2 2h8a2 2 0 0 1 2 2v1H7.2L4 17.4V5Zm18 7-4 8H2l4-8h16Z"),
+  export: icon("M13 3v8.2l2.6-2.6L17 10l-5 5-5-5 1.4-1.4 2.6 2.6V3h2Zm-9 14h2v2h12v-2h2v4H4v-4Z"),
+  fit: icon("M4 9V4h5v2H6v3H4Zm11-5h5v5h-2V6h-3V4ZM4 15h2v3h3v2H4v-5Zm14 0h2v5h-5v-2h3v-3Z"),
+  actual: icon("M4 4h16v16H4V4Zm2 2v12h12V6H6Zm2 2h2v2H8V8Zm6 6h2v2h-2v-2Z"),
+  overlay: icon("M3 5h18v14H3V5Zm2 2v10h14V7H5Zm2 2h4v2H7V9Zm0 4h7v2H7v-2Z"),
+  about: icon("M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm-1 7h2v6h-2v-6Zm0-4h2v2h-2V7Z"),
+  panel: icon("M3 4h18v16H3V4Zm2 2v12h4V6H5Zm6 0v12h8V6h-8Z"),
+  warning: icon("M12 3 2 21h20L12 3Zm0 4 6.6 12H5.4L12 7Zm-1 3v5h2v-5h-2Zm0 6.5v2h2v-2h-2Z"),
+};
+
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let size = Math.max(0, value);
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit += 1; }
+  return `${size >= 100 || unit === 0 ? size.toFixed(0) : size.toFixed(2)} ${units[unit]}`;
+}
+
+function loadDescriptor(): RawDescriptor {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return { ...DEFAULT_DESCRIPTOR, ...JSON.parse(saved) as Partial<RawDescriptor> };
+  } catch { /* 使用安全默认值 */ }
+  return { ...DEFAULT_DESCRIPTOR };
+}
+
+export class ErawApp {
+  private readonly root: HTMLElement;
+  private readonly viewport: RawViewport;
+  private descriptor = loadDescriptor();
+  private document: DocumentInfo | null = null;
+  private frame = 0;
+  private displayMode: DisplayMode = "bayer";
+  private overlayEnabled = true;
+  private committing = false;
+  private fullscreen = false;
+  private toastTimer = 0;
+
+  constructor(root: HTMLElement) {
+    this.root = root;
+    root.innerHTML = this.template();
+    this.writeDescriptor(this.descriptor);
+    this.viewport = new RawViewport(this.get("viewport"), {
+      onZoomChange: (zoom) => { this.get("zoom-status").textContent = `${(zoom * 100).toFixed(zoom < 0.1 ? 2 : 1)}%`; },
+      onSampleChange: (sample) => this.updateSample(sample),
+      onRenderStats: (level, loaded, pending) => { this.get("render-status").textContent = `L${level} · ${loaded} tiles${pending ? ` · ${pending} loading` : ""}`; },
+      onError: (message) => this.showToast(message, "error"),
+    });
+    this.bindEvents();
+    this.updateDocumentUi();
+  }
+
+  private get<T extends HTMLElement = HTMLElement>(id: string): T {
+    const element = this.root.querySelector<T>(`#${id}`);
+    if (!element) throw new Error(`缺少界面元素 #${id}`);
+    return element;
+  }
+
+  private template(): string {
+    return `
+      <div class="app-shell">
+        <header class="topbar">
+          <div class="app-brand"><img src="${erawIconUrl}" alt=""/><div><strong>eRAW</strong><small>RAW SENSOR LAB</small></div></div>
+          <div class="toolbar primary-actions">
+            <button id="open-button" class="tool-button accent">${icons.open}<span>打开</span><kbd>Ctrl O</kbd></button>
+            <button id="export-button" class="tool-button" disabled>${icons.export}<span>导出</span><kbd>Ctrl E</kbd></button>
+          </div>
+          <div class="toolbar display-modes" role="group" aria-label="显示模式">
+            <button data-mode="raw">RAW 强度</button>
+            <button class="active" data-mode="bayer">Bayer 点阵</button>
+            <button data-mode="demosaic">Demosaic</button>
+            <div class="channel-menu">
+              <select id="channel-mode" aria-label="通道显示">
+                <option value="bayer">全部通道</option><option value="red">R 平面</option><option value="green">G 平面</option><option value="blue">B 平面</option>
+              </select>
+            </div>
+          </div>
+          <div class="toolbar view-actions">
+            <button id="fit-button" class="icon-button" title="适应窗口 (Ctrl+0)">${icons.fit}</button>
+            <button id="actual-button" class="icon-button" title="实际像素 (Ctrl+1)">${icons.actual}</button>
+            <button id="overlay-button" class="icon-button active" title="尺寸与对齐叠加层">${icons.overlay}</button>
+            <button id="panel-button" class="icon-button active" title="显示或隐藏参数面板">${icons.panel}</button>
+            <button id="about-button" class="icon-button" title="关于 eRAW">${icons.about}</button>
+          </div>
+        </header>
+
+        <div class="workspace">
+          <aside class="sidebar" id="sidebar">
+            <section class="file-summary">
+              <div class="file-icon">RAW</div>
+              <div class="file-copy"><strong id="file-name">未打开图像</strong><span id="file-meta">请选择 *.raw 或 *.bin 文件</span></div>
+            </section>
+
+            <div class="sidebar-scroll">
+              <section class="parameter-section open">
+                <button class="section-title"><span>图像格式</span><i>−</i></button>
+                <div class="section-content field-grid">
+                  ${this.numberField("width", "有效宽度", "px", 1, 100000)}
+                  ${this.numberField("height", "有效高度", "px", 1, 100000)}
+                  <label><span>位深</span><select data-field="bitDepth"><option value="8">8 bit</option><option value="10">10 bit</option><option value="12">12 bit</option><option value="14">14 bit</option><option value="16">16 bit</option></select></label>
+                  <label><span>存储方式</span><select data-field="packing"><option value="unpacked8">Unpacked 8</option><option value="unpacked16">Unpacked 16</option><option value="mipiRaw10">MIPI RAW10</option><option value="mipiRaw12">MIPI RAW12</option></select></label>
+                  <label><span>字节序</span><select data-field="endianness"><option value="little">Little endian</option><option value="big">Big endian</option></select></label>
+                  <label><span>有效位位置</span><select data-field="bitAlignment"><option value="lsb">容器低位 LSB</option><option value="msb">容器高位 MSB</option></select></label>
+                  <label class="wide"><span>CFA 排列</span><select data-field="cfa"><option value="MONO">Mono</option><option value="RGGB">RGGB</option><option value="BGGR">BGGR</option><option value="GBRG">GBRG</option><option value="GRBG">GRBG</option></select></label>
+                </div>
+              </section>
+
+              <section class="parameter-section open">
+                <button class="section-title"><span>行与帧布局</span><i>−</i></button>
+                <div class="section-content field-grid">
+                  ${this.numberField("headerOffset", "文件头偏移", "B", 0)}
+                  ${this.numberField("rowAlignment", "行对齐", "B", 1)}
+                  ${this.numberField("rowStride", "显式行步长", "B", 0, undefined, "0 = 自动")}
+                  ${this.numberField("frameAlignment", "帧对齐", "B", 1)}
+                  ${this.numberField("frameStride", "显式帧步长", "B", 0, undefined, "0 = 自动")}
+                </div>
+                <div class="computed-layout">
+                  <div><span>有效行</span><strong id="row-bytes">—</strong></div>
+                  <div><span>实际行步长</span><strong id="row-stride">—</strong></div>
+                  <div><span>帧数据</span><strong id="frame-bytes">—</strong></div>
+                  <div><span>实际帧步长</span><strong id="frame-stride">—</strong></div>
+                </div>
+              </section>
+
+              <section class="parameter-section open">
+                <button class="section-title"><span>显示范围</span><i>−</i></button>
+                <div class="section-content field-grid">
+                  ${this.numberField("display-min", "显示下限", "DN", 0, 65535, undefined, false)}
+                  ${this.numberField("display-max", "显示上限", "DN", 0, 65535, "0 = 位深最大值", false)}
+                </div>
+                <p class="section-hint">仅影响预览归一化，不修改 RAW 像素值。</p>
+              </section>
+
+              <section class="parameter-section open warnings-section" id="warnings-section">
+                <button class="section-title"><span>诊断信息</span><em id="warning-count">0</em><i>−</i></button>
+                <div class="section-content warnings-list" id="warnings-list"><div class="no-warning">打开文件后显示布局诊断</div></div>
+              </section>
+            </div>
+          </aside>
+
+          <main class="canvas-area">
+            <div class="viewport" id="viewport">
+              <canvas class="raw-canvas"></canvas><canvas class="overlay-canvas"></canvas>
+              <div class="empty-state" id="empty-state">
+                <div class="empty-grid"><span></span><span></span><span></span><span></span></div>
+                <h1>查看传感器的真实输出</h1>
+                <p>打开 RAW 文件，配置尺寸、packing、CFA 和对齐参数</p>
+                <button id="empty-open-button">${icons.open} 打开 RAW 图像</button>
+                <small>滚轮缩放 · 左键拖动 · 双击切换适应窗口/100%</small>
+              </div>
+              <div class="image-scrollbar horizontal"><div class="scroll-thumb"></div></div>
+              <div class="image-scrollbar vertical"><div class="scroll-thumb"></div></div>
+              <div class="canvas-badge" id="canvas-badge">NO DOCUMENT</div>
+            </div>
+            <div class="frame-strip" id="frame-strip">
+              <button id="first-frame" title="第一帧">|‹</button><button id="previous-frame" title="上一帧">‹</button>
+              <div class="frame-counter"><span>FRAME</span><input id="frame-input" type="number" min="1" value="1"/><b>/</b><strong id="frame-total">0</strong></div>
+              <button id="next-frame" title="下一帧">›</button><button id="last-frame" title="最后一帧">›|</button>
+            </div>
+          </main>
+        </div>
+
+        <footer class="statusbar">
+          <button id="status-warning" class="status-warning">${icons.warning}<span>等待文件</span></button>
+          <div class="status-spacer"></div>
+          <span id="pixel-status">X — · Y — · DN —</span><i></i><span id="render-status">WebGL2 ready</span><i></i><span id="zoom-status">100.0%</span>
+        </footer>
+        <div class="toast" id="toast" role="status"></div>
+
+        ${this.exportDialogTemplate()}
+        ${this.aboutDialogTemplate()}
+      </div>`;
+  }
+
+  private numberField(field: string, label: string, unit: string, min: number, max?: number, hint?: string, descriptorField = true): string {
+    return `<label><span>${label}</span><div class="number-input"><input type="number" ${descriptorField ? `data-field="${field}"` : `id="${field}"`} min="${min}" ${max === undefined ? "" : `max="${max}"`} step="1" ${hint ? `placeholder="${hint}"` : ""}/><b>${unit}</b></div></label>`;
+  }
+
+  private exportDialogTemplate(): string {
+    return `<dialog id="export-dialog" class="modal export-modal">
+      <form method="dialog"><header><div><small>DETERMINISTIC CONVERSION</small><h2>导出 RAW 数据</h2></div><button value="cancel" class="dialog-close">×</button></header>
+      <div class="dialog-body">
+        <section><h3>有效区域</h3><div class="export-grid">
+          ${this.exportNumber("crop-x", "起点 X", 0)}${this.exportNumber("crop-y", "起点 Y", 0)}${this.exportNumber("crop-width", "宽度", 1)}${this.exportNumber("crop-height", "高度", 1)}
+        </div><div class="phase-note">输出 CFA：<strong id="export-cfa">—</strong><span>奇数坐标裁剪会自动改变 CFA 相位</span></div></section>
+        <section><h3>输出编码</h3><div class="export-grid">
+          <label><span>存储方式</span><select id="export-packing"><option value="unpacked8">Unpacked 8</option><option value="unpacked16">Unpacked 16</option><option value="mipiRaw10">MIPI RAW10</option><option value="mipiRaw12">MIPI RAW12</option></select></label>
+          <label><span>位深</span><select id="export-depth"><option>8</option><option>10</option><option>12</option><option>14</option><option>16</option></select></label>
+          <label><span>字节序</span><select id="export-endian"><option value="little">Little endian</option><option value="big">Big endian</option></select></label>
+          <label><span>有效位位置</span><select id="export-bit-alignment"><option value="lsb">容器低位 LSB</option><option value="msb">容器高位 MSB</option></select></label>
+          ${this.exportNumber("export-row-alignment", "行对齐", 1)}${this.exportNumber("export-frame-alignment", "帧对齐", 1)}
+          <label><span>像素值映射</span><select id="export-mapping"><option value="preserve">保持数值，超限裁剪</option><option value="scaleFullRange">按满量程缩放</option></select></label>
+          <label><span>帧范围</span><select id="export-frames"><option value="current">仅当前帧</option><option value="all">全部帧</option></select></label>
+        </div></section>
+      </div>
+      <footer><p id="export-summary">输出不包含源文件头，仅包含所选 RAW 帧。</p><div><button value="cancel" class="secondary-button">取消</button><button id="confirm-export" value="default" class="primary-button">选择位置并导出</button></div></footer></form>
+    </dialog>`;
+  }
+
+  private exportNumber(id: string, label: string, min: number): string {
+    return `<label><span>${label}</span><div class="number-input"><input id="${id}" type="number" min="${min}" step="1"/><b>${id.includes("alignment") ? "B" : "px"}</b></div></label>`;
+  }
+
+  private aboutDialogTemplate(): string {
+    return `<dialog id="about-dialog" class="modal about-modal"><form method="dialog">
+      <button value="cancel" class="dialog-close floating">×</button>
+      <div class="about-hero"><img src="${erawIconUrl}" alt="eRAW"/><div><small>RAW SENSOR LAB</small><h2>eRAW</h2><p>V${VERSION}</p></div></div>
+      <div class="about-copy"><p>面向 SoC 与图像传感器适配工作的 RAW 图像查看、诊断与格式转换工具。</p><dl><div><dt>作者</dt><dd>eRAW contributors</dd></div><div><dt>许可证</dt><dd>GNU GPLv3 or later</dd></div><div><dt>渲染</dt><dd>WebGL2 tiled viewport</dd></div><div><dt>平台</dt><dd>Windows · Tauri 2</dd></div></dl><p class="warranty">本程序为自由软件，不提供任何形式的担保。完整许可条款随源代码和安装包提供。</p></div>
+      <footer><button value="cancel" class="primary-button">完成</button></footer>
+    </form></dialog>`;
+  }
+
+  private bindEvents(): void {
+    this.get("open-button").addEventListener("click", () => void this.openFile());
+    this.get("empty-open-button").addEventListener("click", () => void this.openFile());
+    this.get<HTMLButtonElement>("export-button").addEventListener("click", () => this.openExportDialog());
+    this.get("fit-button").addEventListener("click", () => this.viewport.fit());
+    this.get("actual-button").addEventListener("click", () => this.viewport.actualSize());
+    this.get("overlay-button").addEventListener("click", () => {
+      this.overlayEnabled = !this.overlayEnabled;
+      this.get("overlay-button").classList.toggle("active", this.overlayEnabled);
+      this.viewport.setOverlayEnabled(this.overlayEnabled);
+    });
+    this.get("panel-button").addEventListener("click", () => {
+      this.root.querySelector(".app-shell")!.classList.toggle("panel-hidden");
+      this.get("panel-button").classList.toggle("active");
+    });
+    this.get("about-button").addEventListener("click", () => this.get<HTMLDialogElement>("about-dialog").showModal());
+    this.root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => button.addEventListener("click", () => this.setDisplayMode(button.dataset.mode as DisplayMode)));
+    this.get<HTMLSelectElement>("channel-mode").addEventListener("change", (event) => this.setDisplayMode((event.currentTarget as HTMLSelectElement).value as DisplayMode));
+    this.root.querySelectorAll<HTMLElement>("[data-field]").forEach((element) => {
+      if (element instanceof HTMLSelectElement) element.addEventListener("change", () => void this.commitDescriptor());
+      else {
+        element.addEventListener("blur", () => void this.commitDescriptor());
+        element.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); element.blur(); } });
+      }
+    });
+    ["display-min", "display-max"].forEach((id) => {
+      const input = this.get<HTMLInputElement>(id);
+      input.addEventListener("blur", () => this.updateDisplay());
+      input.addEventListener("keydown", (event) => { if (event.key === "Enter") input.blur(); });
+    });
+    this.root.querySelectorAll<HTMLButtonElement>(".section-title").forEach((button) => button.addEventListener("click", () => {
+      const section = button.closest(".parameter-section")!;
+      section.classList.toggle("open");
+      button.querySelector("i")!.textContent = section.classList.contains("open") ? "−" : "+";
+    }));
+    this.get("status-warning").addEventListener("click", () => this.get("warnings-section").scrollIntoView({ behavior: "smooth", block: "start" }));
+    this.get("first-frame").addEventListener("click", () => this.setFrame(0));
+    this.get("previous-frame").addEventListener("click", () => this.setFrame(this.frame - 1));
+    this.get("next-frame").addEventListener("click", () => this.setFrame(this.frame + 1));
+    this.get("last-frame").addEventListener("click", () => this.setFrame((this.document?.layout.frameCount ?? 1) - 1));
+    this.get<HTMLInputElement>("frame-input").addEventListener("change", (event) => this.setFrame(Number((event.currentTarget as HTMLInputElement).value) - 1));
+    this.get("confirm-export").addEventListener("click", (event) => { event.preventDefault(); void this.performExport(); });
+    ["crop-x", "crop-y", "crop-width", "crop-height"].forEach((id) => this.get<HTMLInputElement>(id).addEventListener("input", () => this.updateExportPhase()));
+    this.get<HTMLSelectElement>("export-packing").addEventListener("change", (event) => {
+      const packing = (event.currentTarget as HTMLSelectElement).value;
+      if (packing === "mipiRaw10") this.get<HTMLSelectElement>("export-depth").value = "10";
+      if (packing === "mipiRaw12") this.get<HTMLSelectElement>("export-depth").value = "12";
+    });
+    window.addEventListener("keydown", (event) => this.onKeyDown(event));
+  }
+
+  private async openFile(): Promise<void> {
+    try {
+      const path = await chooseRawFile();
+      if (!path) return;
+      this.showToast("正在映射并分析 RAW 文件…", "busy");
+      const info = await openDocument(path, this.readDescriptor());
+      this.document = info;
+      this.descriptor = info.descriptor;
+      this.frame = 0;
+      this.viewport.setDocument(info);
+      this.updateDocumentUi();
+      this.showToast(`已打开 ${info.name}`, "success");
+    } catch (error) {
+      this.showToast(String(error), "error", 5000);
+    }
+  }
+
+  private readDescriptor(): RawDescriptor {
+    const number = (field: string) => {
+      const value = Number(this.root.querySelector<HTMLInputElement>(`[data-field="${field}"]`)!.value);
+      return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
+    };
+    const value = <T extends string>(field: string) => this.root.querySelector<HTMLSelectElement>(`[data-field="${field}"]`)!.value as T;
+    return {
+      width: number("width"), height: number("height"), bitDepth: Number(value("bitDepth")),
+      packing: value<Packing>("packing"), endianness: value<Endianness>("endianness"), bitAlignment: value<BitAlignment>("bitAlignment"), cfa: value<CfaPattern>("cfa"),
+      rowAlignment: Math.max(1, number("rowAlignment")), rowStride: number("rowStride"), frameAlignment: Math.max(1, number("frameAlignment")), frameStride: number("frameStride"), headerOffset: number("headerOffset"),
+    };
+  }
+
+  private writeDescriptor(descriptor: RawDescriptor): void {
+    for (const [key, value] of Object.entries(descriptor)) {
+      const input = this.root.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-field="${key}"]`);
+      if (input) input.value = String(value);
+    }
+  }
+
+  private async commitDescriptor(): Promise<void> {
+    if (this.committing) return;
+    const descriptor = this.readDescriptor();
+    this.descriptor = descriptor;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(descriptor));
+    if (!this.document) return;
+    this.committing = true;
+    try {
+      const info = await updateDescriptor(descriptor);
+      this.document = info;
+      this.descriptor = info.descriptor;
+      this.frame = Math.min(this.frame, Math.max(0, info.layout.frameCount - 1));
+      this.viewport.setDocument(info, true);
+      this.viewport.setFrame(this.frame);
+      this.updateDocumentUi();
+    } catch (error) {
+      this.showToast(String(error), "error");
+    } finally {
+      this.committing = false;
+    }
+  }
+
+  private updateDocumentUi(): void {
+    const info = this.document;
+    this.get("empty-state").classList.toggle("hidden", Boolean(info));
+    this.get("canvas-badge").textContent = info ? `${info.descriptor.cfa} · ${info.descriptor.bitDepth} BIT` : "NO DOCUMENT";
+    this.get<HTMLButtonElement>("export-button").disabled = !info;
+    this.get("file-name").textContent = info?.name ?? "未打开图像";
+    this.get("file-meta").textContent = info ? `${formatBytes(info.fileSize)} · ${info.descriptor.width} × ${info.descriptor.height}` : "请选择 *.raw 或 *.bin 文件";
+    document.title = info ? `${info.name} — eRAW V${VERSION}` : `eRAW V${VERSION}`;
+    const layout = info?.layout;
+    this.get("row-bytes").textContent = layout ? formatBytes(layout.rowBytes) : "—";
+    this.get("row-stride").textContent = layout ? formatBytes(layout.rowStride) : "—";
+    this.get("frame-bytes").textContent = layout ? formatBytes(layout.frameBytes) : "—";
+    this.get("frame-stride").textContent = layout ? formatBytes(layout.frameStride) : "—";
+    const count = layout?.frameCount ?? 0;
+    this.get("frame-total").textContent = String(count);
+    this.get<HTMLInputElement>("frame-input").value = String(Math.min(this.frame + 1, Math.max(1, count)));
+    this.get<HTMLInputElement>("frame-input").max = String(Math.max(1, count));
+    this.get("frame-strip").classList.toggle("visible", count > 1);
+    this.renderWarnings();
+  }
+
+  private renderWarnings(): void {
+    const warnings = this.document?.warnings ?? [];
+    const list = this.get("warnings-list");
+    list.innerHTML = warnings.length ? warnings.map((warning) => `<div class="warning-item ${warning.severity}"><span></span><div><strong>${warning.severity === "error" ? "错误" : warning.severity === "warning" ? "警告" : "信息"}</strong><p>${warning.message}</p></div></div>`).join("") : `<div class="no-warning">${this.document ? "参数与文件布局匹配，未发现异常" : "打开文件后显示布局诊断"}</div>`;
+    const relevant = warnings.filter((warning) => warning.severity !== "info");
+    this.get("warning-count").textContent = String(relevant.length);
+    const status = this.get("status-warning");
+    status.className = `status-warning ${relevant.some((warning) => warning.severity === "error") ? "error" : relevant.length ? "warning" : "ok"}`;
+    status.querySelector("span")!.textContent = this.document ? (relevant.length ? `${relevant.length} 项需要注意` : "数据布局正常") : "等待文件";
+  }
+
+  private setDisplayMode(mode: DisplayMode): void {
+    this.displayMode = mode;
+    this.root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => button.classList.toggle("active", button.dataset.mode === mode));
+    if (["red", "green", "blue"].includes(mode)) this.get<HTMLSelectElement>("channel-mode").value = mode;
+    else this.get<HTMLSelectElement>("channel-mode").value = "bayer";
+    this.updateDisplay();
+  }
+
+  private updateDisplay(): void {
+    this.viewport.setDisplay({
+      mode: this.displayMode,
+      displayMin: Math.max(0, Number(this.get<HTMLInputElement>("display-min").value) || 0),
+      displayMax: Math.max(0, Number(this.get<HTMLInputElement>("display-max").value) || 0),
+    });
+  }
+
+  private setFrame(frame: number): void {
+    const count = this.document?.layout.frameCount ?? 0;
+    if (!count) return;
+    this.frame = Math.max(0, Math.min(Math.trunc(frame), count - 1));
+    this.viewport.setFrame(this.frame);
+    this.get<HTMLInputElement>("frame-input").value = String(this.frame + 1);
+  }
+
+  private updateSample(sample: PixelSample | null): void {
+    this.get("pixel-status").textContent = sample ? `X ${sample.x} · Y ${sample.y} · ${sample.channel} ${sample.value ?? "N/A"} DN` : "X — · Y — · DN —";
+  }
+
+  private openExportDialog(): void {
+    if (!this.document) return;
+    this.get<HTMLInputElement>("crop-x").value = "0";
+    this.get<HTMLInputElement>("crop-y").value = "0";
+    this.get<HTMLInputElement>("crop-width").value = String(this.document.descriptor.width);
+    this.get<HTMLInputElement>("crop-height").value = String(this.document.descriptor.height);
+    this.get<HTMLSelectElement>("export-packing").value = this.document.descriptor.packing;
+    this.get<HTMLSelectElement>("export-depth").value = String(this.document.descriptor.bitDepth);
+    this.get<HTMLSelectElement>("export-endian").value = this.document.descriptor.endianness;
+    this.get<HTMLSelectElement>("export-bit-alignment").value = this.document.descriptor.bitAlignment;
+    this.get<HTMLInputElement>("export-row-alignment").value = "1";
+    this.get<HTMLInputElement>("export-frame-alignment").value = "1";
+    this.updateExportPhase();
+    this.get<HTMLDialogElement>("export-dialog").showModal();
+  }
+
+  private shiftedCfa(cfa: CfaPattern, x: number, y: number): CfaPattern {
+    if (cfa === "MONO") return cfa;
+    const grid: Record<CfaPattern, CfaPattern[][]> = {
+      MONO: [["MONO"]], RGGB: [["RGGB", "GRBG"], ["GBRG", "BGGR"]], BGGR: [["BGGR", "GBRG"], ["GRBG", "RGGB"]],
+      GBRG: [["GBRG", "BGGR"], ["RGGB", "GRBG"]], GRBG: [["GRBG", "RGGB"], ["BGGR", "GBRG"]],
+    };
+    return grid[cfa][Math.abs(y) % 2][Math.abs(x) % 2];
+  }
+
+  private updateExportPhase(): void {
+    if (!this.document) return;
+    const x = Number(this.get<HTMLInputElement>("crop-x").value) || 0;
+    const y = Number(this.get<HTMLInputElement>("crop-y").value) || 0;
+    this.get("export-cfa").textContent = this.shiftedCfa(this.document.descriptor.cfa, x, y);
+  }
+
+  private async performExport(): Promise<void> {
+    if (!this.document) return;
+    const defaultPath = this.document.path.replace(/(?:\.[^\\/.]+)?$/, "_extracted.raw");
+    try {
+      const path = await chooseExportFile(defaultPath);
+      if (!path) return;
+      const num = (id: string) => Math.max(0, Math.trunc(Number(this.get<HTMLInputElement>(id).value) || 0));
+      const request: ExportRequest = {
+        path, currentFrame: this.frame, frameSelection: this.get<HTMLSelectElement>("export-frames").value as "current" | "all",
+        cropX: num("crop-x"), cropY: num("crop-y"), cropWidth: num("crop-width"), cropHeight: num("crop-height"),
+        packing: this.get<HTMLSelectElement>("export-packing").value as Packing, bitDepth: Number(this.get<HTMLSelectElement>("export-depth").value),
+        endianness: this.get<HTMLSelectElement>("export-endian").value as Endianness, bitAlignment: this.get<HTMLSelectElement>("export-bit-alignment").value as BitAlignment,
+        rowAlignment: Math.max(1, num("export-row-alignment")), frameAlignment: Math.max(1, num("export-frame-alignment")),
+        valueMapping: this.get<HTMLSelectElement>("export-mapping").value as "preserve" | "scaleFullRange",
+      };
+      this.showToast("正在转换并写入 RAW 数据…", "busy", 15000);
+      const result = await exportDocument(request);
+      this.get<HTMLDialogElement>("export-dialog").close();
+      const clipped = result.clippedValues ? `，${result.clippedValues} 个像素被裁剪` : "";
+      this.showToast(`已导出 ${result.framesWritten} 帧 · ${formatBytes(result.bytesWritten)} · ${result.outputCfa}${clipped}`, "success", 6000);
+    } catch (error) {
+      this.showToast(String(error), "error", 6000);
+    }
+  }
+
+  private onKeyDown(event: KeyboardEvent): void {
+    if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); void this.openFile(); }
+    else if (event.ctrlKey && event.key.toLowerCase() === "e" && this.document) { event.preventDefault(); this.openExportDialog(); }
+    else if (event.ctrlKey && event.key === "0") { event.preventDefault(); this.viewport.fit(); }
+    else if (event.ctrlKey && event.key === "1") { event.preventDefault(); this.viewport.actualSize(); }
+    else if (event.key === "F11") { event.preventDefault(); void this.toggleFullscreen(); }
+  }
+
+  private async toggleFullscreen(): Promise<void> {
+    this.fullscreen = !this.fullscreen;
+    try { await getCurrentWindow().setFullscreen(this.fullscreen); } catch { this.root.querySelector(".app-shell")!.classList.toggle("ui-fullscreen", this.fullscreen); }
+  }
+
+  private showToast(message: string, type: "success" | "error" | "busy", duration = 3200): void {
+    const toast = this.get("toast");
+    window.clearTimeout(this.toastTimer);
+    toast.textContent = message.replace(/^Error:\s*/, "");
+    toast.className = `toast visible ${type}`;
+    this.toastTimer = window.setTimeout(() => toast.classList.remove("visible"), duration);
+  }
+}

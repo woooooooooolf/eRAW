@@ -1,13 +1,11 @@
 import "./styles.css";
+import { ErawApp } from "./app";
 
-document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-  <main class="boot-shell">
-    <div class="brand-mark" aria-hidden="true">e</div>
-    <div>
-      <h1>eRAW</h1>
-      <p>RAW sensor data viewer</p>
-      <span>V0.0.1 · 正在建立工作区</span>
-    </div>
-  </main>
-`;
+const root = document.querySelector<HTMLDivElement>("#app");
+if (!root) throw new Error("无法建立 eRAW 应用根节点");
 
+try {
+  new ErawApp(root);
+} catch (error) {
+  root.innerHTML = `<main class="fatal-error"><h1>eRAW 无法启动</h1><p>${String(error)}</p><small>请确认 WebView2 和显卡驱动支持 WebGL2。</small></main>`;
+}
