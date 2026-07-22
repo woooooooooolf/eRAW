@@ -33,7 +33,18 @@ interface AppSettings {
   wheelSpeed: WheelSpeed;
   tileCache: TileCache;
   language: AppLanguage;
+  sidebarWidth: number;
 }
+
+interface RuntimeDiagnostic {
+  message: string;
+  count: number;
+  timestamp: Date;
+}
+
+const DEFAULT_SIDEBAR_WIDTH = 324;
+const MIN_SIDEBAR_WIDTH = 280;
+const MAX_SIDEBAR_WIDTH = 560;
 
 const DEFAULT_SETTINGS: AppSettings = {
   uiFontSize: "standard",
@@ -43,6 +54,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   wheelSpeed: "standard",
   tileCache: "balanced",
   language: "system",
+  sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
 };
 
 function icon(path: string): string {
@@ -69,6 +81,10 @@ function formatBytes(value: number): string {
   return `${size >= 100 || unit === 0 ? size.toFixed(0) : size.toFixed(2)} ${units[unit]}`;
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]!);
+}
+
 function loadSettings(): AppSettings {
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
@@ -82,6 +98,7 @@ function loadSettings(): AppSettings {
         wheelSpeed: ["gentle", "standard", "fast"].includes(value.wheelSpeed ?? "") ? value.wheelSpeed as WheelSpeed : DEFAULT_SETTINGS.wheelSpeed,
         tileCache: ["compact", "balanced", "large"].includes(value.tileCache ?? "") ? value.tileCache as TileCache : DEFAULT_SETTINGS.tileCache,
         language: ["system", "zh-CN"].includes(value.language ?? "") ? value.language as AppLanguage : DEFAULT_SETTINGS.language,
+        sidebarWidth: Number.isFinite(value.sidebarWidth) ? Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, Math.trunc(value.sidebarWidth!))) : DEFAULT_SETTINGS.sidebarWidth,
       };
     }
   } catch { /* 使用安全默认值 */ }
@@ -106,8 +123,14 @@ export class ErawApp {
   private frame = 0;
   private displayMode: DisplayMode = "bayer";
   private committing = false;
+  private commitRevision = 0;
   private fullscreen = false;
   private toastTimer = 0;
+  private sidebarWidth = this.settings.sidebarWidth;
+  private sidebarResizeStartX = 0;
+  private sidebarResizeStartWidth = 0;
+  private settingsFormSidebarWidth = this.settings.sidebarWidth;
+  private runtimeDiagnostics: RuntimeDiagnostic[] = [];
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -117,7 +140,7 @@ export class ErawApp {
       onZoomChange: (zoom) => { this.get("zoom-status").textContent = `${(zoom * 100).toFixed(zoom < 0.1 ? 2 : 1)}%`; },
       onSampleChange: (sample) => this.updateSample(sample),
       onRenderStats: (level, loaded, pending) => { this.get("render-status").textContent = `L${level} · ${loaded} tiles${pending ? ` · ${pending} loading` : ""}`; },
-      onError: (message) => this.showToast(message, "error"),
+      onError: (message) => this.reportRuntimeError(message),
     });
     this.applySettings();
     this.bindEvents();
@@ -168,24 +191,23 @@ export class ErawApp {
               <section class="parameter-section open">
                 <button class="section-title"><span>图像格式</span><i>−</i></button>
                 <div class="section-content field-grid">
-                  ${this.numberField("width", "有效宽度", "px", 1, 100000)}
-                  ${this.numberField("height", "有效高度", "px", 1, 100000)}
-                  <label><span>位深</span><select data-field="bitDepth"><option value="8">8 bit</option><option value="10">10 bit</option><option value="12">12 bit</option><option value="14">14 bit</option><option value="16">16 bit</option></select></label>
-                  <label><span>存储方式</span><select data-field="packing"><option value="unpacked8">Unpacked 8</option><option value="unpacked16">Unpacked 16</option><option value="mipiRaw10">MIPI RAW10</option><option value="mipiRaw12">MIPI RAW12</option></select></label>
-                  <label><span>字节序</span><select data-field="endianness"><option value="little">Little endian</option><option value="big">Big endian</option></select></label>
-                  <label><span>有效位位置</span><select data-field="bitAlignment"><option value="lsb">容器低位 LSB</option><option value="msb">容器高位 MSB</option></select></label>
-                  <label class="wide"><span>CFA 排列</span><select data-field="cfa"><option value="MONO">Mono</option><option value="RGGB">RGGB</option><option value="BGGR">BGGR</option><option value="GBRG">GBRG</option><option value="GRBG">GRBG</option></select></label>
+                  ${this.dimensionField()}
+                  ${this.selectField("bitDepth", "位深", `<option value="8">8 bit</option><option value="10">10 bit</option><option value="12">12 bit</option><option value="14">14 bit</option><option value="16">16 bit</option>`)}
+                  ${this.selectField("packing", "存储方式", `<option value="unpacked8">Unpacked 8</option><option value="unpacked16">Unpacked 16</option><option value="mipiRaw10">MIPI RAW10</option><option value="mipiRaw12">MIPI RAW12</option>`)}
+                  ${this.segmentedField("endianness", "字节序", [["little", "Little"], ["big", "Big"]])}
+                  ${this.segmentedField("bitAlignment", "有效位位置", [["lsb", "低位 LSB"], ["msb", "高位 MSB"]])}
+                  ${this.selectField("cfa", "CFA 排列", `<option value="MONO">Mono</option><option value="RGGB">RGGB</option><option value="BGGR">BGGR</option><option value="GBRG">GBRG</option><option value="GRBG">GRBG</option>`)}
                 </div>
               </section>
 
               <section class="parameter-section open">
                 <button class="section-title"><span>行与帧布局</span><i>−</i></button>
                 <div class="section-content field-grid">
-                  ${this.numberField("headerOffset", "文件头偏移", "B", 0)}
-                  ${this.numberField("rowAlignment", "行对齐", "B", 1)}
-                  ${this.numberField("rowStride", "显式行步长", "B", 0, undefined, "0 = 自动")}
-                  ${this.numberField("frameAlignment", "帧对齐", "B", 1)}
-                  ${this.numberField("frameStride", "显式帧步长", "B", 0, undefined, "0 = 自动")}
+                  ${this.numberField("headerOffset", "文件头偏移", "B", 0, undefined, undefined, true, true)}
+                  ${this.numberField("rowAlignment", "行对齐", "B", 1, undefined, undefined, true, true)}
+                  ${this.numberField("rowStride", "显式行步长", "B", 0, undefined, "0 = 自动", true, true)}
+                  ${this.numberField("frameAlignment", "帧对齐", "B", 1, undefined, undefined, true, true)}
+                  ${this.numberField("frameStride", "显式帧步长", "B", 0, undefined, "0 = 自动", true, true)}
                 </div>
                 <div class="computed-layout">
                   <div><span>有效行</span><strong id="row-bytes">—</strong></div>
@@ -203,13 +225,10 @@ export class ErawApp {
                 </div>
                 <p class="section-hint">仅影响预览归一化，不修改 RAW 像素值。</p>
               </section>
-
-              <section class="parameter-section open warnings-section" id="warnings-section">
-                <button class="section-title"><span>诊断信息</span><em id="warning-count">0</em><i>−</i></button>
-                <div class="section-content warnings-list" id="warnings-list"><div class="no-warning">打开文件后显示布局诊断</div></div>
-              </section>
             </div>
           </aside>
+
+          <div id="sidebar-resizer" class="sidebar-resizer" role="separator" aria-label="调整参数面板宽度" aria-orientation="vertical" tabindex="0"></div>
 
           <main class="canvas-area">
             <div class="viewport" id="viewport">
@@ -232,8 +251,16 @@ export class ErawApp {
           </main>
         </div>
 
+        <section id="diagnostics-drawer" class="diagnostics-drawer" aria-hidden="true">
+          <header>
+            <div><strong>诊断信息</strong><span id="diagnostics-summary">等待文件</span></div>
+            <button id="close-diagnostics" class="diagnostics-close" title="关闭诊断面板" aria-label="关闭诊断面板">×</button>
+          </header>
+          <div id="diagnostics-list" class="diagnostics-list"><div class="no-warning">打开文件后显示布局诊断与运行时错误</div></div>
+        </section>
+
         <footer class="statusbar">
-          <button id="status-warning" class="status-warning">${icons.warning}<span>等待文件</span></button>
+          <button id="status-warning" class="status-warning" aria-expanded="false" aria-controls="diagnostics-drawer">${icons.warning}<span>诊断</span><b id="diagnostics-count" hidden>0</b></button>
           <div class="status-spacer"></div>
           <span id="pixel-status">X — · Y — · DN —</span><i></i><span id="render-status">WebGL2 ready</span><i></i><span id="zoom-status">100.0%</span>
         </footer>
@@ -245,8 +272,28 @@ export class ErawApp {
       </div>`;
   }
 
-  private numberField(field: string, label: string, unit: string, min: number, max?: number, hint?: string, descriptorField = true): string {
-    return `<label><span>${label}</span><div class="number-input"><input type="number" ${descriptorField ? `data-field="${field}"` : `id="${field}"`} min="${min}" ${max === undefined ? "" : `max="${max}"`} step="1" ${hint ? `placeholder="${hint}"` : ""}/><b>${unit}</b></div></label>`;
+  private dimensionField(): string {
+    return `<div class="parameter-row dimension-row"><span class="field-label">有效分辨率</span><div class="dimension-control">
+      <div class="number-input"><input id="descriptor-width" data-field="width" type="number" min="1" max="100000" step="1" aria-label="有效宽度"/></div>
+      <i>×</i>
+      <div class="number-input"><input id="descriptor-height" data-field="height" type="number" min="1" max="100000" step="1" aria-label="有效高度"/></div>
+    </div></div>`;
+  }
+
+  private selectField(field: string, label: string, options: string): string {
+    return `<div class="parameter-row"><label class="field-label" for="descriptor-${field}">${label}</label><select id="descriptor-${field}" data-field="${field}">${options}</select></div>`;
+  }
+
+  private segmentedField(field: string, label: string, options: Array<[string, string]>): string {
+    const buttons = options.map(([value, text]) => `<button type="button" data-value="${value}" aria-pressed="false">${text}</button>`).join("");
+    return `<div class="parameter-row"><span class="field-label" id="${field}-label">${label}</span><div class="segmented-control" data-field="${field}" role="group" aria-labelledby="${field}-label">${buttons}</div></div>`;
+  }
+
+  private numberField(field: string, label: string, unit: string, min: number, max?: number, hint?: string, descriptorField = true, adjustable = false): string {
+    const inputId = descriptorField ? `descriptor-${field}` : field;
+    const input = `<div class="number-input"><input id="${inputId}" type="number" ${descriptorField ? `data-field="${field}"` : ""} min="${min}" ${max === undefined ? "" : `max="${max}"`} step="1" ${hint ? `placeholder="${hint}"` : ""}/><b>${unit}</b></div>`;
+    const control = adjustable ? `<div class="stepper-control"><button type="button" data-step-target="${field}" data-step="-1" aria-label="减小${label}">−</button>${input}<button type="button" data-step-target="${field}" data-step="1" aria-label="增大${label}">+</button></div>` : input;
+    return `<div class="parameter-row"><label class="field-label" for="${inputId}">${label}</label>${control}</div>`;
   }
 
   private exportDialogTemplate(): string {
@@ -323,11 +370,25 @@ export class ErawApp {
     this.get<HTMLSelectElement>("channel-mode").addEventListener("change", (event) => this.setDisplayMode((event.currentTarget as HTMLSelectElement).value as DisplayMode));
     this.root.querySelectorAll<HTMLElement>("[data-field]").forEach((element) => {
       if (element instanceof HTMLSelectElement) element.addEventListener("change", () => void this.commitDescriptor());
-      else {
+      else if (element instanceof HTMLInputElement) {
         element.addEventListener("blur", () => void this.commitDescriptor());
         element.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); element.blur(); } });
+      } else if (element.classList.contains("segmented-control")) {
+        element.querySelectorAll<HTMLButtonElement>("[data-value]").forEach((button) => button.addEventListener("click", () => {
+          this.setSegmentedValue(element, button.dataset.value ?? "");
+          void this.commitDescriptor();
+        }));
       }
     });
+    this.root.querySelectorAll<HTMLButtonElement>("[data-step-target]").forEach((button) => button.addEventListener("click", () => {
+      const field = button.dataset.stepTarget!;
+      const input = this.root.querySelector<HTMLInputElement>(`input[data-field="${field}"]`)!;
+      const min = Number(input.min || 0);
+      const max = input.max ? Number(input.max) : Number.MAX_SAFE_INTEGER;
+      const next = Math.max(min, Math.min(max, Math.trunc(Number(input.value) || 0) + Number(button.dataset.step)));
+      input.value = String(next);
+      void this.commitDescriptor();
+    }));
     ["display-min", "display-max"].forEach((id) => {
       const input = this.get<HTMLInputElement>(id);
       input.addEventListener("blur", () => this.updateDisplay());
@@ -338,7 +399,9 @@ export class ErawApp {
       section.classList.toggle("open");
       button.querySelector("i")!.textContent = section.classList.contains("open") ? "−" : "+";
     }));
-    this.get("status-warning").addEventListener("click", () => this.get("warnings-section").scrollIntoView({ behavior: "smooth", block: "start" }));
+    this.get("status-warning").addEventListener("click", () => this.toggleDiagnostics());
+    this.get("close-diagnostics").addEventListener("click", () => this.setDiagnosticsOpen(false));
+    this.bindSidebarResize();
     this.get("first-frame").addEventListener("click", () => this.setFrame(0));
     this.get("previous-frame").addEventListener("click", () => this.setFrame(this.frame - 1));
     this.get("next-frame").addEventListener("click", () => this.setFrame(this.frame + 1));
@@ -354,6 +417,7 @@ export class ErawApp {
       if (packing === "mipiRaw12") this.get<HTMLSelectElement>("export-depth").value = "12";
     });
     window.addEventListener("keydown", (event) => this.onKeyDown(event));
+    window.addEventListener("resize", () => this.setSidebarWidth(this.settings.sidebarWidth, false));
   }
 
   private async openFile(): Promise<void> {
@@ -370,16 +434,16 @@ export class ErawApp {
       this.updateDocumentUi();
       this.showToast(`已打开 ${info.name}`, "success");
     } catch (error) {
-      this.showToast(String(error), "error", 5000);
+      this.reportRuntimeError(String(error));
     }
   }
 
   private readDescriptor(): RawDescriptor {
     const number = (field: string) => {
-      const value = Number(this.root.querySelector<HTMLInputElement>(`[data-field="${field}"]`)!.value);
+      const value = Number(this.descriptorFieldValue(field));
       return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
     };
-    const value = <T extends string>(field: string) => this.root.querySelector<HTMLSelectElement>(`[data-field="${field}"]`)!.value as T;
+    const value = <T extends string>(field: string) => this.descriptorFieldValue(field) as T;
     return {
       width: number("width"), height: number("height"), bitDepth: Number(value("bitDepth")),
       packing: value<Packing>("packing"), endianness: value<Endianness>("endianness"), bitAlignment: value<BitAlignment>("bitAlignment"), cfa: value<CfaPattern>("cfa"),
@@ -389,28 +453,51 @@ export class ErawApp {
 
   private writeDescriptor(descriptor: RawDescriptor): void {
     for (const [key, value] of Object.entries(descriptor)) {
-      const input = this.root.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-field="${key}"]`);
-      if (input) input.value = String(value);
+      const field = this.root.querySelector<HTMLElement>(`[data-field="${key}"]`);
+      if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) field.value = String(value);
+      else if (field?.classList.contains("segmented-control")) this.setSegmentedValue(field, String(value));
     }
   }
 
+  private descriptorFieldValue(field: string): string {
+    const element = this.root.querySelector<HTMLElement>(`[data-field="${field}"]`);
+    if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement) return element.value;
+    return element?.querySelector<HTMLButtonElement>("[data-value].active")?.dataset.value ?? "";
+  }
+
+  private setSegmentedValue(control: HTMLElement, value: string): void {
+    control.querySelectorAll<HTMLButtonElement>("[data-value]").forEach((button) => {
+      const active = button.dataset.value === value;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+  }
+
   private async commitDescriptor(): Promise<void> {
+    this.commitRevision += 1;
     if (this.committing) return;
-    const descriptor = this.readDescriptor();
-    this.descriptor = descriptor;
-    if (this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(descriptor));
-    if (!this.document) return;
     this.committing = true;
     try {
-      const info = await updateDescriptor(descriptor);
-      this.document = info;
-      this.descriptor = info.descriptor;
-      this.frame = Math.min(this.frame, Math.max(0, info.layout.frameCount - 1));
-      this.viewport.setDocument(info, true);
-      this.viewport.setFrame(this.frame);
-      this.updateDocumentUi();
-    } catch (error) {
-      this.showToast(String(error), "error");
+      while (true) {
+        const revision = this.commitRevision;
+        const descriptor = this.readDescriptor();
+        this.descriptor = descriptor;
+        if (this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(descriptor));
+        if (this.document) {
+          try {
+            const info = await updateDescriptor(descriptor);
+            this.document = info;
+            this.descriptor = info.descriptor;
+            this.frame = Math.min(this.frame, Math.max(0, info.layout.frameCount - 1));
+            this.viewport.setDocument(info, true);
+            this.viewport.setFrame(this.frame);
+            this.updateDocumentUi();
+          } catch (error) {
+            this.reportRuntimeError(String(error));
+          }
+        }
+        if (revision === this.commitRevision) break;
+      }
     } finally {
       this.committing = false;
     }
@@ -433,18 +520,103 @@ export class ErawApp {
     this.get<HTMLInputElement>("frame-input").value = String(Math.min(this.frame + 1, Math.max(1, count)));
     this.get<HTMLInputElement>("frame-input").max = String(Math.max(1, count));
     this.get("frame-strip").classList.toggle("visible", count > 1);
-    this.renderWarnings();
+    this.renderDiagnostics();
   }
 
-  private renderWarnings(): void {
+  private renderDiagnostics(): void {
     const warnings = this.document?.warnings ?? [];
-    const list = this.get("warnings-list");
-    list.innerHTML = warnings.length ? warnings.map((warning) => `<div class="warning-item ${warning.severity}"><span></span><div><strong>${warning.severity === "error" ? "错误" : warning.severity === "warning" ? "警告" : "信息"}</strong><p>${warning.message}</p></div></div>`).join("") : `<div class="no-warning">${this.document ? "参数与文件布局匹配，未发现异常" : "打开文件后显示布局诊断"}</div>`;
+    const warningMarkup = warnings.map((warning) => `<div class="warning-item ${warning.severity}"><span></span><div><strong>${warning.severity === "error" ? "错误" : warning.severity === "warning" ? "警告" : "信息"}<small>布局诊断</small></strong><p>${escapeHtml(warning.message)}</p></div></div>`);
+    const runtimeMarkup = this.runtimeDiagnostics.map((diagnostic) => `<div class="warning-item error runtime"><span></span><div><strong>运行时错误<small>${diagnostic.timestamp.toLocaleTimeString("zh-CN", { hour12: false })}${diagnostic.count > 1 ? ` · 重复 ${diagnostic.count} 次` : ""}</small></strong><p>${escapeHtml(diagnostic.message)}</p></div></div>`);
+    const list = this.get("diagnostics-list");
+    const entries = [...runtimeMarkup, ...warningMarkup];
+    list.innerHTML = entries.length ? entries.join("") : `<div class="no-warning">${this.document ? "参数与文件布局匹配，未发现异常" : "打开文件后显示布局诊断与运行时错误"}</div>`;
     const relevant = warnings.filter((warning) => warning.severity !== "info");
-    this.get("warning-count").textContent = String(relevant.length);
+    const issueCount = relevant.length + this.runtimeDiagnostics.length;
+    const errorPresent = this.runtimeDiagnostics.length > 0 || relevant.some((warning) => warning.severity === "error");
+    const count = this.get("diagnostics-count");
+    count.textContent = String(issueCount);
+    count.toggleAttribute("hidden", issueCount === 0);
+    this.get("diagnostics-summary").textContent = issueCount ? `${issueCount} 项需要注意` : this.document ? "当前数据布局正常" : "等待文件";
     const status = this.get("status-warning");
-    status.className = `status-warning ${relevant.some((warning) => warning.severity === "error") ? "error" : relevant.length ? "warning" : "ok"}`;
-    status.querySelector("span")!.textContent = this.document ? (relevant.length ? `${relevant.length} 项需要注意` : "数据布局正常") : "等待文件";
+    status.className = `status-warning ${errorPresent ? "error" : relevant.length ? "warning" : "ok"}`;
+  }
+
+  private reportRuntimeError(message: string, duration = 5000): void {
+    const normalized = message.replace(/^Error:\s*/, "").trim();
+    const existing = this.runtimeDiagnostics.find((diagnostic) => diagnostic.message === normalized);
+    if (existing) {
+      existing.count += 1;
+      existing.timestamp = new Date();
+      this.runtimeDiagnostics = [existing, ...this.runtimeDiagnostics.filter((diagnostic) => diagnostic !== existing)];
+    } else {
+      this.runtimeDiagnostics.unshift({ message: normalized, count: 1, timestamp: new Date() });
+      this.runtimeDiagnostics = this.runtimeDiagnostics.slice(0, 50);
+    }
+    this.renderDiagnostics();
+    this.showToast(normalized, "error", duration);
+  }
+
+  private toggleDiagnostics(): void {
+    const shell = this.root.querySelector<HTMLElement>(".app-shell")!;
+    this.setDiagnosticsOpen(!shell.classList.contains("diagnostics-open"));
+  }
+
+  private setDiagnosticsOpen(open: boolean): void {
+    const shell = this.root.querySelector<HTMLElement>(".app-shell")!;
+    shell.classList.toggle("diagnostics-open", open);
+    this.get("diagnostics-drawer").setAttribute("aria-hidden", String(!open));
+    this.get("status-warning").setAttribute("aria-expanded", String(open));
+  }
+
+  private bindSidebarResize(): void {
+    const resizer = this.get("sidebar-resizer");
+    const stop = (event: PointerEvent) => {
+      if (!resizer.hasPointerCapture(event.pointerId)) return;
+      resizer.releasePointerCapture(event.pointerId);
+      this.root.querySelector(".app-shell")!.classList.remove("resizing-sidebar");
+      this.settings.sidebarWidth = this.sidebarWidth;
+      this.persistSettings();
+    };
+    resizer.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      this.sidebarResizeStartX = event.clientX;
+      this.sidebarResizeStartWidth = this.sidebarWidth;
+      resizer.setPointerCapture(event.pointerId);
+      this.root.querySelector(".app-shell")!.classList.add("resizing-sidebar");
+    });
+    resizer.addEventListener("pointermove", (event) => {
+      if (resizer.hasPointerCapture(event.pointerId)) this.setSidebarWidth(this.sidebarResizeStartWidth + event.clientX - this.sidebarResizeStartX, false);
+    });
+    resizer.addEventListener("pointerup", stop);
+    resizer.addEventListener("pointercancel", stop);
+    resizer.addEventListener("dblclick", () => {
+      this.setSidebarWidth(DEFAULT_SIDEBAR_WIDTH, true);
+    });
+    resizer.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home") return;
+      event.preventDefault();
+      const next = event.key === "Home" ? DEFAULT_SIDEBAR_WIDTH : this.sidebarWidth + (event.key === "ArrowLeft" ? -16 : 16);
+      this.setSidebarWidth(next, true);
+    });
+  }
+
+  private setSidebarWidth(width: number, persist: boolean): void {
+    const windowLimit = Math.max(MIN_SIDEBAR_WIDTH, Math.floor(window.innerWidth * 0.45));
+    this.sidebarWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, windowLimit, Math.round(width)));
+    this.root.querySelector<HTMLElement>(".app-shell")!.style.setProperty("--sidebar-width", `${this.sidebarWidth}px`);
+    const resizer = this.get("sidebar-resizer");
+    resizer.setAttribute("aria-valuemin", String(MIN_SIDEBAR_WIDTH));
+    resizer.setAttribute("aria-valuemax", String(Math.min(MAX_SIDEBAR_WIDTH, windowLimit)));
+    resizer.setAttribute("aria-valuenow", String(this.sidebarWidth));
+    if (persist) {
+      this.settings.sidebarWidth = this.sidebarWidth;
+      this.persistSettings();
+    }
+  }
+
+  private persistSettings(): void {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
   }
 
   private setDisplayMode(mode: DisplayMode): void {
@@ -528,12 +700,13 @@ export class ErawApp {
       const clipped = result.clippedValues ? `，${result.clippedValues} 个像素被裁剪` : "";
       this.showToast(`已导出 ${result.framesWritten} 帧 · ${formatBytes(result.bytesWritten)} · ${result.outputCfa}${clipped}`, "success", 6000);
     } catch (error) {
-      this.showToast(String(error), "error", 6000);
+      this.reportRuntimeError(String(error), 6000);
     }
   }
 
   private onKeyDown(event: KeyboardEvent): void {
-    if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); void this.openFile(); }
+    if (event.key === "Escape" && this.root.querySelector(".app-shell")!.classList.contains("diagnostics-open")) { event.preventDefault(); this.setDiagnosticsOpen(false); }
+    else if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); void this.openFile(); }
     else if (event.ctrlKey && event.key.toLowerCase() === "e" && this.document) { event.preventDefault(); this.openExportDialog(); }
     else if (event.ctrlKey && event.key === "0") { event.preventDefault(); this.viewport.fit(); }
     else if (event.ctrlKey && event.key === "1") { event.preventDefault(); this.viewport.actualSize(); }
@@ -551,6 +724,7 @@ export class ErawApp {
   }
 
   private writeSettingsForm(settings: AppSettings): void {
+    this.settingsFormSidebarWidth = settings.sidebarWidth;
     this.get<HTMLSelectElement>("setting-font-size").value = settings.uiFontSize;
     this.get<HTMLInputElement>("setting-reduce-motion").checked = settings.reduceMotion;
     this.get<HTMLSelectElement>("setting-open-view").value = settings.openView;
@@ -569,8 +743,9 @@ export class ErawApp {
       wheelSpeed: this.get<HTMLSelectElement>("setting-wheel-speed").value as WheelSpeed,
       tileCache: this.get<HTMLSelectElement>("setting-tile-cache").value as TileCache,
       language: this.get<HTMLSelectElement>("setting-language").value as AppLanguage,
+      sidebarWidth: this.settingsFormSidebarWidth,
     };
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
+    this.persistSettings();
     if (this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(this.descriptor));
     else localStorage.removeItem(STORAGE_KEY);
     this.applySettings();
@@ -584,6 +759,7 @@ export class ErawApp {
     const wheelSensitivity: Record<WheelSpeed, number> = { gentle: 0.001, standard: 0.0015, fast: 0.0022 };
     const maxTextures: Record<TileCache, number> = { compact: 128, balanced: 256, large: 512 };
     this.viewport.setPreferences({ wheelSensitivity: wheelSensitivity[this.settings.wheelSpeed], maxTextures: maxTextures[this.settings.tileCache] });
+    this.setSidebarWidth(this.settings.sidebarWidth, false);
   }
 
   private showToast(message: string, type: "success" | "error" | "busy", duration = 3200): void {
