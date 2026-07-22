@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "eRAW",
+  "version": "0.0.1",
+  "identifier": "io.github.eraw.viewer",
+  "build": {
+    "beforeDevCommand": "npm.cmd run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm.cmd run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "eRAW V0.0.1",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 960,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "shortDescription": "RAW sensor data viewer and converter",
+    "longDescription": "A RAW sensor data viewer, debugger and deterministic format converter for SoC bring-up.",
+    "category": "DeveloperTool",
+    "copyright": "Copyright © 2026 eRAW contributors",
+    "license": "GPL-3.0-or-later"
+  }
+}
+

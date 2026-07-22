@@ -1,0 +1,23 @@
+[package]
+name = "eraw"
+version = "0.0.1"
+description = "RAW sensor data viewer and converter"
+authors = ["eRAW contributors"]
+license = "GPL-3.0-or-later"
+repository = ""
+edition = "2024"
+rust-version = "1.85"
+
+[lib]
+name = "eraw_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+
