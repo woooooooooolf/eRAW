@@ -15,7 +15,7 @@ import type {
 } from "./types";
 import { DEFAULT_DESCRIPTOR } from "./types";
 
-const VERSION = "0.0.2";
+const VERSION = "0.0.3";
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
 
@@ -299,7 +299,7 @@ export class ErawApp {
         <section class="settings-group"><div class="settings-heading"><h3>性能</h3><p>更大的 GPU 缓存可减少超大图像来回拖动时的瓦片重载。</p></div>
           <label class="settings-row"><div><strong>GPU 瓦片缓存</strong><span>只缓存预览纹理，不复制完整 RAW 文件</span></div><select id="setting-tile-cache"><option value="compact">32 MiB</option><option value="balanced">64 MiB（推荐）</option><option value="large">128 MiB</option></select></label>
         </section>
-        <section class="settings-group"><div class="settings-heading"><h3>语言</h3><p>V0.0.2 内置简体中文；此入口将用于后续语言包与区域格式。</p></div>
+        <section class="settings-group"><div class="settings-heading"><h3>语言</h3><p>当前版本内置简体中文；此入口将用于后续语言包与区域格式。</p></div>
           <label class="settings-row"><div><strong>界面语言</strong><span>“跟随系统”在当前版本回退为简体中文</span></div><select id="setting-language"><option value="system">跟随系统</option><option value="zh-CN">简体中文</option></select></label>
         </section>
       </div>
