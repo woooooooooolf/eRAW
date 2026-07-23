@@ -13,6 +13,7 @@ pub enum Packing {
     Unpacked16,
     MipiRaw10,
     MipiRaw12,
+    MipiRaw14,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -130,6 +131,7 @@ pub fn minimum_row_bytes(descriptor: &RawDescriptor) -> Option<u64> {
         Packing::Unpacked16 => width.checked_mul(2),
         Packing::MipiRaw10 => width.checked_add(3)?.checked_div(4)?.checked_mul(5),
         Packing::MipiRaw12 => width.checked_add(1)?.checked_div(2)?.checked_mul(3),
+        Packing::MipiRaw14 => width.checked_add(3)?.checked_div(4)?.checked_mul(7),
     }
 }
 
@@ -161,12 +163,17 @@ pub fn calculate_layout(
         Packing::MipiRaw10 if descriptor.bit_depth != 10 => warnings.push(RawWarning::new(
             WarningSeverity::Warning,
             "packing_depth_mismatch",
-            "MIPI RAW10 固定按 10 bit 解码；当前位深仅用于显示范围",
+            "MIPI RAW10 固定按 10 bit 解码；当前位深设置与打包格式不一致",
         )),
         Packing::MipiRaw12 if descriptor.bit_depth != 12 => warnings.push(RawWarning::new(
             WarningSeverity::Warning,
             "packing_depth_mismatch",
-            "MIPI RAW12 固定按 12 bit 解码；当前位深仅用于显示范围",
+            "MIPI RAW12 固定按 12 bit 解码；当前位深设置与打包格式不一致",
+        )),
+        Packing::MipiRaw14 if descriptor.bit_depth != 14 => warnings.push(RawWarning::new(
+            WarningSeverity::Warning,
+            "packing_depth_mismatch",
+            "MIPI RAW14 固定按 14 bit 解码；当前位深设置与打包格式不一致",
         )),
         _ => {}
     }
@@ -262,6 +269,7 @@ fn container_bit_depth(packing: Packing) -> u8 {
         Packing::Unpacked16 => 16,
         Packing::MipiRaw10 => 10,
         Packing::MipiRaw12 => 12,
+        Packing::MipiRaw14 => 14,
     }
 }
 
@@ -306,6 +314,22 @@ pub fn read_pixel(
             let high = u16::from(read(base.checked_add(lane)?)?);
             let lows = u16::from(read(base.checked_add(2)?)?);
             (high << 4) | ((lows >> (lane * 4)) & 0x0f)
+        }
+        Packing::MipiRaw14 => {
+            let group = u64::from(x / 4);
+            let lane = u64::from(x % 4);
+            let base = row_base.checked_add(group.checked_mul(7)?)?;
+            let high = u16::from(read(base.checked_add(lane)?)?) << 6;
+            let packed_a = u16::from(read(base.checked_add(4)?)?);
+            let packed_b = u16::from(read(base.checked_add(5)?)?);
+            let packed_c = u16::from(read(base.checked_add(6)?)?);
+            let low = match lane {
+                0 => packed_a & 0x3f,
+                1 => ((packed_a >> 6) & 0x03) | ((packed_b & 0x0f) << 2),
+                2 => ((packed_b >> 4) & 0x0f) | ((packed_c & 0x03) << 4),
+                _ => (packed_c >> 2) & 0x3f,
+            };
+            high | low
         }
     };
     let container_bits = container_bit_depth(descriptor.packing);
@@ -753,6 +777,22 @@ fn encode_row(
                 row[base + 2] = ((a & 15) | ((b & 15) << 4)) as u8;
             }
         }
+        Packing::MipiRaw14 => {
+            if depth != 14 {
+                return Err("MIPI RAW14 输出要求 14 bit 位深".into());
+            }
+            for (group, chunk) in values.chunks(4).enumerate() {
+                let base = group * 7;
+                let pixels = [0, 1, 2, 3].map(|lane| chunk.get(lane).copied().unwrap_or(0));
+                for (lane, value) in pixels.iter().enumerate() {
+                    row[base + lane] = (value >> 6) as u8;
+                }
+                let lows = pixels.map(|value| (value & 0x3f) as u8);
+                row[base + 4] = lows[0] | ((lows[1] & 0x03) << 6);
+                row[base + 5] = (lows[1] >> 2) | ((lows[2] & 0x0f) << 4);
+                row[base + 6] = (lows[2] >> 4) | (lows[3] << 2);
+            }
+        }
     }
     Ok(row)
 }
@@ -930,6 +970,52 @@ mod tests {
         let (layout, _) = calculate_layout(&d, 3);
         assert_eq!(read_pixel(&bytes, &d, &layout, 0, 0, 0), Some(values[0]));
         assert_eq!(read_pixel(&bytes, &d, &layout, 0, 1, 0), Some(values[1]));
+    }
+
+    #[test]
+    fn encodes_and_decodes_mipi_raw14_group() {
+        let values = [0x001u16, 0x123, 0x2aaa, 0x3fff];
+        let bytes = encode_row(
+            &values,
+            Packing::MipiRaw14,
+            14,
+            Endianness::Little,
+            BitAlignment::Lsb,
+        )
+        .unwrap();
+        assert_eq!(bytes, [0x00, 0x04, 0xaa, 0xff, 0xc1, 0xa8, 0xfe]);
+        let d = RawDescriptor {
+            width: 4,
+            height: 1,
+            bit_depth: 14,
+            packing: Packing::MipiRaw14,
+            ..RawDescriptor::default()
+        };
+        let (layout, _) = calculate_layout(&d, bytes.len() as u64);
+        assert_eq!(layout.row_bytes, 7);
+        for (x, expected) in values.into_iter().enumerate() {
+            assert_eq!(
+                read_pixel(&bytes, &d, &layout, 0, x as u32, 0),
+                Some(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn reads_odd_bit_depths_from_unpacked16() {
+        for depth in [9u8, 11, 13, 15] {
+            let expected = (1u16 << depth) - 1;
+            let bytes = expected.to_le_bytes();
+            let d = RawDescriptor {
+                width: 1,
+                height: 1,
+                bit_depth: depth,
+                packing: Packing::Unpacked16,
+                ..RawDescriptor::default()
+            };
+            let (layout, _) = calculate_layout(&d, bytes.len() as u64);
+            assert_eq!(read_pixel(&bytes, &d, &layout, 0, 0, 0), Some(expected));
+        }
     }
 
     #[test]

@@ -1,4 +1,4 @@
-export type Packing = "unpacked8" | "unpacked16" | "mipiRaw10" | "mipiRaw12";
+export type Packing = "unpacked8" | "unpacked16" | "mipiRaw10" | "mipiRaw12" | "mipiRaw14";
 export type Endianness = "little" | "big";
 export type BitAlignment = "lsb" | "msb";
 export type CfaPattern = "MONO" | "RGGB" | "BGGR" | "GBRG" | "GRBG";
@@ -106,4 +106,3 @@ export const DEFAULT_DESCRIPTOR: RawDescriptor = {
   frameStride: 0,
   headerOffset: 0,
 };
-
