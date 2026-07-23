@@ -1,6 +1,7 @@
 use crate::raw::{
-    ExportRequest, ExportResult, PixelSample, RawDescriptor, RawLayout, RawWarning, TileRequest,
-    calculate_layout, cfa_name_at, export_raw, read_pixel, render_tile,
+    ExportRequest, ExportResult, PixelInspectionRequest, PixelSample, RawDescriptor, RawLayout,
+    RawWarning, TileRequest, calculate_layout, cfa_name_at, export_raw, inspect_pixels, read_pixel,
+    render_tile,
 };
 use memmap2::{Mmap, MmapOptions};
 use serde::Serialize;
@@ -151,6 +152,35 @@ pub async fn render_raw_tile(
     })
     .await
     .map_err(|error| format!("瓦片渲染任务异常：{error}"))?
+}
+
+#[tauri::command]
+pub async fn inspect_raw_pixels(
+    request: PixelInspectionRequest,
+    state: State<'_, AppState>,
+) -> Result<Response, String> {
+    let (map, descriptor, layout, generation) = {
+        let guard = lock_document(&state)?;
+        let document = guard.as_ref().ok_or("尚未打开 RAW 文件")?;
+        (
+            document.map.clone(),
+            document.descriptor.clone(),
+            document.layout,
+            document.generation,
+        )
+    };
+    if request.generation != generation {
+        return Err("stale_generation".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes: &[u8] = match map.as_ref() {
+            Some(value) => value.as_ref(),
+            None => &[],
+        };
+        inspect_pixels(bytes, &descriptor, &layout, &request).map(Response::new)
+    })
+    .await
+    .map_err(|error| format!("像素检查任务异常：{error}"))?
 }
 
 #[tauri::command]

@@ -2,8 +2,8 @@ mod commands;
 mod raw;
 
 use commands::{
-    AppState, close_document, export_document, open_document, render_raw_tile, sample_raw_pixel,
-    update_descriptor,
+    AppState, close_document, export_document, inspect_raw_pixels, open_document, render_raw_tile,
+    sample_raw_pixel, update_descriptor,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -16,6 +16,7 @@ pub fn run() {
             update_descriptor,
             close_document,
             render_raw_tile,
+            inspect_raw_pixels,
             sample_raw_pixel,
             export_document,
         ])

@@ -5,6 +5,7 @@ import { RawViewport, type ImagePoint } from "./viewport";
 import type {
   BitAlignment,
   CfaPattern,
+  DemosaicPixelValueMode,
   DisplayMode,
   DocumentInfo,
   Endianness,
@@ -33,6 +34,8 @@ interface AppSettings {
   tileCache: TileCache;
   language: AppLanguage;
   sidebarWidth: number;
+  pixelValuesEnabled: boolean;
+  demosaicPixelValues: DemosaicPixelValueMode;
 }
 
 interface RuntimeDiagnostic {
@@ -54,6 +57,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   tileCache: "balanced",
   language: "system",
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+  pixelValuesEnabled: true,
+  demosaicPixelValues: "rgb",
 };
 
 function icon(path: string): string {
@@ -102,6 +107,8 @@ function loadSettings(): AppSettings {
         tileCache: ["compact", "balanced", "large"].includes(value.tileCache ?? "") ? value.tileCache as TileCache : DEFAULT_SETTINGS.tileCache,
         language: ["system", "zh-CN"].includes(value.language ?? "") ? value.language as AppLanguage : DEFAULT_SETTINGS.language,
         sidebarWidth: Number.isFinite(value.sidebarWidth) ? Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, Math.trunc(value.sidebarWidth!))) : DEFAULT_SETTINGS.sidebarWidth,
+        pixelValuesEnabled: typeof value.pixelValuesEnabled === "boolean" ? value.pixelValuesEnabled : DEFAULT_SETTINGS.pixelValuesEnabled,
+        demosaicPixelValues: ["rawDn", "rgb"].includes(value.demosaicPixelValues ?? "") ? value.demosaicPixelValues as DemosaicPixelValueMode : DEFAULT_SETTINGS.demosaicPixelValues,
       };
     }
   } catch { /* 使用安全默认值 */ }
@@ -217,6 +224,7 @@ export class ErawApp {
           <main class="canvas-area">
             <div class="viewport" id="viewport">
               <canvas class="raw-canvas"></canvas>
+              <canvas class="pixel-value-overlay" aria-hidden="true"></canvas>
               <div class="canvas-crosshair" aria-hidden="true"><i class="crosshair-horizontal"></i><i class="crosshair-vertical"></i></div>
               <div class="empty-state" id="empty-state">
                 <div class="empty-grid"><span></span><span></span><span></span><span></span></div>
@@ -365,6 +373,10 @@ export class ErawApp {
           <label class="settings-row"><div><strong>滚轮缩放速度</strong><span>缩放始终以鼠标指向的图像位置为中心</span></div><select id="setting-wheel-speed"><option value="gentle">柔和</option><option value="standard">标准</option><option value="fast">快速</option></select></label>
           <label class="settings-row toggle-row"><div><strong>记住 RAW 参数</strong><span>下次启动时恢复尺寸、packing、CFA 和对齐配置</span></div><input id="setting-remember-descriptor" type="checkbox"/></label>
         </section>
+        <section class="settings-group"><div class="settings-heading"><h3>像素检查</h3><p>仅在像素格能够完整容纳数值时显示，不会截断或缩写。</p></div>
+          <label class="settings-row toggle-row"><div><strong>高倍率显示像素值</strong><span>RAW 强度与 Bayer 点阵始终显示原始 DN</span></div><input id="setting-pixel-values" type="checkbox"/></label>
+          <label class="settings-row" id="demosaic-pixel-values-row"><div><strong>Demosaic 数值内容</strong><span>RGB 为原始位深范围内的插值分量，不是 8-bit 显示值</span></div><select id="setting-demosaic-pixel-values"><option value="rawDn">原始 DN</option><option value="rgb">三行插值 RGB</option></select></label>
+        </section>
         <section class="settings-group"><div class="settings-heading"><h3>性能</h3><p>更大的 GPU 缓存可减少超大图像来回拖动时的瓦片重载。</p></div>
           <label class="settings-row"><div><strong>GPU 瓦片缓存</strong><span>只缓存预览纹理，不复制完整 RAW 文件</span></div><select id="setting-tile-cache"><option value="compact">32 MiB</option><option value="balanced">64 MiB（推荐）</option><option value="large">128 MiB</option></select></label>
         </section>
@@ -432,6 +444,7 @@ export class ErawApp {
     this.get("confirm-export").addEventListener("click", (event) => { event.preventDefault(); void this.performExport(); });
     this.get("confirm-settings").addEventListener("click", () => this.saveSettingsFromDialog());
     this.get("reset-settings").addEventListener("click", () => this.writeSettingsForm(DEFAULT_SETTINGS));
+    this.get<HTMLInputElement>("setting-pixel-values").addEventListener("change", () => this.updatePixelSettingsAvailability());
     this.get("pixel-locator-form").addEventListener("submit", (event) => { event.preventDefault(); this.locatePixel(); });
     this.get("close-pixel-locator").addEventListener("click", () => this.get<HTMLDialogElement>("pixel-locator-dialog").close());
     this.get("cancel-pixel-locator").addEventListener("click", () => this.get<HTMLDialogElement>("pixel-locator-dialog").close());
@@ -857,8 +870,11 @@ export class ErawApp {
     this.get<HTMLSelectElement>("setting-open-view").value = settings.openView;
     this.get<HTMLSelectElement>("setting-wheel-speed").value = settings.wheelSpeed;
     this.get<HTMLInputElement>("setting-remember-descriptor").checked = settings.rememberDescriptor;
+    this.get<HTMLInputElement>("setting-pixel-values").checked = settings.pixelValuesEnabled;
+    this.get<HTMLSelectElement>("setting-demosaic-pixel-values").value = settings.demosaicPixelValues;
     this.get<HTMLSelectElement>("setting-tile-cache").value = settings.tileCache;
     this.get<HTMLSelectElement>("setting-language").value = settings.language;
+    this.updatePixelSettingsAvailability();
   }
 
   private saveSettingsFromDialog(): void {
@@ -871,6 +887,8 @@ export class ErawApp {
       tileCache: this.get<HTMLSelectElement>("setting-tile-cache").value as TileCache,
       language: this.get<HTMLSelectElement>("setting-language").value as AppLanguage,
       sidebarWidth: this.settingsFormSidebarWidth,
+      pixelValuesEnabled: this.get<HTMLInputElement>("setting-pixel-values").checked,
+      demosaicPixelValues: this.get<HTMLSelectElement>("setting-demosaic-pixel-values").value as DemosaicPixelValueMode,
     };
     this.persistSettings();
     if (this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(this.descriptor));
@@ -886,7 +904,17 @@ export class ErawApp {
     const wheelSensitivity: Record<WheelSpeed, number> = { gentle: 0.001, standard: 0.0015, fast: 0.0022 };
     const maxTextures: Record<TileCache, number> = { compact: 128, balanced: 256, large: 512 };
     this.viewport.setPreferences({ wheelSensitivity: wheelSensitivity[this.settings.wheelSpeed], maxTextures: maxTextures[this.settings.tileCache] });
+    this.viewport.setPixelInspectionPreferences({
+      enabled: this.settings.pixelValuesEnabled,
+      demosaicValues: this.settings.demosaicPixelValues,
+    });
     this.setSidebarWidth(this.settings.sidebarWidth, false);
+  }
+
+  private updatePixelSettingsAvailability(): void {
+    const enabled = this.get<HTMLInputElement>("setting-pixel-values").checked;
+    this.get<HTMLSelectElement>("setting-demosaic-pixel-values").disabled = !enabled;
+    this.get("demosaic-pixel-values-row").classList.toggle("settings-disabled", !enabled);
   }
 
   private showToast(message: string, type: "success" | "error" | "busy", duration = 3200): void {

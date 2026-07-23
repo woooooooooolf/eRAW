@@ -257,6 +257,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 }
 .raw-canvas { position: absolute; inset: 0; z-index: 1; display: block; cursor: crosshair; touch-action: none; }
 .raw-canvas.dragging { cursor: grabbing; }
+.pixel-value-overlay { position: absolute; z-index: 2; inset: 0; display: block; pointer-events: none; }
 .canvas-crosshair { position: absolute; z-index: 6; inset: 0; opacity: 0; transition: opacity .08s ease; pointer-events: none; }
 .canvas-crosshair.visible { opacity: 1; }
 .canvas-crosshair i { position: absolute; display: block; margin: 0; background: rgba(151, 217, 240, .34); box-shadow: 0 0 5px rgba(74, 182, 224, .13); }
@@ -413,6 +414,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 .settings-row strong { color: #aabcca; font-size: var(--font-md); font-weight: 560; }
 .settings-row span { color: #607487; font-size: var(--font-xs); line-height: 1.4; }
 .settings-row select { width: 168px; flex: 0 0 168px; }
+.settings-row.settings-disabled { opacity: .46; }
 .toggle-row input { position: relative; width: 38px; height: 21px; flex: 0 0 38px; padding: 0; border: 0; border-radius: 12px; appearance: none; background: #202c38; cursor: pointer; }
 .toggle-row input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 15px; height: 15px; border-radius: 50%; background: #788a99; transition: .16s ease; }
 .toggle-row input:checked { background: rgba(41, 160, 207, .48); }

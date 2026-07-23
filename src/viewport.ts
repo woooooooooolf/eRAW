@@ -1,5 +1,6 @@
 import { renderTile } from "./api";
-import type { DisplayMode, DocumentInfo, TileRequest } from "./types";
+import { PixelValueOverlay } from "./pixel-overlay";
+import type { DemosaicPixelValueMode, DisplayMode, DocumentInfo, TileRequest } from "./types";
 
 const TILE_SIZE = 256;
 const MAX_IN_FLIGHT = 8;
@@ -87,6 +88,7 @@ function createProgram(gl: WebGL2RenderingContext): WebGLProgram {
 export class RawViewport {
   private readonly container: HTMLElement;
   private readonly canvas: HTMLCanvasElement;
+  private readonly pixelValueOverlay: PixelValueOverlay;
   private readonly gl: WebGL2RenderingContext;
   private readonly callbacks: ViewportCallbacks;
   private readonly program: WebGLProgram;
@@ -128,6 +130,13 @@ export class RawViewport {
     this.container = container;
     this.callbacks = callbacks;
     this.canvas = container.querySelector<HTMLCanvasElement>(".raw-canvas")!;
+    this.pixelValueOverlay = new PixelValueOverlay(
+      container.querySelector<HTMLCanvasElement>(".pixel-value-overlay")!,
+      {
+        onError: (message) => this.callbacks.onError(message),
+        requestDraw: () => this.requestDraw(),
+      },
+    );
     const gl = this.canvas.getContext("webgl2", { alpha: true, antialias: false, premultipliedAlpha: false });
     if (!gl) throw new Error("当前 WebView2 不支持 eRAW 所需的 WebGL2 画布");
     this.gl = gl;
@@ -248,6 +257,10 @@ export class RawViewport {
     this.evictTextures();
   }
 
+  setPixelInspectionPreferences(preferences: { enabled: boolean; demosaicValues: DemosaicPixelValueMode }): void {
+    this.pixelValueOverlay.setPreferences(preferences);
+  }
+
   fit(): void {
     if (!this.document) return;
     const margin = 72;
@@ -305,6 +318,7 @@ export class RawViewport {
       this.canvas.style.width = `${this.width}px`;
       this.canvas.style.height = `${this.height}px`;
     }
+    this.pixelValueOverlay.resize(this.width, this.height, dpr);
     if (this.document) {
       this.constrainCamera();
       this.requestDraw();
@@ -464,6 +478,7 @@ export class RawViewport {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     if (!this.document) {
+      this.pixelValueOverlay.clear();
       this.updateScrollbars();
       return;
     }
@@ -489,6 +504,16 @@ export class RawViewport {
     }
     this.updateScrollbars();
     this.callbacks.onRenderStats(level, visible.filter((tile) => this.textures.has(this.tileKey(level, tile.x, tile.y))).length, this.inFlight.size);
+    this.pixelValueOverlay.draw({
+      document: this.document,
+      frame: this.frame,
+      displayMode: this.settings.mode,
+      zoom: this.zoom,
+      cameraX: this.cameraX,
+      cameraY: this.cameraY,
+      width: this.width,
+      height: this.height,
+    });
   }
 
   private queueTile(key: string, level: number, tileX: number, tileY: number): void {
@@ -549,6 +574,7 @@ export class RawViewport {
     this.inFlight.clear();
     this.failedTiles.clear();
     this.failureReported = false;
+    this.pixelValueOverlay.invalidate();
   }
 
   private updateScrollbars(): void {

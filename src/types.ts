@@ -4,6 +4,7 @@ export type BitAlignment = "lsb" | "msb";
 export type CfaPattern = "MONO" | "RGGB" | "BGGR" | "GBRG" | "GRBG";
 export type WarningSeverity = "info" | "warning" | "error";
 export type DisplayMode = "raw" | "bayer" | "demosaic" | "red" | "green" | "blue";
+export type DemosaicPixelValueMode = "rawDn" | "rgb";
 
 export interface RawDescriptor {
   width: number;
@@ -56,6 +57,16 @@ export interface TileRequest {
   mode: DisplayMode;
   displayMin: number;
   displayMax: number;
+}
+
+export interface PixelInspectionRequest {
+  generation: number;
+  frame: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  mode: DisplayMode;
 }
 
 export interface PixelSample {

@@ -4,6 +4,7 @@ import type {
   DocumentInfo,
   ExportRequest,
   ExportResult,
+  PixelInspectionRequest,
   PixelSample,
   RawDescriptor,
   TileRequest,
@@ -43,6 +44,13 @@ export async function renderTile(request: TileRequest): Promise<Uint8Array> {
   return new Uint8Array(result);
 }
 
+export async function inspectPixels(request: PixelInspectionRequest): Promise<Uint8Array> {
+  const result = await invoke<ArrayBuffer | Uint8Array | number[]>("inspect_raw_pixels", { request });
+  if (result instanceof ArrayBuffer) return new Uint8Array(result);
+  if (result instanceof Uint8Array) return result;
+  return new Uint8Array(result);
+}
+
 export function samplePixel(x: number, y: number, frame: number): Promise<PixelSample> {
   return invoke("sample_raw_pixel", { x, y, frame });
 }
@@ -50,4 +58,3 @@ export function samplePixel(x: number, y: number, frame: number): Promise<PixelS
 export function exportDocument(request: ExportRequest): Promise<ExportResult> {
   return invoke("export_document", { request });
 }
-

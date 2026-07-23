@@ -374,6 +374,18 @@ pub struct TileRequest {
     pub display_max: u16,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PixelInspectionRequest {
+    pub generation: u64,
+    pub frame: u64,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    pub mode: DisplayMode,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PixelSample {
@@ -634,6 +646,52 @@ pub fn render_tile(
                 } else {
                     &[48, 20, 33, 255]
                 });
+            }
+        }
+    }
+    Ok(output)
+}
+
+pub fn inspect_pixels(
+    data: &[u8],
+    d: &RawDescriptor,
+    l: &RawLayout,
+    request: &PixelInspectionRequest,
+) -> Result<Vec<u8>, String> {
+    const BYTES_PER_PIXEL: usize = 10;
+    const MAX_INSPECTION_PIXELS: u64 = 65_536;
+    let pixel_count = u64::from(request.width)
+        .checked_mul(u64::from(request.height))
+        .ok_or("像素检查区域大小溢出")?;
+    if pixel_count > MAX_INSPECTION_PIXELS {
+        return Err(format!(
+            "像素检查区域过大：{pixel_count}，最大允许 {MAX_INSPECTION_PIXELS} 个像素"
+        ));
+    }
+    let output_len = usize::try_from(pixel_count)
+        .ok()
+        .and_then(|count| count.checked_mul(BYTES_PER_PIXEL))
+        .ok_or("像素检查缓冲区大小溢出")?;
+    let mut output = vec![0u8; output_len];
+    for oy in 0..request.height {
+        for ox in 0..request.width {
+            let x = request.x.checked_add(ox).ok_or("像素检查 X 坐标溢出")?;
+            let y = request.y.checked_add(oy).ok_or("像素检查 Y 坐标溢出")?;
+            let index = usize::try_from(u64::from(oy) * u64::from(request.width) + u64::from(ox))
+                .ok()
+                .and_then(|value| value.checked_mul(BYTES_PER_PIXEL))
+                .ok_or("像素检查数据索引溢出")?;
+            let raw = read_pixel(data, d, l, request.frame, x, y);
+            let rgb = sampled_rgb(data, d, l, request.frame, (x, y), 0, request.mode);
+            if let Some(value) = raw {
+                output[index] |= 0b0000_0001;
+                output[index + 2..index + 4].copy_from_slice(&value.to_le_bytes());
+            }
+            if let Some([red, green, blue]) = rgb {
+                output[index] |= 0b0000_0010;
+                output[index + 4..index + 6].copy_from_slice(&red.to_le_bytes());
+                output[index + 6..index + 8].copy_from_slice(&green.to_le_bytes());
+                output[index + 8..index + 10].copy_from_slice(&blue.to_le_bytes());
             }
         }
     }
@@ -1113,5 +1171,52 @@ mod tests {
         let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
         assert_eq!(tile.len(), 64 * 64 * 4);
         assert!(tile.chunks_exact(4).any(|pixel| pixel[3] == 255));
+    }
+
+    #[test]
+    fn pixel_inspection_returns_raw_and_demosaic_components() {
+        let mut d = descriptor(Packing::Unpacked16, 10);
+        d.width = 2;
+        d.height = 2;
+        d.cfa = CfaPattern::Rggb;
+        let values = [100u16, 200, 300, 400];
+        let bytes: Vec<u8> = values
+            .iter()
+            .flat_map(|value| value.to_le_bytes())
+            .collect();
+        let (layout, _) = calculate_layout(&d, bytes.len() as u64);
+        let request = PixelInspectionRequest {
+            generation: 1,
+            frame: 0,
+            x: 0,
+            y: 0,
+            width: 1,
+            height: 1,
+            mode: DisplayMode::Demosaic,
+        };
+        let inspected = inspect_pixels(&bytes, &d, &layout, &request).unwrap();
+        assert_eq!(inspected.len(), 10);
+        assert_eq!(inspected[0], 0b0000_0011);
+        assert_eq!(u16::from_le_bytes([inspected[2], inspected[3]]), 100);
+        assert_eq!(u16::from_le_bytes([inspected[4], inspected[5]]), 100);
+        assert_eq!(u16::from_le_bytes([inspected[6], inspected[7]]), 250);
+        assert_eq!(u16::from_le_bytes([inspected[8], inspected[9]]), 400);
+    }
+
+    #[test]
+    fn pixel_inspection_limits_requested_area() {
+        let d = descriptor(Packing::Unpacked16, 10);
+        let layout = calculate_layout(&d, 0).0;
+        let request = PixelInspectionRequest {
+            generation: 1,
+            frame: 0,
+            x: 0,
+            y: 0,
+            width: 257,
+            height: 256,
+            mode: DisplayMode::Raw,
+        };
+        let error = inspect_pixels(&[], &d, &layout, &request).unwrap_err();
+        assert!(error.contains("区域过大"));
     }
 }
