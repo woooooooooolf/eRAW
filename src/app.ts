@@ -134,6 +134,7 @@ export class ErawApp {
   private sidebarResizeStartWidth = 0;
   private settingsFormSidebarWidth = this.settings.sidebarWidth;
   private runtimeDiagnostics: RuntimeDiagnostic[] = [];
+  private lastSample: ImagePoint | null = null;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -142,7 +143,7 @@ export class ErawApp {
     this.viewport = new RawViewport(this.get("viewport"), {
       onZoomChange: (zoom) => { this.get("zoom-status").textContent = `${(zoom * 100).toFixed(zoom < 0.1 ? 2 : 1)}%`; },
       onSampleChange: (sample) => this.updateSample(sample),
-      onRenderStats: (level, loaded, pending) => { this.get("render-status").textContent = `L${level} · ${loaded} tiles${pending ? ` · ${pending} loading` : ""}`; },
+      onRenderStats: (level, loaded, pending) => { this.get("render-status").textContent = `L${level} · ${loaded} tiles · ${pending} loading`; },
       onError: (message) => this.reportRuntimeError(message),
     });
     this.applySettings();
@@ -216,6 +217,7 @@ export class ErawApp {
           <main class="canvas-area">
             <div class="viewport" id="viewport">
               <canvas class="raw-canvas"></canvas>
+              <div class="canvas-crosshair" aria-hidden="true"><i class="crosshair-horizontal"></i><i class="crosshair-vertical"></i></div>
               <div class="empty-state" id="empty-state">
                 <div class="empty-grid"><span></span><span></span><span></span><span></span></div>
                 <h1>查看传感器的真实输出</h1>
@@ -245,12 +247,15 @@ export class ErawApp {
         <footer class="statusbar">
           <button id="status-warning" class="status-warning" aria-expanded="false" aria-controls="diagnostics-drawer">${icons.warning}<span>诊断</span><b id="diagnostics-count" hidden>0</b></button>
           <i></i><span id="file-status" class="file-status">未打开文件</span><div class="status-spacer"></div>
-          <span id="pixel-status">X — · Y —</span><i></i><span id="render-status">WebGL2 ready</span><i></i><span id="zoom-status">100.0%</span>
+          <button id="pixel-status" class="status-pixel" title="输入坐标并定位像素" aria-haspopup="dialog" disabled>X — · Y —</button><i></i>
+          <span id="render-status" class="status-help" data-help="L 表示当前预览层级；tiles 是当前视野中已完成渲染的瓦片数；loading 是正在解析并上传到 WebGL 的瓦片数。">L0 · 0 tiles · 0 loading</span>
+          <i></i><span id="zoom-status">100.0%</span>
         </footer>
         <div class="toast" id="toast" role="status"></div>
         <div class="parameter-tooltip" id="parameter-tooltip" role="tooltip"></div>
 
         ${this.exportDialogTemplate()}
+        ${this.pixelLocatorDialogTemplate()}
         ${this.settingsDialogTemplate()}
         ${this.aboutDialogTemplate()}
       </div>`;
@@ -320,6 +325,22 @@ export class ErawApp {
 
   private exportNumber(id: string, label: string, min: number): string {
     return `<label><span>${label}</span><div class="number-input"><input id="${id}" type="number" min="${min}" step="1"/><b>${id.includes("alignment") ? "B" : "px"}</b></div></label>`;
+  }
+
+  private pixelLocatorDialogTemplate(): string {
+    return `<dialog id="pixel-locator-dialog" class="modal pixel-locator-modal">
+      <form id="pixel-locator-form">
+        <header><div><small>PIXEL NAVIGATION</small><h2>定位像素</h2></div><button id="close-pixel-locator" type="button" class="dialog-close" aria-label="关闭">×</button></header>
+        <div class="pixel-locator-body">
+          <p>输入从 0 开始的 RAW 像素坐标。定位后将使用最大倍率，并把该像素置于画布中央。</p>
+          <div class="pixel-coordinate-grid">
+            <label><span>X 坐标</span><div class="number-input"><input id="pixel-locator-x" type="number" min="0" step="1" required/><b>px</b></div></label>
+            <label><span>Y 坐标</span><div class="number-input"><input id="pixel-locator-y" type="number" min="0" step="1" required/><b>px</b></div></label>
+          </div>
+        </div>
+        <footer><p id="pixel-locator-range">—</p><div><button id="cancel-pixel-locator" type="button" class="secondary-button">取消</button><button type="submit" class="primary-button">定位并放大</button></div></footer>
+      </form>
+    </dialog>`;
   }
 
   private aboutDialogTemplate(): string {
@@ -400,6 +421,7 @@ export class ErawApp {
       button.querySelector("i")!.textContent = section.classList.contains("open") ? "−" : "+";
     }));
     this.get("status-warning").addEventListener("click", () => this.toggleDiagnostics());
+    this.get("pixel-status").addEventListener("click", () => this.openPixelLocator());
     this.get("close-diagnostics").addEventListener("click", () => this.setDiagnosticsOpen(false));
     this.bindSidebarResize();
     this.get("first-frame").addEventListener("click", () => this.setFrame(0));
@@ -410,6 +432,9 @@ export class ErawApp {
     this.get("confirm-export").addEventListener("click", (event) => { event.preventDefault(); void this.performExport(); });
     this.get("confirm-settings").addEventListener("click", () => this.saveSettingsFromDialog());
     this.get("reset-settings").addEventListener("click", () => this.writeSettingsForm(DEFAULT_SETTINGS));
+    this.get("pixel-locator-form").addEventListener("submit", (event) => { event.preventDefault(); this.locatePixel(); });
+    this.get("close-pixel-locator").addEventListener("click", () => this.get<HTMLDialogElement>("pixel-locator-dialog").close());
+    this.get("cancel-pixel-locator").addEventListener("click", () => this.get<HTMLDialogElement>("pixel-locator-dialog").close());
     ["crop-x", "crop-y", "crop-width", "crop-height"].forEach((id) => this.get<HTMLInputElement>(id).addEventListener("input", () => this.updateExportPhase()));
     this.get<HTMLSelectElement>("export-packing").addEventListener("change", (event) => {
       const packing = (event.currentTarget as HTMLSelectElement).value;
@@ -455,13 +480,13 @@ export class ErawApp {
       showTimer = 0;
       tooltip.classList.remove("visible");
     };
-    this.root.querySelectorAll<HTMLElement>(".field-label[data-help]").forEach((label) => {
-      label.addEventListener("pointerenter", (event) => {
+    this.root.querySelectorAll<HTMLElement>("[data-help]").forEach((target) => {
+      target.addEventListener("pointerenter", (event) => {
         hide();
         pointerX = event.clientX;
         pointerY = event.clientY;
         showTimer = window.setTimeout(() => {
-          tooltip.textContent = label.dataset.help ?? "";
+          tooltip.textContent = target.dataset.help ?? "";
           tooltip.classList.add("visible");
           const margin = 12;
           const x = Math.min(window.innerWidth - tooltip.offsetWidth - margin, pointerX + 14);
@@ -471,8 +496,8 @@ export class ErawApp {
           showTimer = 0;
         }, 500);
       });
-      label.addEventListener("pointermove", move);
-      label.addEventListener("pointerleave", hide);
+      target.addEventListener("pointermove", move);
+      target.addEventListener("pointerleave", hide);
     });
   }
 
@@ -566,6 +591,7 @@ export class ErawApp {
     emptyState.setAttribute("aria-hidden", String(Boolean(info)));
     this.get<HTMLButtonElement>("empty-open-button").disabled = Boolean(info);
     this.get<HTMLButtonElement>("export-button").disabled = !info;
+    this.get<HTMLButtonElement>("pixel-status").disabled = !info;
     const fileStatus = this.get("file-status");
     fileStatus.textContent = info?.path ?? "未打开文件";
     fileStatus.title = info?.path ?? "";
@@ -700,7 +726,52 @@ export class ErawApp {
   }
 
   private updateSample(sample: ImagePoint | null): void {
+    if (sample) this.lastSample = sample;
     this.get("pixel-status").textContent = sample ? `X ${sample.x} · Y ${sample.y}` : "X — · Y —";
+  }
+
+  private openPixelLocator(): void {
+    if (!this.document) return;
+    const { width, height } = this.document.descriptor;
+    const sample = this.lastSample
+      && this.lastSample.x < width && this.lastSample.y < height
+      ? this.lastSample
+      : { x: Math.floor(width / 2), y: Math.floor(height / 2) };
+    const xInput = this.get<HTMLInputElement>("pixel-locator-x");
+    const yInput = this.get<HTMLInputElement>("pixel-locator-y");
+    xInput.max = String(width - 1);
+    yInput.max = String(height - 1);
+    xInput.value = String(sample.x);
+    yInput.value = String(sample.y);
+    this.get("pixel-locator-range").textContent = `有效范围：X 0–${width - 1} · Y 0–${height - 1}`;
+    this.get<HTMLDialogElement>("pixel-locator-dialog").showModal();
+    requestAnimationFrame(() => { xInput.focus(); xInput.select(); });
+  }
+
+  private locatePixel(): void {
+    if (!this.document) return;
+    const xInput = this.get<HTMLInputElement>("pixel-locator-x");
+    const yInput = this.get<HTMLInputElement>("pixel-locator-y");
+    const x = Number(xInput.value);
+    const y = Number(yInput.value);
+    const { width, height } = this.document.descriptor;
+    if (!Number.isInteger(x) || x < 0 || x >= width) {
+      this.showToast(`X 坐标必须是 0–${width - 1} 之间的整数`, "error");
+      xInput.focus();
+      xInput.select();
+      return;
+    }
+    if (!Number.isInteger(y) || y < 0 || y >= height) {
+      this.showToast(`Y 坐标必须是 0–${height - 1} 之间的整数`, "error");
+      yInput.focus();
+      yInput.select();
+      return;
+    }
+    const point = { x, y };
+    this.lastSample = point;
+    this.updateSample(point);
+    this.viewport.focusPixel(point);
+    this.get<HTMLDialogElement>("pixel-locator-dialog").close();
   }
 
   private openExportDialog(): void {

@@ -5,6 +5,7 @@ const TILE_SIZE = 256;
 const MAX_IN_FLIGHT = 8;
 const DEFAULT_MAX_TEXTURES = 192;
 const KEEP_VISIBLE = 24;
+const MAX_ZOOM = 64;
 
 interface DisplaySettings {
   mode: DisplayMode;
@@ -97,6 +98,7 @@ export class RawViewport {
   private readonly horizontalThumb: HTMLElement;
   private readonly verticalScrollbar: HTMLElement;
   private readonly verticalThumb: HTMLElement;
+  private readonly crosshair: HTMLElement;
   private readonly resizeObserver: ResizeObserver;
   private document: DocumentInfo | null = null;
   private frame = 0;
@@ -138,6 +140,7 @@ export class RawViewport {
     this.horizontalThumb = this.horizontalScrollbar.querySelector<HTMLElement>(".scroll-thumb")!;
     this.verticalScrollbar = container.querySelector<HTMLElement>(".image-scrollbar.vertical")!;
     this.verticalThumb = this.verticalScrollbar.querySelector<HTMLElement>(".scroll-thumb")!;
+    this.crosshair = container.querySelector<HTMLElement>(".canvas-crosshair")!;
     this.initializeGl();
     this.bindEvents();
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -171,7 +174,10 @@ export class RawViewport {
     this.canvas.addEventListener("pointermove", (event) => this.onPointerMove(event));
     this.canvas.addEventListener("pointerup", (event) => this.onPointerUp(event));
     this.canvas.addEventListener("pointercancel", (event) => this.onPointerUp(event));
-    this.canvas.addEventListener("pointerleave", () => this.updatePointerPosition(null));
+    this.canvas.addEventListener("pointerleave", () => {
+      this.hideCrosshair();
+      this.updatePointerPosition(null);
+    });
     this.canvas.addEventListener("dblclick", () => {
       if (Math.abs(this.zoom - this.fitScale) < 0.001) this.actualSize(); else this.fit();
     });
@@ -269,6 +275,20 @@ export class RawViewport {
     this.requestDraw();
   }
 
+  focusPixel(point: ImagePoint): void {
+    if (!this.document
+      || point.x < 0 || point.y < 0
+      || point.x >= this.document.descriptor.width
+      || point.y >= this.document.descriptor.height) return;
+    this.zoom = MAX_ZOOM;
+    this.cameraX = this.width / 2 - (point.x + 0.5) * this.zoom;
+    this.cameraY = this.height / 2 - (point.y + 0.5) * this.zoom;
+    this.constrainCamera();
+    this.updatePointerPosition(point);
+    this.callbacks.onZoomChange(this.zoom);
+    this.requestDraw();
+  }
+
   getZoom(): number { return this.zoom; }
   getFrame(): number { return this.frame; }
 
@@ -303,11 +323,12 @@ export class RawViewport {
     const imageY = (pointerY - this.cameraY) / this.zoom;
     const factor = Math.exp(-event.deltaY * this.wheelSensitivity);
     const minZoom = Math.max(this.fitScale * 0.08, 0.0005);
-    const newZoom = Math.max(minZoom, Math.min(64, this.zoom * factor));
+    const newZoom = Math.max(minZoom, Math.min(MAX_ZOOM, this.zoom * factor));
     this.cameraX = pointerX - imageX * newZoom;
     this.cameraY = pointerY - imageY * newZoom;
     this.zoom = newZoom;
     this.constrainCamera();
+    this.updatePointerPosition(this.updateCrosshair(event));
     this.callbacks.onZoomChange(this.zoom);
     this.requestDraw();
   }
@@ -330,17 +351,11 @@ export class RawViewport {
       this.cameraX = this.dragCameraX + event.clientX - this.dragX;
       this.cameraY = this.dragCameraY + event.clientY - this.dragY;
       this.constrainCamera();
+      this.updateCrosshair(event);
       this.requestDraw();
       return;
     }
-    const rect = this.canvas.getBoundingClientRect();
-    const x = Math.floor((event.clientX - rect.left - this.cameraX) / this.zoom);
-    const y = Math.floor((event.clientY - rect.top - this.cameraY) / this.zoom);
-    if (x >= 0 && y >= 0 && x < this.document.descriptor.width && y < this.document.descriptor.height) {
-      this.updatePointerPosition({ x, y });
-    } else {
-      this.updatePointerPosition(null);
-    }
+    this.updatePointerPosition(this.updateCrosshair(event));
   }
 
   private onPointerUp(event: PointerEvent): void {
@@ -348,6 +363,37 @@ export class RawViewport {
     this.dragging = false;
     this.canvas.classList.remove("dragging");
     if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
+    this.updatePointerPosition(this.updateCrosshair(event));
+  }
+
+  private updateCrosshair(event: MouseEvent): ImagePoint | null {
+    if (!this.document) {
+      this.hideCrosshair();
+      return null;
+    }
+    const rect = this.canvas.getBoundingClientRect();
+    const pointerX = event.clientX - rect.left;
+    const pointerY = event.clientY - rect.top;
+    if (pointerX < 0 || pointerY < 0 || pointerX >= rect.width || pointerY >= rect.height) {
+      this.hideCrosshair();
+      return null;
+    }
+    const x = Math.floor((pointerX - this.cameraX) / this.zoom);
+    const y = Math.floor((pointerY - this.cameraY) / this.zoom);
+    if (x < 0 || y < 0 || x >= this.document.descriptor.width || y >= this.document.descriptor.height) {
+      this.hideCrosshair();
+      return null;
+    }
+    const screenX = this.cameraX + (x + 0.5) * this.zoom;
+    const screenY = this.cameraY + (y + 0.5) * this.zoom;
+    this.crosshair.style.setProperty("--crosshair-x", `${screenX}px`);
+    this.crosshair.style.setProperty("--crosshair-y", `${screenY}px`);
+    this.crosshair.classList.add("visible");
+    return { x, y };
+  }
+
+  private hideCrosshair(): void {
+    this.crosshair.classList.remove("visible");
   }
 
   private updatePointerPosition(point: ImagePoint | null): void {
