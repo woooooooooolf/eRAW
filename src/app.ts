@@ -88,10 +88,6 @@ function descriptorsEqual(left: RawDescriptor, right: RawDescriptor): boolean {
   return (Object.keys(DEFAULT_DESCRIPTOR) as Array<keyof RawDescriptor>).every((key) => left[key] === right[key]);
 }
 
-function exactBytes(value: number): string {
-  return `${Math.max(0, value).toLocaleString("zh-CN")} B`;
-}
-
 function loadSettings(): AppSettings {
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
@@ -211,12 +207,6 @@ export class ErawApp {
                   ${this.numberField("frameAlignment", "帧对齐", "B", 1, undefined, undefined, true, true)}
                   ${this.numberField("frameStride", "显式帧步长", "B", 0, undefined, "0 = 自动", true, true)}
                 </div>
-                <div class="computed-layout">
-                  <div><span>每行有效像素</span><strong id="row-bytes">—</strong></div>
-                  <div><span>每行存储跨度</span><strong id="row-stride">—</strong></div>
-                  <div><span>单帧有效图像</span><strong id="frame-bytes">—</strong></div>
-                  <div><span>每帧存储跨度</span><strong id="frame-stride">—</strong></div>
-                </div>
               </section>
             </div>
           </aside>
@@ -267,7 +257,7 @@ export class ErawApp {
   }
 
   private dimensionField(): string {
-    return `<div class="parameter-row dimension-row" data-help="${this.parameterHelp("dimensions")}"><span class="field-label">有效分辨率</span><div class="dimension-control">
+    return `<div class="parameter-row dimension-row"><span class="field-label" data-help="${this.parameterHelp("dimensions")}">有效分辨率</span><div class="dimension-control">
       <div class="number-input"><input id="descriptor-width" data-field="width" type="number" min="1" max="100000" step="1" aria-label="有效宽度"/></div>
       <i>×</i>
       <div class="number-input"><input id="descriptor-height" data-field="height" type="number" min="1" max="100000" step="1" aria-label="有效高度"/></div>
@@ -275,19 +265,19 @@ export class ErawApp {
   }
 
   private selectField(field: string, label: string, options: string): string {
-    return `<div class="parameter-row" data-help="${this.parameterHelp(field)}"><span class="field-label">${label}</span><select id="descriptor-${field}" data-field="${field}" aria-label="${label}">${options}</select></div>`;
+    return `<div class="parameter-row"><span class="field-label" data-help="${this.parameterHelp(field)}">${label}</span><select id="descriptor-${field}" data-field="${field}" aria-label="${label}">${options}</select></div>`;
   }
 
   private segmentedField(field: string, label: string, options: Array<[string, string]>): string {
     const buttons = options.map(([value, text]) => `<button type="button" data-value="${value}" aria-pressed="false">${text}</button>`).join("");
-    return `<div class="parameter-row" data-help="${this.parameterHelp(field)}"><span class="field-label" id="${field}-label">${label}</span><div class="segmented-control" data-field="${field}" role="group" aria-labelledby="${field}-label">${buttons}</div></div>`;
+    return `<div class="parameter-row"><span class="field-label" id="${field}-label" data-help="${this.parameterHelp(field)}">${label}</span><div class="segmented-control" data-field="${field}" role="group" aria-labelledby="${field}-label">${buttons}</div></div>`;
   }
 
   private numberField(field: string, label: string, unit: string, min: number, max?: number, hint?: string, descriptorField = true, adjustable = false): string {
     const inputId = descriptorField ? `descriptor-${field}` : field;
     const input = `<div class="number-input"><input id="${inputId}" type="number" ${descriptorField ? `data-field="${field}"` : ""} min="${min}" ${max === undefined ? "" : `max="${max}"`} step="1" ${hint ? `placeholder="${hint}"` : ""}/><b>${unit}</b></div>`;
     const control = adjustable ? `<div class="stepper-control"><button type="button" data-step-target="${field}" data-step="-1" aria-label="减小${label}">−</button>${input}<button type="button" data-step-target="${field}" data-step="1" aria-label="增大${label}">+</button></div>` : input;
-    return `<div class="parameter-row" data-help="${this.parameterHelp(field)}"><span class="field-label">${label}</span>${control}</div>`;
+    return `<div class="parameter-row"><span class="field-label" data-help="${this.parameterHelp(field)}">${label}</span>${control}</div>`;
   }
 
   private parameterHelp(field: string): string {
@@ -447,21 +437,42 @@ export class ErawApp {
 
   private bindParameterHelp(): void {
     const tooltip = this.get("parameter-tooltip");
+    let showTimer = 0;
+    let pointerX = 0;
+    let pointerY = 0;
     const move = (event: PointerEvent) => {
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+      if (!tooltip.classList.contains("visible")) return;
       const margin = 12;
-      const x = Math.min(window.innerWidth - tooltip.offsetWidth - margin, event.clientX + 14);
-      const y = Math.min(window.innerHeight - tooltip.offsetHeight - margin, event.clientY + 18);
+      const x = Math.min(window.innerWidth - tooltip.offsetWidth - margin, pointerX + 14);
+      const y = Math.min(window.innerHeight - tooltip.offsetHeight - margin, pointerY + 18);
       tooltip.style.left = `${Math.max(margin, x)}px`;
       tooltip.style.top = `${Math.max(margin, y)}px`;
     };
-    this.root.querySelectorAll<HTMLElement>(".parameter-row[data-help]").forEach((row) => {
-      row.addEventListener("pointerenter", (event) => {
-        tooltip.textContent = row.dataset.help ?? "";
-        tooltip.classList.add("visible");
-        move(event);
+    const hide = () => {
+      window.clearTimeout(showTimer);
+      showTimer = 0;
+      tooltip.classList.remove("visible");
+    };
+    this.root.querySelectorAll<HTMLElement>(".field-label[data-help]").forEach((label) => {
+      label.addEventListener("pointerenter", (event) => {
+        hide();
+        pointerX = event.clientX;
+        pointerY = event.clientY;
+        showTimer = window.setTimeout(() => {
+          tooltip.textContent = label.dataset.help ?? "";
+          tooltip.classList.add("visible");
+          const margin = 12;
+          const x = Math.min(window.innerWidth - tooltip.offsetWidth - margin, pointerX + 14);
+          const y = Math.min(window.innerHeight - tooltip.offsetHeight - margin, pointerY + 18);
+          tooltip.style.left = `${Math.max(margin, x)}px`;
+          tooltip.style.top = `${Math.max(margin, y)}px`;
+          showTimer = 0;
+        }, 500);
       });
-      row.addEventListener("pointermove", move);
-      row.addEventListener("pointerleave", () => tooltip.classList.remove("visible"));
+      label.addEventListener("pointermove", move);
+      label.addEventListener("pointerleave", hide);
     });
   }
 
@@ -550,21 +561,16 @@ export class ErawApp {
 
   private updateDocumentUi(): void {
     const info = this.document;
-    this.get("empty-state").classList.toggle("hidden", Boolean(info));
+    const emptyState = this.get("empty-state");
+    emptyState.classList.toggle("hidden", Boolean(info));
+    emptyState.setAttribute("aria-hidden", String(Boolean(info)));
+    this.get<HTMLButtonElement>("empty-open-button").disabled = Boolean(info);
     this.get<HTMLButtonElement>("export-button").disabled = !info;
     const fileStatus = this.get("file-status");
     fileStatus.textContent = info?.path ?? "未打开文件";
     fileStatus.title = info?.path ?? "";
     document.title = info ? `${info.name} — eRAW V${VERSION}` : `eRAW V${VERSION}`;
     const layout = info?.layout;
-    const difference = (actual: number, payload: number, location: string) => actual === payload
-      ? `无${location}填充`
-      : actual > payload ? `${location}填充 ${exactBytes(actual - payload)}` : `${location}短缺 ${exactBytes(payload - actual)}`;
-    this.get("row-bytes").textContent = layout && info ? `${info.descriptor.width.toLocaleString("zh-CN")} px → ${exactBytes(layout.rowBytes)}` : "—";
-    this.get("row-stride").textContent = layout ? `${exactBytes(layout.rowStride)}/行 · ${difference(layout.rowStride, layout.rowBytes, "行尾")}` : "—";
-    const activeFrameBytes = layout && info ? layout.rowBytes * info.descriptor.height : 0;
-    this.get("frame-bytes").textContent = layout && info ? `${info.descriptor.width.toLocaleString("zh-CN")} × ${info.descriptor.height.toLocaleString("zh-CN")} px → ${exactBytes(activeFrameBytes)}` : "—";
-    this.get("frame-stride").textContent = layout ? `${exactBytes(layout.frameStride)}/帧 · ${difference(layout.frameStride, layout.frameBytes, "帧尾")}` : "—";
     const count = layout?.frameCount ?? 0;
     this.get("frame-total").textContent = String(count);
     this.get<HTMLInputElement>("frame-input").value = String(Math.min(this.frame + 1, Math.max(1, count)));
