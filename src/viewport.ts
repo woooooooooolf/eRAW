@@ -1,5 +1,5 @@
-import { renderTile, samplePixel } from "./api";
-import type { DisplayMode, DocumentInfo, PixelSample, TileRequest } from "./types";
+import { renderTile } from "./api";
+import type { DisplayMode, DocumentInfo, TileRequest } from "./types";
 
 const TILE_SIZE = 256;
 const MAX_IN_FLIGHT = 8;
@@ -22,9 +22,14 @@ interface TextureEntry {
 
 export interface ViewportCallbacks {
   onZoomChange(zoom: number): void;
-  onSampleChange(sample: PixelSample | null): void;
+  onSampleChange(sample: ImagePoint | null): void;
   onRenderStats(level: number, loaded: number, pending: number): void;
   onError(message: string): void;
+}
+
+export interface ImagePoint {
+  x: number;
+  y: number;
 }
 
 const vertexShaderSource = `#version 300 es
@@ -114,7 +119,6 @@ export class RawViewport {
   private maxTextures = DEFAULT_MAX_TEXTURES;
   private wheelSensitivity = 0.0015;
   private animationFrame = 0;
-  private sampleTimer = 0;
   private lastSampleKey = "";
   private renderCounter = 0;
 
@@ -167,7 +171,7 @@ export class RawViewport {
     this.canvas.addEventListener("pointermove", (event) => this.onPointerMove(event));
     this.canvas.addEventListener("pointerup", (event) => this.onPointerUp(event));
     this.canvas.addEventListener("pointercancel", (event) => this.onPointerUp(event));
-    this.canvas.addEventListener("pointerleave", () => this.scheduleSample(null));
+    this.canvas.addEventListener("pointerleave", () => this.updatePointerPosition(null));
     this.canvas.addEventListener("dblclick", () => {
       if (Math.abs(this.zoom - this.fitScale) < 0.001) this.actualSize(); else this.fit();
     });
@@ -211,6 +215,7 @@ export class RawViewport {
       || document.descriptor.width !== this.document.descriptor.width
       || document.descriptor.height !== this.document.descriptor.height;
     this.document = document;
+    this.updatePointerPosition(null);
     this.frame = Math.min(this.frame, Math.max(0, document.layout.frameCount - 1));
     this.clearTextures();
     if (!preserveView || dimensionsChanged) this.fit(); else this.requestDraw();
@@ -219,6 +224,7 @@ export class RawViewport {
   setFrame(frame: number): void {
     if (!this.document) return;
     this.frame = Math.max(0, Math.min(frame, Math.max(0, this.document.layout.frameCount - 1)));
+    this.updatePointerPosition(null);
     this.clearTextures();
     this.requestDraw();
   }
@@ -309,6 +315,7 @@ export class RawViewport {
   private onPointerDown(event: PointerEvent): void {
     if (!this.document || event.button !== 0) return;
     this.dragging = true;
+    this.updatePointerPosition(null);
     this.dragX = event.clientX;
     this.dragY = event.clientY;
     this.dragCameraX = this.cameraX;
@@ -330,9 +337,9 @@ export class RawViewport {
     const x = Math.floor((event.clientX - rect.left - this.cameraX) / this.zoom);
     const y = Math.floor((event.clientY - rect.top - this.cameraY) / this.zoom);
     if (x >= 0 && y >= 0 && x < this.document.descriptor.width && y < this.document.descriptor.height) {
-      this.scheduleSample({ x, y });
+      this.updatePointerPosition({ x, y });
     } else {
-      this.scheduleSample(null);
+      this.updatePointerPosition(null);
     }
   }
 
@@ -343,9 +350,9 @@ export class RawViewport {
     if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
   }
 
-  private scheduleSample(point: { x: number; y: number } | null): void {
-    window.clearTimeout(this.sampleTimer);
+  private updatePointerPosition(point: ImagePoint | null): void {
     if (!point) {
+      if (!this.lastSampleKey) return;
       this.lastSampleKey = "";
       this.callbacks.onSampleChange(null);
       return;
@@ -353,13 +360,7 @@ export class RawViewport {
     const key = `${this.frame}:${point.x}:${point.y}`;
     if (key === this.lastSampleKey) return;
     this.lastSampleKey = key;
-    this.sampleTimer = window.setTimeout(async () => {
-      try {
-        this.callbacks.onSampleChange(await samplePixel(point.x, point.y, this.frame));
-      } catch {
-        this.callbacks.onSampleChange(null);
-      }
-    }, 55);
+    this.callbacks.onSampleChange(point);
   }
 
   private constrainCamera(): void {

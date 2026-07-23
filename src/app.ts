@@ -1,7 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import erawIconUrl from "./assets/eraw-icon.svg";
 import { chooseExportFile, chooseRawFile, exportDocument, openDocument, updateDescriptor } from "./api";
-import { RawViewport } from "./viewport";
+import { RawViewport, type ImagePoint } from "./viewport";
 import type {
   BitAlignment,
   CfaPattern,
@@ -10,7 +10,6 @@ import type {
   Endianness,
   ExportRequest,
   Packing,
-  PixelSample,
   RawDescriptor,
 } from "./types";
 import { DEFAULT_DESCRIPTOR } from "./types";
@@ -83,6 +82,14 @@ function formatBytes(value: number): string {
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]!);
+}
+
+function descriptorsEqual(left: RawDescriptor, right: RawDescriptor): boolean {
+  return (Object.keys(DEFAULT_DESCRIPTOR) as Array<keyof RawDescriptor>).every((key) => left[key] === right[key]);
+}
+
+function exactBytes(value: number): string {
+  return `${Math.max(0, value).toLocaleString("zh-CN")} B`;
 }
 
 function loadSettings(): AppSettings {
@@ -182,18 +189,13 @@ export class ErawApp {
 
         <div class="workspace">
           <aside class="sidebar" id="sidebar">
-            <section class="file-summary">
-              <div class="file-icon">RAW</div>
-              <div class="file-copy"><strong id="file-name">未打开图像</strong><span id="file-meta">请选择 *.raw 或 *.bin 文件</span></div>
-            </section>
-
             <div class="sidebar-scroll">
               <section class="parameter-section open">
                 <button class="section-title"><span>图像格式</span><i>−</i></button>
                 <div class="section-content field-grid">
                   ${this.dimensionField()}
-                  ${this.selectField("bitDepth", "位深", `<option value="8">8 bit</option><option value="10">10 bit</option><option value="12">12 bit</option><option value="14">14 bit</option><option value="16">16 bit</option>`)}
-                  ${this.selectField("packing", "存储方式", `<option value="unpacked8">Unpacked 8</option><option value="unpacked16">Unpacked 16</option><option value="mipiRaw10">MIPI RAW10</option><option value="mipiRaw12">MIPI RAW12</option>`)}
+                  ${this.selectField("bitDepth", "位深", `<option value="8">8 bit</option><option value="9">9 bit</option><option value="10">10 bit</option><option value="11">11 bit</option><option value="12">12 bit</option><option value="13">13 bit</option><option value="14">14 bit</option><option value="15">15 bit</option><option value="16">16 bit</option>`)}
+                  ${this.selectField("packing", "存储方式", `<option value="unpacked8">Unpacked 8</option><option value="unpacked16">Unpacked 16</option><option value="mipiRaw10">MIPI RAW10</option><option value="mipiRaw12">MIPI RAW12</option><option value="mipiRaw14">MIPI RAW14</option>`)}
                   ${this.segmentedField("endianness", "字节序", [["little", "Little"], ["big", "Big"]])}
                   ${this.segmentedField("bitAlignment", "有效位位置", [["lsb", "低位 LSB"], ["msb", "高位 MSB"]])}
                   ${this.selectField("cfa", "CFA 排列", `<option value="MONO">Mono</option><option value="RGGB">RGGB</option><option value="BGGR">BGGR</option><option value="GBRG">GBRG</option><option value="GRBG">GRBG</option>`)}
@@ -210,20 +212,11 @@ export class ErawApp {
                   ${this.numberField("frameStride", "显式帧步长", "B", 0, undefined, "0 = 自动", true, true)}
                 </div>
                 <div class="computed-layout">
-                  <div><span>有效行</span><strong id="row-bytes">—</strong></div>
-                  <div><span>实际行步长</span><strong id="row-stride">—</strong></div>
-                  <div><span>帧数据</span><strong id="frame-bytes">—</strong></div>
-                  <div><span>实际帧步长</span><strong id="frame-stride">—</strong></div>
+                  <div><span>每行有效像素</span><strong id="row-bytes">—</strong></div>
+                  <div><span>每行存储跨度</span><strong id="row-stride">—</strong></div>
+                  <div><span>单帧有效图像</span><strong id="frame-bytes">—</strong></div>
+                  <div><span>每帧存储跨度</span><strong id="frame-stride">—</strong></div>
                 </div>
-              </section>
-
-              <section class="parameter-section open">
-                <button class="section-title"><span>显示范围</span><i>−</i></button>
-                <div class="section-content field-grid">
-                  ${this.numberField("display-min", "显示下限", "DN", 0, 65535, undefined, false)}
-                  ${this.numberField("display-max", "显示上限", "DN", 0, 65535, "0 = 位深最大值", false)}
-                </div>
-                <p class="section-hint">仅影响预览归一化，不修改 RAW 像素值。</p>
               </section>
             </div>
           </aside>
@@ -261,10 +254,11 @@ export class ErawApp {
 
         <footer class="statusbar">
           <button id="status-warning" class="status-warning" aria-expanded="false" aria-controls="diagnostics-drawer">${icons.warning}<span>诊断</span><b id="diagnostics-count" hidden>0</b></button>
-          <div class="status-spacer"></div>
-          <span id="pixel-status">X — · Y — · DN —</span><i></i><span id="render-status">WebGL2 ready</span><i></i><span id="zoom-status">100.0%</span>
+          <i></i><span id="file-status" class="file-status">未打开文件</span><div class="status-spacer"></div>
+          <span id="pixel-status">X — · Y —</span><i></i><span id="render-status">WebGL2 ready</span><i></i><span id="zoom-status">100.0%</span>
         </footer>
         <div class="toast" id="toast" role="status"></div>
+        <div class="parameter-tooltip" id="parameter-tooltip" role="tooltip"></div>
 
         ${this.exportDialogTemplate()}
         ${this.settingsDialogTemplate()}
@@ -273,7 +267,7 @@ export class ErawApp {
   }
 
   private dimensionField(): string {
-    return `<div class="parameter-row dimension-row"><span class="field-label">有效分辨率</span><div class="dimension-control">
+    return `<div class="parameter-row dimension-row" data-help="${this.parameterHelp("dimensions")}"><span class="field-label">有效分辨率</span><div class="dimension-control">
       <div class="number-input"><input id="descriptor-width" data-field="width" type="number" min="1" max="100000" step="1" aria-label="有效宽度"/></div>
       <i>×</i>
       <div class="number-input"><input id="descriptor-height" data-field="height" type="number" min="1" max="100000" step="1" aria-label="有效高度"/></div>
@@ -281,19 +275,36 @@ export class ErawApp {
   }
 
   private selectField(field: string, label: string, options: string): string {
-    return `<div class="parameter-row"><label class="field-label" for="descriptor-${field}">${label}</label><select id="descriptor-${field}" data-field="${field}">${options}</select></div>`;
+    return `<div class="parameter-row" data-help="${this.parameterHelp(field)}"><span class="field-label">${label}</span><select id="descriptor-${field}" data-field="${field}" aria-label="${label}">${options}</select></div>`;
   }
 
   private segmentedField(field: string, label: string, options: Array<[string, string]>): string {
     const buttons = options.map(([value, text]) => `<button type="button" data-value="${value}" aria-pressed="false">${text}</button>`).join("");
-    return `<div class="parameter-row"><span class="field-label" id="${field}-label">${label}</span><div class="segmented-control" data-field="${field}" role="group" aria-labelledby="${field}-label">${buttons}</div></div>`;
+    return `<div class="parameter-row" data-help="${this.parameterHelp(field)}"><span class="field-label" id="${field}-label">${label}</span><div class="segmented-control" data-field="${field}" role="group" aria-labelledby="${field}-label">${buttons}</div></div>`;
   }
 
   private numberField(field: string, label: string, unit: string, min: number, max?: number, hint?: string, descriptorField = true, adjustable = false): string {
     const inputId = descriptorField ? `descriptor-${field}` : field;
     const input = `<div class="number-input"><input id="${inputId}" type="number" ${descriptorField ? `data-field="${field}"` : ""} min="${min}" ${max === undefined ? "" : `max="${max}"`} step="1" ${hint ? `placeholder="${hint}"` : ""}/><b>${unit}</b></div>`;
     const control = adjustable ? `<div class="stepper-control"><button type="button" data-step-target="${field}" data-step="-1" aria-label="减小${label}">−</button>${input}<button type="button" data-step-target="${field}" data-step="1" aria-label="增大${label}">+</button></div>` : input;
-    return `<div class="parameter-row"><label class="field-label" for="${inputId}">${label}</label>${control}</div>`;
+    return `<div class="parameter-row" data-help="${this.parameterHelp(field)}"><span class="field-label">${label}</span>${control}</div>`;
+  }
+
+  private parameterHelp(field: string): string {
+    const descriptions: Record<string, string> = {
+      dimensions: "图像中可见的有效像素宽度和高度，不包含每行或每帧末尾的填充数据。",
+      bitDepth: "每个像素实际使用的有效位数。9/11/13/15 bit 数据通常存放在 16-bit 容器中。",
+      packing: "RAW 像素在文件中的字节排列方式；MIPI 格式会将多个像素紧凑打包。",
+      endianness: "Unpacked 多字节像素在文件中的字节顺序；MIPI packed 格式不使用此设置。",
+      bitAlignment: "有效像素位在 Unpacked 容器中靠低位或靠高位存放。",
+      cfa: "传感器彩色滤光阵列的 2×2 排列；Mono 表示单色传感器。",
+      headerOffset: "第一帧 RAW 像素数据相对于文件开头的字节偏移。",
+      rowAlignment: "自动行步长使用的字节对齐值；仅在显式行步长为 0 时生效。",
+      rowStride: "相邻两行起点之间的字节距离；0 表示根据有效行大小和行对齐自动计算。",
+      frameAlignment: "自动帧步长使用的字节对齐值；仅在显式帧步长为 0 时生效。",
+      frameStride: "相邻两帧起点之间的字节距离；0 表示根据帧数据大小和帧对齐自动计算。",
+    };
+    return escapeHtml(descriptions[field] ?? "");
   }
 
   private exportDialogTemplate(): string {
@@ -304,8 +315,8 @@ export class ErawApp {
           ${this.exportNumber("crop-x", "起点 X", 0)}${this.exportNumber("crop-y", "起点 Y", 0)}${this.exportNumber("crop-width", "宽度", 1)}${this.exportNumber("crop-height", "高度", 1)}
         </div><div class="phase-note">输出 CFA：<strong id="export-cfa">—</strong><span>奇数坐标裁剪会自动改变 CFA 相位</span></div></section>
         <section><h3>输出编码</h3><div class="export-grid">
-          <label><span>存储方式</span><select id="export-packing"><option value="unpacked8">Unpacked 8</option><option value="unpacked16">Unpacked 16</option><option value="mipiRaw10">MIPI RAW10</option><option value="mipiRaw12">MIPI RAW12</option></select></label>
-          <label><span>位深</span><select id="export-depth"><option>8</option><option>10</option><option>12</option><option>14</option><option>16</option></select></label>
+          <label><span>存储方式</span><select id="export-packing"><option value="unpacked8">Unpacked 8</option><option value="unpacked16">Unpacked 16</option><option value="mipiRaw10">MIPI RAW10</option><option value="mipiRaw12">MIPI RAW12</option><option value="mipiRaw14">MIPI RAW14</option></select></label>
+          <label><span>位深</span><select id="export-depth"><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option></select></label>
           <label><span>字节序</span><select id="export-endian"><option value="little">Little endian</option><option value="big">Big endian</option></select></label>
           <label><span>有效位位置</span><select id="export-bit-alignment"><option value="lsb">容器低位 LSB</option><option value="msb">容器高位 MSB</option></select></label>
           ${this.exportNumber("export-row-alignment", "行对齐", 1)}${this.exportNumber("export-frame-alignment", "帧对齐", 1)}
@@ -369,7 +380,10 @@ export class ErawApp {
     this.root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => button.addEventListener("click", () => this.setDisplayMode(button.dataset.mode as DisplayMode)));
     this.get<HTMLSelectElement>("channel-mode").addEventListener("change", (event) => this.setDisplayMode((event.currentTarget as HTMLSelectElement).value as DisplayMode));
     this.root.querySelectorAll<HTMLElement>("[data-field]").forEach((element) => {
-      if (element instanceof HTMLSelectElement) element.addEventListener("change", () => void this.commitDescriptor());
+      if (element instanceof HTMLSelectElement) element.addEventListener("change", () => {
+        this.synchronizePackingAndDepth(element.dataset.field ?? "");
+        void this.commitDescriptor();
+      });
       else if (element instanceof HTMLInputElement) {
         element.addEventListener("blur", () => void this.commitDescriptor());
         element.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); element.blur(); } });
@@ -389,11 +403,7 @@ export class ErawApp {
       input.value = String(next);
       void this.commitDescriptor();
     }));
-    ["display-min", "display-max"].forEach((id) => {
-      const input = this.get<HTMLInputElement>(id);
-      input.addEventListener("blur", () => this.updateDisplay());
-      input.addEventListener("keydown", (event) => { if (event.key === "Enter") input.blur(); });
-    });
+    this.bindParameterHelp();
     this.root.querySelectorAll<HTMLButtonElement>(".section-title").forEach((button) => button.addEventListener("click", () => {
       const section = button.closest(".parameter-section")!;
       section.classList.toggle("open");
@@ -415,9 +425,44 @@ export class ErawApp {
       const packing = (event.currentTarget as HTMLSelectElement).value;
       if (packing === "mipiRaw10") this.get<HTMLSelectElement>("export-depth").value = "10";
       if (packing === "mipiRaw12") this.get<HTMLSelectElement>("export-depth").value = "12";
+      if (packing === "mipiRaw14") this.get<HTMLSelectElement>("export-depth").value = "14";
+      if (packing === "unpacked8") this.get<HTMLSelectElement>("export-depth").value = "8";
     });
     window.addEventListener("keydown", (event) => this.onKeyDown(event));
     window.addEventListener("resize", () => this.setSidebarWidth(this.settings.sidebarWidth, false));
+  }
+
+  private synchronizePackingAndDepth(changedField: string): void {
+    const depth = this.root.querySelector<HTMLSelectElement>('[data-field="bitDepth"]')!;
+    const packing = this.root.querySelector<HTMLSelectElement>('[data-field="packing"]')!;
+    if (changedField === "bitDepth" && [9, 11, 13, 15].includes(Number(depth.value))) {
+      packing.value = "unpacked16";
+      return;
+    }
+    if (changedField !== "packing") return;
+    const fixedDepth: Partial<Record<Packing, string>> = { unpacked8: "8", mipiRaw10: "10", mipiRaw12: "12", mipiRaw14: "14" };
+    const value = fixedDepth[packing.value as Packing];
+    if (value) depth.value = value;
+  }
+
+  private bindParameterHelp(): void {
+    const tooltip = this.get("parameter-tooltip");
+    const move = (event: PointerEvent) => {
+      const margin = 12;
+      const x = Math.min(window.innerWidth - tooltip.offsetWidth - margin, event.clientX + 14);
+      const y = Math.min(window.innerHeight - tooltip.offsetHeight - margin, event.clientY + 18);
+      tooltip.style.left = `${Math.max(margin, x)}px`;
+      tooltip.style.top = `${Math.max(margin, y)}px`;
+    };
+    this.root.querySelectorAll<HTMLElement>(".parameter-row[data-help]").forEach((row) => {
+      row.addEventListener("pointerenter", (event) => {
+        tooltip.textContent = row.dataset.help ?? "";
+        tooltip.classList.add("visible");
+        move(event);
+      });
+      row.addEventListener("pointermove", move);
+      row.addEventListener("pointerleave", () => tooltip.classList.remove("visible"));
+    });
   }
 
   private async openFile(): Promise<void> {
@@ -481,16 +526,16 @@ export class ErawApp {
       while (true) {
         const revision = this.commitRevision;
         const descriptor = this.readDescriptor();
+        const localChanged = !descriptorsEqual(descriptor, this.descriptor);
         this.descriptor = descriptor;
-        if (this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(descriptor));
-        if (this.document) {
+        if (localChanged && this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(descriptor));
+        if (this.document && !descriptorsEqual(descriptor, this.document.descriptor)) {
           try {
             const info = await updateDescriptor(descriptor);
             this.document = info;
             this.descriptor = info.descriptor;
             this.frame = Math.min(this.frame, Math.max(0, info.layout.frameCount - 1));
             this.viewport.setDocument(info, true);
-            this.viewport.setFrame(this.frame);
             this.updateDocumentUi();
           } catch (error) {
             this.reportRuntimeError(String(error));
@@ -507,14 +552,19 @@ export class ErawApp {
     const info = this.document;
     this.get("empty-state").classList.toggle("hidden", Boolean(info));
     this.get<HTMLButtonElement>("export-button").disabled = !info;
-    this.get("file-name").textContent = info?.name ?? "未打开图像";
-    this.get("file-meta").textContent = info ? `${formatBytes(info.fileSize)} · ${info.descriptor.width} × ${info.descriptor.height}` : "请选择 *.raw 或 *.bin 文件";
+    const fileStatus = this.get("file-status");
+    fileStatus.textContent = info?.path ?? "未打开文件";
+    fileStatus.title = info?.path ?? "";
     document.title = info ? `${info.name} — eRAW V${VERSION}` : `eRAW V${VERSION}`;
     const layout = info?.layout;
-    this.get("row-bytes").textContent = layout ? formatBytes(layout.rowBytes) : "—";
-    this.get("row-stride").textContent = layout ? formatBytes(layout.rowStride) : "—";
-    this.get("frame-bytes").textContent = layout ? formatBytes(layout.frameBytes) : "—";
-    this.get("frame-stride").textContent = layout ? formatBytes(layout.frameStride) : "—";
+    const difference = (actual: number, payload: number, location: string) => actual === payload
+      ? `无${location}填充`
+      : actual > payload ? `${location}填充 ${exactBytes(actual - payload)}` : `${location}短缺 ${exactBytes(payload - actual)}`;
+    this.get("row-bytes").textContent = layout && info ? `${info.descriptor.width.toLocaleString("zh-CN")} px → ${exactBytes(layout.rowBytes)}` : "—";
+    this.get("row-stride").textContent = layout ? `${exactBytes(layout.rowStride)}/行 · ${difference(layout.rowStride, layout.rowBytes, "行尾")}` : "—";
+    const activeFrameBytes = layout && info ? layout.rowBytes * info.descriptor.height : 0;
+    this.get("frame-bytes").textContent = layout && info ? `${info.descriptor.width.toLocaleString("zh-CN")} × ${info.descriptor.height.toLocaleString("zh-CN")} px → ${exactBytes(activeFrameBytes)}` : "—";
+    this.get("frame-stride").textContent = layout ? `${exactBytes(layout.frameStride)}/帧 · ${difference(layout.frameStride, layout.frameBytes, "帧尾")}` : "—";
     const count = layout?.frameCount ?? 0;
     this.get("frame-total").textContent = String(count);
     this.get<HTMLInputElement>("frame-input").value = String(Math.min(this.frame + 1, Math.max(1, count)));
@@ -630,8 +680,8 @@ export class ErawApp {
   private updateDisplay(): void {
     this.viewport.setDisplay({
       mode: this.displayMode,
-      displayMin: Math.max(0, Number(this.get<HTMLInputElement>("display-min").value) || 0),
-      displayMax: Math.max(0, Number(this.get<HTMLInputElement>("display-max").value) || 0),
+      displayMin: 0,
+      displayMax: 0,
     });
   }
 
@@ -643,8 +693,8 @@ export class ErawApp {
     this.get<HTMLInputElement>("frame-input").value = String(this.frame + 1);
   }
 
-  private updateSample(sample: PixelSample | null): void {
-    this.get("pixel-status").textContent = sample ? `X ${sample.x} · Y ${sample.y} · ${sample.channel} ${sample.value ?? "N/A"} DN` : "X — · Y — · DN —";
+  private updateSample(sample: ImagePoint | null): void {
+    this.get("pixel-status").textContent = sample ? `X ${sample.x} · Y ${sample.y}` : "X — · Y —";
   }
 
   private openExportDialog(): void {
