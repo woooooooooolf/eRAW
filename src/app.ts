@@ -14,7 +14,7 @@ import type {
 } from "./types";
 import { DEFAULT_DESCRIPTOR } from "./types";
 
-const VERSION = "0.0.5";
+const VERSION = "0.0.6";
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
 
