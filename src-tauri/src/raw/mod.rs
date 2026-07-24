@@ -1175,10 +1175,14 @@ mod tests {
 
     #[test]
     fn pixel_inspection_returns_raw_and_demosaic_components() {
-        let mut d = descriptor(Packing::Unpacked16, 10);
-        d.width = 2;
-        d.height = 2;
-        d.cfa = CfaPattern::Rggb;
+        let d = RawDescriptor {
+            width: 2,
+            height: 2,
+            bit_depth: 10,
+            packing: Packing::Unpacked16,
+            cfa: CfaPattern::Rggb,
+            ..RawDescriptor::default()
+        };
         let values = [100u16, 200, 300, 400];
         let bytes: Vec<u8> = values
             .iter()
@@ -1205,7 +1209,11 @@ mod tests {
 
     #[test]
     fn pixel_inspection_limits_requested_area() {
-        let d = descriptor(Packing::Unpacked16, 10);
+        let d = RawDescriptor {
+            bit_depth: 10,
+            packing: Packing::Unpacked16,
+            ..RawDescriptor::default()
+        };
         let layout = calculate_layout(&d, 0).0;
         let request = PixelInspectionRequest {
             generation: 1,
