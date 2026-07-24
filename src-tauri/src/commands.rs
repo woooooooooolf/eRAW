@@ -1,14 +1,18 @@
 use crate::raw::{
     ExportRequest, ExportResult, PixelInspectionRequest, PixelSample, RawDescriptor, RawLayout,
     RawWarning, TileRequest, calculate_layout, cfa_name_at, export_raw, inspect_pixels, read_pixel,
-    render_tile,
+    render_tile_cancellable,
 };
 use memmap2::{Mmap, MmapOptions};
 use serde::Serialize;
 use std::{
+    collections::{HashMap, VecDeque},
     fs::File,
     path::Path,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 use tauri::{State, ipc::Response};
 
@@ -23,9 +27,67 @@ struct RawDocument {
     generation: u64,
 }
 
+const PREVIEW_CACHE_TILES: usize = 128;
+
 #[derive(Default)]
+struct PreviewCache {
+    entries: HashMap<String, Vec<u8>>,
+    order: VecDeque<String>,
+}
+
+impl PreviewCache {
+    fn get(&mut self, key: &str) -> Option<Vec<u8>> {
+        let value = self.entries.get(key)?.clone();
+        self.order.retain(|existing| existing != key);
+        self.order.push_back(key.to_owned());
+        Some(value)
+    }
+
+    fn insert(&mut self, key: String, value: Vec<u8>) {
+        self.entries.insert(key.clone(), value);
+        self.order.retain(|existing| existing != &key);
+        self.order.push_back(key);
+        while self.entries.len() > PREVIEW_CACHE_TILES {
+            if let Some(oldest) = self.order.pop_front() {
+                self.entries.remove(&oldest);
+            }
+        }
+    }
+
+    fn clear(&mut self) {
+        self.entries.clear();
+        self.order.clear();
+    }
+}
+
 pub struct AppState {
     document: Mutex<Option<RawDocument>>,
+    generation_clock: Arc<AtomicU64>,
+    preview_cache: Arc<Mutex<PreviewCache>>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            document: Mutex::new(None),
+            generation_clock: Arc::new(AtomicU64::new(0)),
+            preview_cache: Arc::new(Mutex::new(PreviewCache::default())),
+        }
+    }
+}
+
+impl AppState {
+    fn next_generation(&self) -> u64 {
+        self.generation_clock.fetch_add(1, Ordering::AcqRel) + 1
+    }
+
+    fn clear_preview_cache(&self) -> Result<(), String> {
+        self.preview_cache
+            .lock()
+            .map_err(|_| "预览缓存已损坏，请重新启动应用".to_owned())?
+            .clear();
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -89,6 +151,7 @@ pub fn open_document(
         .and_then(|v| v.to_str())
         .unwrap_or("未命名.raw")
         .to_owned();
+    let generation = state.next_generation();
     let document = RawDocument {
         path,
         name,
@@ -97,10 +160,11 @@ pub fn open_document(
         descriptor,
         layout,
         warnings,
-        generation: 1,
+        generation,
     };
     let info = DocumentInfo::from(&document);
     *lock_document(&state)? = Some(document);
+    state.clear_preview_cache()?;
     Ok(info)
 }
 
@@ -115,13 +179,18 @@ pub fn update_descriptor(
     document.descriptor = descriptor;
     document.layout = layout;
     document.warnings = warnings;
-    document.generation = document.generation.wrapping_add(1).max(1);
-    Ok(DocumentInfo::from(&*document))
+    document.generation = state.next_generation();
+    let info = DocumentInfo::from(&*document);
+    drop(guard);
+    state.clear_preview_cache()?;
+    Ok(info)
 }
 
 #[tauri::command]
 pub fn close_document(state: State<'_, AppState>) -> Result<(), String> {
+    state.next_generation();
     *lock_document(&state)? = None;
+    state.clear_preview_cache()?;
     Ok(())
 }
 
@@ -143,12 +212,44 @@ pub async fn render_raw_tile(
     if request.generation != generation {
         return Err("stale_generation".into());
     }
+    let cache_key = format!(
+        "{}:{}:{:?}:{}:{}:{}:{}:{}:{}",
+        request.generation,
+        request.frame,
+        request.mode,
+        request.display_min,
+        request.display_max,
+        request.level,
+        request.tile_x,
+        request.tile_y,
+        request.tile_size,
+    );
+    if let Some(bytes) = state
+        .preview_cache
+        .lock()
+        .map_err(|_| "预览缓存已损坏，请重新启动应用".to_owned())?
+        .get(&cache_key)
+    {
+        return Ok(Response::new(bytes));
+    }
+    let generation_clock = state.generation_clock.clone();
+    let preview_cache = state.preview_cache.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let bytes: &[u8] = match map.as_ref() {
             Some(value) => value.as_ref(),
             None => &[],
         };
-        render_tile(bytes, &descriptor, &layout, &request).map(Response::new)
+        let rendered = render_tile_cancellable(bytes, &descriptor, &layout, &request, || {
+            generation_clock.load(Ordering::Acquire) == request.generation
+        })?;
+        if generation_clock.load(Ordering::Acquire) != request.generation {
+            return Err("stale_generation".into());
+        }
+        preview_cache
+            .lock()
+            .map_err(|_| "预览缓存已损坏，请重新启动应用".to_owned())?
+            .insert(cache_key, rendered.clone());
+        Ok(Response::new(rendered))
     })
     .await
     .map_err(|error| format!("瓦片渲染任务异常：{error}"))?

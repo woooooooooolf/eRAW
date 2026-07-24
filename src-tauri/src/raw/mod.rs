@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::{
-    cmp::min,
     fs::{self, File, OpenOptions},
     io::{BufWriter, Write},
     path::{Path, PathBuf},
@@ -561,13 +560,12 @@ fn interpolate_channel(
     (count > 0).then_some((sum / count) as u16)
 }
 
-fn sampled_rgb(
+fn sampled_rgb_l0(
     data: &[u8],
     d: &RawDescriptor,
     l: &RawLayout,
     frame: u64,
     point: (u32, u32),
-    level: u8,
     mode: DisplayMode,
 ) -> Option<[u16; 3]> {
     let (x, y) = point;
@@ -577,39 +575,12 @@ fn sampled_rgb(
     }
     match mode {
         DisplayMode::Raw => Some([value; 3]),
-        DisplayMode::Bayer if level == 0 => match cfa_channel(d.cfa, x, y) {
+        DisplayMode::Bayer => match cfa_channel(d.cfa, x, y) {
             CfaChannel::Red => Some([value, 0, 0]),
             CfaChannel::Green => Some([0, value, 0]),
             CfaChannel::Blue => Some([0, 0, value]),
             CfaChannel::Mono => Some([value; 3]),
         },
-        DisplayMode::Bayer => {
-            let bx = x & !1;
-            let by = y & !1;
-            let mut sums = [0u32; 3];
-            let mut counts = [0u32; 3];
-            for cy in by..min(by + 2, d.height) {
-                for cx in bx..min(bx + 2, d.width) {
-                    if let Some(v) = read_pixel(data, d, l, frame, cx, cy) {
-                        let index = match cfa_channel(d.cfa, cx, cy) {
-                            CfaChannel::Red => 0,
-                            CfaChannel::Green => 1,
-                            CfaChannel::Blue => 2,
-                            CfaChannel::Mono => 1,
-                        };
-                        sums[index] += u32::from(v);
-                        counts[index] += 1;
-                    }
-                }
-            }
-            Some([0, 1, 2].map(|i| {
-                if counts[i] > 0 {
-                    (sums[i] / counts[i]) as u16
-                } else {
-                    0
-                }
-            }))
-        }
         DisplayMode::Demosaic => Some([
             interpolate_channel(data, d, l, frame, x, y, CfaChannel::Red)?,
             interpolate_channel(data, d, l, frame, x, y, CfaChannel::Green)?,
@@ -630,23 +601,97 @@ fn sampled_rgb(
     }
 }
 
-pub fn render_tile(
+fn average(sum: u64, count: u64) -> u16 {
+    ((sum + count / 2) / count) as u16
+}
+
+fn aggregate_rgb(
+    data: &[u8],
+    d: &RawDescriptor,
+    l: &RawLayout,
+    frame: u64,
+    x0: u32,
+    y0: u32,
+    x1: u32,
+    y1: u32,
+    mode: DisplayMode,
+) -> Option<[u16; 3]> {
+    let mut raw_sum = 0u64;
+    let mut raw_count = 0u64;
+    let mut channel_sums = [0u64; 3];
+    let mut channel_counts = [0u64; 3];
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let Some(value) = read_pixel(data, d, l, frame, x, y) else {
+                continue;
+            };
+            raw_sum += u64::from(value);
+            raw_count += 1;
+            let channel = match cfa_channel(d.cfa, x, y) {
+                CfaChannel::Red => 0,
+                CfaChannel::Green | CfaChannel::Mono => 1,
+                CfaChannel::Blue => 2,
+            };
+            channel_sums[channel] += u64::from(value);
+            channel_counts[channel] += 1;
+        }
+    }
+    if raw_count == 0 {
+        return None;
+    }
+    let raw = average(raw_sum, raw_count);
+    if d.cfa == CfaPattern::Mono || matches!(mode, DisplayMode::Raw) {
+        return Some([raw; 3]);
+    }
+    let channel_value = |index: usize| {
+        (channel_counts[index] > 0).then(|| average(channel_sums[index], channel_counts[index]))
+    };
+    match mode {
+        DisplayMode::Bayer => Some([
+            channel_value(0).unwrap_or(0),
+            channel_value(1).unwrap_or(0),
+            channel_value(2).unwrap_or(0),
+        ]),
+        DisplayMode::Demosaic => Some([
+            channel_value(0).unwrap_or(raw),
+            channel_value(1).unwrap_or(raw),
+            channel_value(2).unwrap_or(raw),
+        ]),
+        DisplayMode::Red => channel_value(0).map(|value| [value; 3]),
+        DisplayMode::Green => channel_value(1).map(|value| [value; 3]),
+        DisplayMode::Blue => channel_value(2).map(|value| [value; 3]),
+        DisplayMode::Raw => Some([raw; 3]),
+    }
+}
+
+#[cfg(test)]
+fn render_tile(
     data: &[u8],
     d: &RawDescriptor,
     l: &RawLayout,
     request: &TileRequest,
 ) -> Result<Vec<u8>, String> {
+    render_tile_cancellable(data, d, l, request, || true)
+}
+
+pub fn render_tile_cancellable(
+    data: &[u8],
+    d: &RawDescriptor,
+    l: &RawLayout,
+    request: &TileRequest,
+    is_current: impl Fn() -> bool,
+) -> Result<Vec<u8>, String> {
     let tile_size = request.tile_size.clamp(64, 1024) as u32;
-    let scale = 1u64
+    let scale = 1u32
         .checked_shl(u32::from(request.level.min(30)))
         .ok_or("缩放层级无效")?;
     let origin_x = u64::from(request.tile_x)
         .checked_mul(u64::from(tile_size))
-        .and_then(|v| v.checked_mul(scale))
+        .and_then(|v| v.checked_mul(u64::from(scale)))
         .ok_or("瓦片坐标溢出")?;
     let origin_y = u64::from(request.tile_y)
         .checked_mul(u64::from(tile_size))
-        .and_then(|v| v.checked_mul(scale))
+        .and_then(|v| v.checked_mul(u64::from(scale)))
         .ok_or("瓦片坐标溢出")?;
     let max_value = if request.display_max == 0 {
         if d.bit_depth >= 16 {
@@ -659,22 +704,36 @@ pub fn render_tile(
     };
     let mut output = vec![0u8; tile_size as usize * tile_size as usize * 4];
     for oy in 0..tile_size {
+        if !is_current() {
+            return Err("stale_generation".into());
+        }
         for ox in 0..tile_size {
-            let sx = origin_x + u64::from(ox) * scale + scale / 2;
-            let sy = origin_y + u64::from(oy) * scale + scale / 2;
+            if !is_current() {
+                return Err("stale_generation".into());
+            }
+            let sx = origin_x + u64::from(ox) * u64::from(scale);
+            let sy = origin_y + u64::from(oy) * u64::from(scale);
             let index = ((oy * tile_size + ox) * 4) as usize;
             if sx >= u64::from(d.width) || sy >= u64::from(d.height) {
                 continue;
             }
-            let rgba = sampled_rgb(
-                data,
-                d,
-                l,
-                request.frame,
-                (sx as u32, sy as u32),
-                request.level,
-                request.mode,
-            );
+            let x0 = sx as u32;
+            let y0 = sy as u32;
+            let rgba = if request.level == 0 {
+                sampled_rgb_l0(data, d, l, request.frame, (x0, y0), request.mode)
+            } else {
+                aggregate_rgb(
+                    data,
+                    d,
+                    l,
+                    request.frame,
+                    x0,
+                    y0,
+                    x0.saturating_add(scale).min(d.width),
+                    y0.saturating_add(scale).min(d.height),
+                    request.mode,
+                )
+            };
             if let Some(rgb) = rgba {
                 output[index] = normalize(rgb[0], request.display_min, max_value);
                 output[index + 1] = normalize(rgb[1], request.display_min, max_value);
@@ -723,7 +782,7 @@ pub fn inspect_pixels(
                 .and_then(|value| value.checked_mul(BYTES_PER_PIXEL))
                 .ok_or("像素检查数据索引溢出")?;
             let raw = read_pixel(data, d, l, request.frame, x, y);
-            let rgb = sampled_rgb(data, d, l, request.frame, (x, y), 0, request.mode);
+            let rgb = sampled_rgb_l0(data, d, l, request.frame, (x, y), request.mode);
             if let Some(value) = raw {
                 output[index] |= 0b0000_0001;
                 output[index + 2..index + 4].copy_from_slice(&value.to_le_bytes());
@@ -1329,6 +1388,145 @@ mod tests {
         let missing = 40 * 4;
         assert!(tile[missing] == 82 || tile[missing] == 48);
         assert_eq!(tile.len(), 64 * 64 * 4);
+    }
+
+    #[test]
+    fn raw_preview_levels_average_the_complete_source_region() {
+        let d = RawDescriptor {
+            width: 64,
+            height: 64,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Mono,
+            ..RawDescriptor::default()
+        };
+        let bytes = (0..d.height)
+            .flat_map(|y| (0..d.width).map(move |x| if (x + y) & 1 == 0 { 0 } else { 255 }))
+            .collect::<Vec<_>>();
+        let (layout, _) = calculate_layout(&d, bytes.len() as u64);
+        let request = TileRequest {
+            generation: 1,
+            frame: 0,
+            level: 1,
+            tile_x: 0,
+            tile_y: 0,
+            tile_size: 64,
+            mode: DisplayMode::Raw,
+            display_min: 0,
+            display_max: 255,
+        };
+        let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
+        assert_eq!(&tile[0..4], &[128, 128, 128, 255]);
+    }
+
+    #[test]
+    fn bayer_preview_levels_preserve_all_cfa_channels() {
+        let d = RawDescriptor {
+            width: 64,
+            height: 64,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Rggb,
+            ..RawDescriptor::default()
+        };
+        let bytes = (0..d.height)
+            .flat_map(|y| {
+                (0..d.width).map(move |x| match cfa_channel(d.cfa, x, y) {
+                    CfaChannel::Red => 200,
+                    CfaChannel::Green => 100,
+                    CfaChannel::Blue => 50,
+                    CfaChannel::Mono => unreachable!(),
+                })
+            })
+            .collect::<Vec<_>>();
+        let (layout, _) = calculate_layout(&d, bytes.len() as u64);
+        for level in [1, 2, 3] {
+            let request = TileRequest {
+                generation: 1,
+                frame: 0,
+                level,
+                tile_x: 0,
+                tile_y: 0,
+                tile_size: 64,
+                mode: DisplayMode::Bayer,
+                display_min: 0,
+                display_max: 255,
+            };
+            let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
+            assert_eq!(&tile[0..4], &[200, 100, 50, 255], "level {level}");
+        }
+    }
+
+    #[test]
+    fn demosaic_preview_keeps_flat_color_stable_between_levels() {
+        let d = RawDescriptor {
+            width: 64,
+            height: 64,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Rggb,
+            ..RawDescriptor::default()
+        };
+        let bytes = (0..d.height)
+            .flat_map(|y| {
+                (0..d.width).map(move |x| match cfa_channel(d.cfa, x, y) {
+                    CfaChannel::Red => 200,
+                    CfaChannel::Green => 100,
+                    CfaChannel::Blue => 50,
+                    CfaChannel::Mono => unreachable!(),
+                })
+            })
+            .collect::<Vec<_>>();
+        let (layout, _) = calculate_layout(&d, bytes.len() as u64);
+        let render = |level| {
+            render_tile(
+                &bytes,
+                &d,
+                &layout,
+                &TileRequest {
+                    generation: 1,
+                    frame: 0,
+                    level,
+                    tile_x: 0,
+                    tile_y: 0,
+                    tile_size: 64,
+                    mode: DisplayMode::Demosaic,
+                    display_min: 0,
+                    display_max: 255,
+                },
+            )
+            .unwrap()
+        };
+        assert_eq!(&render(0)[0..4], &[200, 100, 50, 255]);
+        assert_eq!(&render(1)[0..4], &[200, 100, 50, 255]);
+        assert_eq!(&render(2)[0..4], &[200, 100, 50, 255]);
+    }
+
+    #[test]
+    fn tile_rendering_can_be_cancelled_between_output_rows() {
+        let d = RawDescriptor {
+            width: 64,
+            height: 64,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Mono,
+            ..RawDescriptor::default()
+        };
+        let bytes = vec![128; 64 * 64];
+        let (layout, _) = calculate_layout(&d, bytes.len() as u64);
+        let request = TileRequest {
+            generation: 1,
+            frame: 0,
+            level: 1,
+            tile_x: 0,
+            tile_y: 0,
+            tile_size: 64,
+            mode: DisplayMode::Raw,
+            display_min: 0,
+            display_max: 255,
+        };
+        let result = render_tile_cancellable(&bytes, &d, &layout, &request, || false);
+        assert_eq!(result.unwrap_err(), "stale_generation");
     }
 
     #[test]
