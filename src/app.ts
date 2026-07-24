@@ -16,6 +16,7 @@ import type {
 import { DEFAULT_DESCRIPTOR } from "./types";
 
 const VERSION = "0.0.9";
+const BUILD_TIME = formatBuildTime(__ERAW_BUILD_TIME__);
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
 
@@ -24,6 +25,7 @@ type OpenView = "fit" | "actual";
 type WheelSpeed = "gentle" | "standard" | "fast";
 type TileCache = "compact" | "balanced" | "large";
 type AppLanguage = "system" | "zh-CN";
+type SidebarPosition = "left" | "right";
 
 interface AppSettings {
   uiFontSize: UiFontSize;
@@ -34,6 +36,7 @@ interface AppSettings {
   tileCache: TileCache;
   language: AppLanguage;
   sidebarWidth: number;
+  sidebarPosition: SidebarPosition;
   pixelValuesEnabled: boolean;
   demosaicPixelValues: DemosaicPixelValueMode;
 }
@@ -57,6 +60,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   tileCache: "balanced",
   language: "system",
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+  sidebarPosition: "left",
   pixelValuesEnabled: true,
   demosaicPixelValues: "rgb",
 };
@@ -80,6 +84,20 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]!);
 }
 
+function formatBuildTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 function descriptorsEqual(left: RawDescriptor, right: RawDescriptor): boolean {
   return (Object.keys(DEFAULT_DESCRIPTOR) as Array<keyof RawDescriptor>).every((key) => left[key] === right[key]);
 }
@@ -98,6 +116,7 @@ function loadSettings(): AppSettings {
         tileCache: ["compact", "balanced", "large"].includes(value.tileCache ?? "") ? value.tileCache as TileCache : DEFAULT_SETTINGS.tileCache,
         language: ["system", "zh-CN"].includes(value.language ?? "") ? value.language as AppLanguage : DEFAULT_SETTINGS.language,
         sidebarWidth: Number.isFinite(value.sidebarWidth) ? Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, Math.trunc(value.sidebarWidth!))) : DEFAULT_SETTINGS.sidebarWidth,
+        sidebarPosition: ["left", "right"].includes(value.sidebarPosition ?? "") ? value.sidebarPosition as SidebarPosition : DEFAULT_SETTINGS.sidebarPosition,
         pixelValuesEnabled: typeof value.pixelValuesEnabled === "boolean" ? value.pixelValuesEnabled : DEFAULT_SETTINGS.pixelValuesEnabled,
         demosaicPixelValues: ["rawDn", "rgb"].includes(value.demosaicPixelValues ?? "") ? value.demosaicPixelValues as DemosaicPixelValueMode : DEFAULT_SETTINGS.demosaicPixelValues,
       };
@@ -324,9 +343,31 @@ export class ErawApp {
   private aboutDialogTemplate(): string {
     return `<dialog id="about-dialog" class="modal about-modal"><form method="dialog">
       <button value="cancel" class="dialog-close floating">×</button>
-      <div class="about-hero"><img src="${erawIconUrl}" alt="eRAW"/><div><small>RAW SENSOR LAB</small><h2>eRAW</h2><p>V${VERSION}</p></div></div>
-      <div class="about-copy"><p>面向 SoC 与图像传感器适配工作的 RAW 图像查看、诊断与格式转换工具。</p><dl><div><dt>作者</dt><dd>eRAW contributors</dd></div><div><dt>许可证</dt><dd>GNU GPLv3 or later</dd></div><div><dt>渲染</dt><dd>WebGL2 tiled viewport</dd></div><div><dt>平台</dt><dd>Windows · Tauri 2</dd></div></dl><p class="warranty">本程序为自由软件，不提供任何形式的担保。完整许可条款随源代码和安装包提供。</p></div>
+      <div class="about-hero"><img src="${erawIconUrl}" alt="eRAW"/><div><small>RAW SENSOR LAB</small><h2>eRAW</h2><p>V${VERSION}</p><time datetime="${__ERAW_BUILD_TIME__}">构建于 ${BUILD_TIME}</time></div></div>
+      <div class="about-copy">
+        <div class="about-credits">
+          <div><span>产品设计</span><strong>凌净清河</strong></div>
+          <div><span>工程实现</span><strong>Codex（GPT-5.6 Sol）</strong></div>
+        </div>
+        <button id="open-source-components" type="button" class="about-link"><span><strong>开源组件</strong><small>查看主要第三方组件与许可证信息</small></span><b>›</b></button>
+      </div>
       <footer><button value="cancel" class="primary-button">完成</button></footer>
+    </form></dialog>
+    <dialog id="open-source-dialog" class="modal open-source-modal"><form method="dialog">
+      <header><div><small>OPEN SOURCE ACKNOWLEDGEMENTS</small><h2>主要开源组件</h2></div><button value="cancel" class="dialog-close">×</button></header>
+      <div class="open-source-body">
+        <p>eRAW 使用以下主要开源组件。组件版权归各自权利人所有，使用与再分发遵循其各自许可证。本页用于快速查阅，不替代组件附带的完整许可文本。</p>
+        <div class="component-list">
+          <div><strong>Tauri 2 与 @tauri-apps/api</strong><span>桌面应用框架与前端接口</span><code>MIT OR Apache-2.0</code></div>
+          <div><strong>Tauri Dialog Plugin</strong><span>系统文件选择对话框</span><code>MIT OR Apache-2.0</code></div>
+          <div><strong>Serde 与 serde_json</strong><span>Rust 数据序列化</span><code>MIT OR Apache-2.0</code></div>
+          <div><strong>memmap2</strong><span>RAW 文件内存映射</span><code>MIT OR Apache-2.0</code></div>
+          <div><strong>Vite</strong><span>前端构建工具</span><code>MIT</code></div>
+          <div><strong>TypeScript</strong><span>前端类型系统与编译工具</span><code>Apache-2.0</code></div>
+        </div>
+        <p class="open-source-note">完整传递依赖许可证清单将在正式公开发布前随源代码与发布产物提供。</p>
+      </div>
+      <footer><button id="back-to-about" type="button" class="secondary-button">返回关于</button><button value="cancel" class="primary-button">完成</button></footer>
     </form></dialog>`;
   }
 
@@ -336,6 +377,7 @@ export class ErawApp {
       <div class="settings-body">
         <section class="settings-group"><div class="settings-heading"><h3>外观</h3><p>调整界面文字与动态效果，不改变 RAW 图像的显示比例。</p></div>
           <label class="settings-row"><div><strong>界面字号</strong><span>高分辨率显示器推荐使用“大”或“特大”</span></div><select id="setting-font-size"><option value="standard">标准</option><option value="large">大</option><option value="extraLarge">特大</option></select></label>
+          <label class="settings-row"><div><strong>参数栏位置</strong><span>将图像格式和布局参数放在窗口左侧或右侧</span></div><select id="setting-sidebar-position"><option value="left">左侧</option><option value="right">右侧</option></select></label>
           <label class="settings-row toggle-row"><div><strong>减少动态效果</strong><span>关闭面板、弹窗和提示的过渡动画</span></div><input id="setting-reduce-motion" type="checkbox"/></label>
         </section>
         <section class="settings-group"><div class="settings-heading"><h3>操作</h3><p>控制打开文件和画布交互的默认行为。</p></div>
@@ -370,6 +412,14 @@ export class ErawApp {
     });
     this.get("settings-button").addEventListener("click", () => this.openSettingsDialog());
     this.get("about-button").addEventListener("click", () => this.get<HTMLDialogElement>("about-dialog").showModal());
+    this.get("open-source-components").addEventListener("click", () => {
+      this.get<HTMLDialogElement>("about-dialog").close();
+      this.get<HTMLDialogElement>("open-source-dialog").showModal();
+    });
+    this.get("back-to-about").addEventListener("click", () => {
+      this.get<HTMLDialogElement>("open-source-dialog").close();
+      this.get<HTMLDialogElement>("about-dialog").showModal();
+    });
     this.root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => button.addEventListener("click", () => this.setDisplayMode(button.dataset.mode as DisplayMode)));
     this.get<HTMLSelectElement>("channel-mode").addEventListener("change", (event) => this.setDisplayMode((event.currentTarget as HTMLSelectElement).value as DisplayMode));
     this.root.querySelectorAll<HTMLElement>("[data-field]").forEach((element) => {
@@ -642,7 +692,12 @@ export class ErawApp {
       this.root.querySelector(".app-shell")!.classList.add("resizing-sidebar");
     });
     resizer.addEventListener("pointermove", (event) => {
-      if (resizer.hasPointerCapture(event.pointerId)) this.setSidebarWidth(this.sidebarResizeStartWidth + event.clientX - this.sidebarResizeStartX, false);
+      if (!resizer.hasPointerCapture(event.pointerId)) return;
+      const direction = this.settings.sidebarPosition === "right" ? -1 : 1;
+      this.setSidebarWidth(
+        this.sidebarResizeStartWidth + direction * (event.clientX - this.sidebarResizeStartX),
+        false,
+      );
     });
     resizer.addEventListener("pointerup", stop);
     resizer.addEventListener("pointercancel", stop);
@@ -652,7 +707,9 @@ export class ErawApp {
     resizer.addEventListener("keydown", (event) => {
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home") return;
       event.preventDefault();
-      const next = event.key === "Home" ? DEFAULT_SIDEBAR_WIDTH : this.sidebarWidth + (event.key === "ArrowLeft" ? -16 : 16);
+      const movement = event.key === "ArrowLeft" ? -16 : 16;
+      const direction = this.settings.sidebarPosition === "right" ? -1 : 1;
+      const next = event.key === "Home" ? DEFAULT_SIDEBAR_WIDTH : this.sidebarWidth + direction * movement;
       this.setSidebarWidth(next, true);
     });
   }
@@ -781,6 +838,7 @@ export class ErawApp {
   private writeSettingsForm(settings: AppSettings): void {
     this.settingsFormSidebarWidth = settings.sidebarWidth;
     this.get<HTMLSelectElement>("setting-font-size").value = settings.uiFontSize;
+    this.get<HTMLSelectElement>("setting-sidebar-position").value = settings.sidebarPosition;
     this.get<HTMLInputElement>("setting-reduce-motion").checked = settings.reduceMotion;
     this.get<HTMLSelectElement>("setting-open-view").value = settings.openView;
     this.get<HTMLSelectElement>("setting-wheel-speed").value = settings.wheelSpeed;
@@ -802,6 +860,7 @@ export class ErawApp {
       tileCache: this.get<HTMLSelectElement>("setting-tile-cache").value as TileCache,
       language: this.get<HTMLSelectElement>("setting-language").value as AppLanguage,
       sidebarWidth: this.settingsFormSidebarWidth,
+      sidebarPosition: this.get<HTMLSelectElement>("setting-sidebar-position").value as SidebarPosition,
       pixelValuesEnabled: this.get<HTMLInputElement>("setting-pixel-values").checked,
       demosaicPixelValues: this.get<HTMLSelectElement>("setting-demosaic-pixel-values").value as DemosaicPixelValueMode,
     };
@@ -816,6 +875,12 @@ export class ErawApp {
   private applySettings(): void {
     document.documentElement.dataset.uiSize = this.settings.uiFontSize;
     document.documentElement.dataset.reduceMotion = String(this.settings.reduceMotion);
+    const shell = this.root.querySelector<HTMLElement>(".app-shell")!;
+    shell.classList.toggle("sidebar-right", this.settings.sidebarPosition === "right");
+    this.get("sidebar-resizer").setAttribute(
+      "aria-label",
+      `调整${this.settings.sidebarPosition === "right" ? "右侧" : "左侧"}参数面板宽度`,
+    );
     const wheelSensitivity: Record<WheelSpeed, number> = { gentle: 0.001, standard: 0.0015, fast: 0.0022 };
     const maxTextures: Record<TileCache, number> = { compact: 128, balanced: 256, large: 512 };
     this.viewport.setPreferences({ wheelSensitivity: wheelSensitivity[this.settings.wheelSpeed], maxTextures: maxTextures[this.settings.tileCache] });
