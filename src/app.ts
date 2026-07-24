@@ -26,8 +26,10 @@ type WheelSpeed = "gentle" | "standard" | "fast";
 type TileCache = "compact" | "balanced" | "large";
 type AppLanguage = "system" | "zh-CN";
 type SidebarPosition = "left" | "right";
+type AppTheme = "dark-ocean" | "dark-violet" | "dark-amber" | "light-frost" | "light-mint" | "light-sand";
 
 interface AppSettings {
+  theme: AppTheme;
   uiFontSize: UiFontSize;
   reduceMotion: boolean;
   openView: OpenView;
@@ -51,7 +53,24 @@ const DEFAULT_SIDEBAR_WIDTH = 324;
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 560;
 
+const THEMES: ReadonlyArray<{
+  id: AppTheme;
+  name: string;
+  tone: "深色" | "浅色";
+  background: string;
+  surface: string;
+  accent: string;
+}> = [
+  { id: "dark-ocean", name: "深海蓝", tone: "深色", background: "#070a0f", surface: "#131b26", accent: "#52caf4" },
+  { id: "dark-violet", name: "曜石紫", tone: "深色", background: "#0a0810", surface: "#1b1726", accent: "#a890ff" },
+  { id: "dark-amber", name: "琥珀黑", tone: "深色", background: "#0d0b08", surface: "#221b12", accent: "#efb65b" },
+  { id: "light-frost", name: "极昼蓝", tone: "浅色", background: "#e9eff4", surface: "#ffffff", accent: "#087dab" },
+  { id: "light-mint", name: "薄荷白", tone: "浅色", background: "#e8f1ee", surface: "#fbfffd", accent: "#168b72" },
+  { id: "light-sand", name: "暖砂白", tone: "浅色", background: "#f2ede5", surface: "#fffdf9", accent: "#a46117" },
+];
+
 const DEFAULT_SETTINGS: AppSettings = {
+  theme: "dark-ocean",
   uiFontSize: "standard",
   reduceMotion: false,
   openView: "fit",
@@ -75,6 +94,7 @@ const icons = {
   fit: icon("M4 9V4h5v2H6v3H4Zm11-5h5v5h-2V6h-3V4ZM4 15h2v3h3v2H4v-5Zm14 0h2v5h-5v-2h3v-3Z"),
   actual: icon("M4 4h16v16H4V4Zm2 2v12h12V6H6Zm2 2h2v2H8V8Zm6 6h2v2h-2v-2Z"),
   settings: icon("M19.4 13a7.9 7.9 0 0 0 .1-1 7.9 7.9 0 0 0-.1-1l2.1-1.6-2-3.4-2.5 1a7.3 7.3 0 0 0-1.7-1L15 3.3h-4L10.7 6A7.3 7.3 0 0 0 9 7L6.5 6l-2 3.4L6.6 11a7.9 7.9 0 0 0-.1 1 7.9 7.9 0 0 0 .1 1l-2.1 1.6 2 3.4L9 17a7.3 7.3 0 0 0 1.7 1l.3 2.7h4l.3-2.7a7.3 7.3 0 0 0 1.7-1l2.5 1 2-3.4L19.4 13ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"),
+  theme: icon("M12 3a9 9 0 0 0 0 18h1.2a2.3 2.3 0 0 0 1.6-4l-.4-.4a1.2 1.2 0 0 1 .9-2h1.8A3.9 3.9 0 0 0 21 10.7C21 6.5 17 3 12 3Zm-4 9.2a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Zm1.5-4.4a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Zm4.3-.7a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Zm3 3a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Z"),
   about: icon("M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm-1 7h2v6h-2v-6Zm0-4h2v2h-2V7Z"),
   panel: icon("M3 4h18v16H3V4Zm2 2v12h4V6H5Zm6 0v12h8V6h-8Z"),
   warning: icon("M12 3 2 21h20L12 3Zm0 4 6.6 12H5.4L12 7Zm-1 3v5h2v-5h-2Zm0 6.5v2h2v-2h-2Z"),
@@ -108,6 +128,7 @@ function loadSettings(): AppSettings {
     if (saved) {
       const value = JSON.parse(saved) as Partial<AppSettings>;
       return {
+        theme: THEMES.some((theme) => theme.id === value.theme) ? value.theme as AppTheme : DEFAULT_SETTINGS.theme,
         uiFontSize: ["standard", "large", "extraLarge"].includes(value.uiFontSize ?? "") ? value.uiFontSize as UiFontSize : DEFAULT_SETTINGS.uiFontSize,
         reduceMotion: typeof value.reduceMotion === "boolean" ? value.reduceMotion : DEFAULT_SETTINGS.reduceMotion,
         openView: ["fit", "actual"].includes(value.openView ?? "") ? value.openView as OpenView : DEFAULT_SETTINGS.openView,
@@ -200,6 +221,19 @@ export class ErawApp {
             <button id="fit-button" class="icon-button" title="适应窗口 (Ctrl+0)">${icons.fit}</button>
             <button id="actual-button" class="icon-button" title="实际像素 (Ctrl+1)">${icons.actual}</button>
             <button id="panel-button" class="icon-button active" title="显示或隐藏参数面板">${icons.panel}</button>
+            <div id="theme-control" class="theme-control">
+              <button id="theme-button" class="icon-button" title="切换界面主题" aria-label="切换界面主题" aria-haspopup="menu" aria-expanded="false">${icons.theme}</button>
+              <div id="theme-popover" class="theme-popover" role="menu" aria-label="选择界面主题" hidden>
+                <header><strong>界面主题</strong><span>即时切换并自动保存</span></header>
+                <div class="theme-options">${THEMES.map((theme) => `
+                  <button type="button" role="menuitemradio" data-theme-value="${theme.id}" aria-checked="false">
+                    <i class="theme-swatch" style="--swatch-bg:${theme.background};--swatch-surface:${theme.surface};--swatch-accent:${theme.accent}"><b></b><b></b><b></b></i>
+                    <span><strong>${theme.name}</strong><small>${theme.tone}</small></span>
+                    <em aria-hidden="true">✓</em>
+                  </button>`).join("")}
+                </div>
+              </div>
+            </div>
             <button id="settings-button" class="icon-button" title="设置">${icons.settings}</button>
             <button id="about-button" class="icon-button" title="关于 eRAW">${icons.about}</button>
           </div>
@@ -410,8 +444,24 @@ export class ErawApp {
       this.root.querySelector(".app-shell")!.classList.toggle("panel-hidden");
       this.get("panel-button").classList.toggle("active");
     });
-    this.get("settings-button").addEventListener("click", () => this.openSettingsDialog());
-    this.get("about-button").addEventListener("click", () => this.get<HTMLDialogElement>("about-dialog").showModal());
+    this.get("theme-button").addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.setThemeMenuOpen(this.get("theme-popover").hidden);
+    });
+    this.root.querySelectorAll<HTMLButtonElement>("[data-theme-value]").forEach((button) => button.addEventListener("click", () => {
+      this.setTheme(button.dataset.themeValue as AppTheme);
+    }));
+    document.addEventListener("pointerdown", (event) => {
+      if (!(event.target instanceof Element) || !event.target.closest("#theme-control")) this.setThemeMenuOpen(false);
+    });
+    this.get("settings-button").addEventListener("click", () => {
+      this.setThemeMenuOpen(false);
+      this.openSettingsDialog();
+    });
+    this.get("about-button").addEventListener("click", () => {
+      this.setThemeMenuOpen(false);
+      this.get<HTMLDialogElement>("about-dialog").showModal();
+    });
     this.get("open-source-components").addEventListener("click", () => {
       this.get<HTMLDialogElement>("about-dialog").close();
       this.get<HTMLDialogElement>("open-source-dialog").showModal();
@@ -732,6 +782,34 @@ export class ErawApp {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
   }
 
+  private setTheme(theme: AppTheme): void {
+    if (!THEMES.some((candidate) => candidate.id === theme)) return;
+    this.settings.theme = theme;
+    this.persistSettings();
+    this.applyTheme();
+    this.setThemeMenuOpen(false);
+  }
+
+  private applyTheme(): void {
+    document.documentElement.dataset.theme = this.settings.theme;
+    const selected = THEMES.find((theme) => theme.id === this.settings.theme)!;
+    const button = this.get("theme-button");
+    button.classList.toggle("active", this.settings.theme !== DEFAULT_SETTINGS.theme);
+    button.setAttribute("title", `切换界面主题（当前：${selected.name}）`);
+    button.setAttribute("aria-label", `切换界面主题，当前为${selected.name}`);
+    this.root.querySelectorAll<HTMLButtonElement>("[data-theme-value]").forEach((option) => {
+      const active = option.dataset.themeValue === this.settings.theme;
+      option.classList.toggle("active", active);
+      option.setAttribute("aria-checked", String(active));
+    });
+  }
+
+  private setThemeMenuOpen(open: boolean): void {
+    const popover = this.get("theme-popover");
+    popover.hidden = !open;
+    this.get("theme-button").setAttribute("aria-expanded", String(open));
+  }
+
   private setDisplayMode(mode: DisplayMode): void {
     this.displayMode = mode;
     this.root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => button.classList.toggle("active", button.dataset.mode === mode));
@@ -806,7 +884,8 @@ export class ErawApp {
   }
 
   private onKeyDown(event: KeyboardEvent): void {
-    if (event.key === "Escape" && this.root.querySelector(".app-shell")!.classList.contains("diagnostics-open")) { event.preventDefault(); this.setDiagnosticsOpen(false); }
+    if (event.key === "Escape" && !this.get("theme-popover").hidden) { event.preventDefault(); this.setThemeMenuOpen(false); }
+    else if (event.key === "Escape" && this.root.querySelector(".app-shell")!.classList.contains("diagnostics-open")) { event.preventDefault(); this.setDiagnosticsOpen(false); }
     else if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); void this.openFile(); }
     else if (event.ctrlKey && event.key.toLowerCase() === "e" && this.document?.layout.frameCount && !this.exportDialog.isOpen) {
       event.preventDefault();
@@ -852,6 +931,7 @@ export class ErawApp {
 
   private saveSettingsFromDialog(): void {
     this.settings = {
+      theme: this.settings.theme,
       uiFontSize: this.get<HTMLSelectElement>("setting-font-size").value as UiFontSize,
       reduceMotion: this.get<HTMLInputElement>("setting-reduce-motion").checked,
       openView: this.get<HTMLSelectElement>("setting-open-view").value as OpenView,
@@ -873,6 +953,7 @@ export class ErawApp {
   }
 
   private applySettings(): void {
+    this.applyTheme();
     document.documentElement.dataset.uiSize = this.settings.uiFontSize;
     document.documentElement.dataset.reduceMotion = String(this.settings.reduceMotion);
     const shell = this.root.querySelector<HTMLElement>(".app-shell")!;
