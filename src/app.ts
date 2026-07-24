@@ -273,6 +273,10 @@ export class ErawApp {
             <div class="viewport" id="viewport">
               <canvas class="raw-canvas"></canvas>
               <canvas class="pixel-value-overlay" aria-hidden="true"></canvas>
+              <svg class="image-boundary" aria-hidden="true" width="100%" height="100%" preserveAspectRatio="none">
+                <rect class="image-boundary-shadow"></rect>
+                <rect class="image-boundary-line"></rect>
+              </svg>
               <div class="canvas-crosshair" aria-hidden="true"><i class="crosshair-horizontal"></i><i class="crosshair-vertical"></i></div>
               <div class="empty-state" id="empty-state">
                 <div class="empty-grid"><span></span><span></span><span></span><span></span></div>

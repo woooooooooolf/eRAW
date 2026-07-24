@@ -39,6 +39,8 @@
   --canvas-muted: #627485;
   --canvas-accent: #8be6ff;
   --canvas-accent-rgb: 139 230 255;
+  --image-edge: rgb(139 230 255 / .62);
+  --image-edge-shadow: rgb(0 0 0 / .45);
   --soft-fill: rgba(255, 255, 255, .025);
   --soft-hover: rgba(105, 168, 208, .07);
   --raised-shadow: rgba(0, 0, 0, .42);
@@ -74,9 +76,12 @@ html[data-theme="dark-violet"] {
   --control-focus: #181221;
   --segment-surface: #0d0a13;
   --canvas-surface: #07060a;
-  --viewport-surface: #0a0810;
+  --viewport-surface: #0b0811;
   --viewport-pattern: rgba(174, 153, 205, .022);
   --viewport-glow: rgba(95, 62, 140, .1);
+  --canvas-accent: #c2afff;
+  --canvas-accent-rgb: 194 175 255;
+  --image-edge: rgb(194 175 255 / .62);
   --soft-hover: rgba(158, 128, 220, .08);
 }
 
@@ -103,10 +108,13 @@ html[data-theme="dark-amber"] {
   --control-surface: #130f0a;
   --control-focus: #1c160e;
   --segment-surface: #100d09;
-  --canvas-surface: #080705;
-  --viewport-surface: #0d0b08;
+  --canvas-surface: #0a0805;
+  --viewport-surface: #100c07;
   --viewport-pattern: rgba(211, 179, 127, .022);
   --viewport-glow: rgba(131, 85, 28, .09);
+  --canvas-accent: #f3c77f;
+  --canvas-accent-rgb: 243 199 127;
+  --image-edge: rgb(243 199 127 / .62);
   --soft-hover: rgba(207, 151, 66, .08);
 }
 
@@ -138,14 +146,16 @@ html[data-theme^="light-"] {
   --control-surface: #ffffff;
   --control-focus: #f6fbfd;
   --segment-surface: #eaf0f4;
-  --canvas-surface: #11161c;
-  --viewport-surface: #111820;
-  --viewport-pattern: rgba(184, 207, 219, .025);
-  --viewport-glow: rgba(44, 120, 153, .09);
-  --canvas-text: #c9d8e4;
-  --canvas-muted: #627485;
-  --canvas-accent: #65d4fb;
-  --canvas-accent-rgb: 101 212 251;
+  --canvas-surface: #d9e3e8;
+  --viewport-surface: #e4ebef;
+  --viewport-pattern: rgba(54, 85, 102, .045);
+  --viewport-glow: rgba(8, 125, 171, .085);
+  --canvas-text: #263944;
+  --canvas-muted: #657985;
+  --canvas-accent: #087dab;
+  --canvas-accent-rgb: 8 125 171;
+  --image-edge: rgb(8 125 171 / .5);
+  --image-edge-shadow: rgb(35 54 64 / .2);
   --soft-fill: rgba(21, 69, 94, .045);
   --soft-hover: rgba(18, 111, 151, .08);
   --raised-shadow: rgba(35, 52, 62, .22);
@@ -175,8 +185,16 @@ html[data-theme="light-mint"] {
   --control-focus: #f4fbf8;
   --segment-surface: #e5efeb;
   --soft-hover: rgba(22, 139, 114, .08);
-  --canvas-accent: #6edfc0;
-  --canvas-accent-rgb: 110 223 192;
+  --canvas-surface: #d8e7e1;
+  --viewport-surface: #e5efeb;
+  --viewport-pattern: rgba(44, 91, 76, .045);
+  --viewport-glow: rgba(22, 139, 114, .08);
+  --canvas-text: #263a34;
+  --canvas-muted: #657a73;
+  --canvas-accent: #168b72;
+  --canvas-accent-rgb: 22 139 114;
+  --image-edge: rgb(22 139 114 / .5);
+  --image-edge-shadow: rgb(35 60 51 / .2);
 }
 
 html[data-theme="light-sand"] {
@@ -202,8 +220,16 @@ html[data-theme="light-sand"] {
   --control-focus: #fffaf2;
   --segment-surface: #eee6da;
   --soft-hover: rgba(164, 97, 23, .075);
-  --canvas-accent: #f0be70;
-  --canvas-accent-rgb: 240 190 112;
+  --canvas-surface: #e8dfd2;
+  --viewport-surface: #f0e8dc;
+  --viewport-pattern: rgba(105, 78, 47, .045);
+  --viewport-glow: rgba(164, 97, 23, .075);
+  --canvas-text: #3d3025;
+  --canvas-muted: #786b5f;
+  --canvas-accent: #a46117;
+  --canvas-accent-rgb: 164 97 23;
+  --image-edge: rgb(164 97 23 / .5);
+  --image-edge-shadow: rgb(68 50 31 / .2);
 }
 
 html[data-ui-size="large"] { --font-xs: 11px; --font-sm: 12.5px; --font-md: 14px; --font-lg: 16px; --font-title: 22px; }
@@ -475,6 +501,11 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 .raw-canvas { position: absolute; inset: 0; z-index: 1; display: block; cursor: crosshair; touch-action: none; }
 .raw-canvas.dragging { cursor: grabbing; }
 .pixel-value-overlay { position: absolute; z-index: 2; inset: 0; display: block; pointer-events: none; }
+.image-boundary { position: absolute; z-index: 3; inset: 0; overflow: hidden; opacity: 0; transition: opacity .14s ease; pointer-events: none; }
+.image-boundary.visible { opacity: 1; }
+.image-boundary rect { fill: none; vector-effect: non-scaling-stroke; }
+.image-boundary-shadow { stroke: var(--image-edge-shadow); stroke-width: 3px; }
+.image-boundary-line { stroke: var(--image-edge); stroke-width: 1px; }
 .canvas-crosshair { position: absolute; z-index: 6; inset: 0; opacity: 0; transition: opacity .08s ease; pointer-events: none; }
 .canvas-crosshair.visible { opacity: 1; }
 .canvas-crosshair i { position: absolute; display: block; margin: 0; background: rgb(var(--accent-rgb) / .34); box-shadow: 0 0 5px rgb(var(--accent-rgb) / .13); }

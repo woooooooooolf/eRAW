@@ -101,6 +101,8 @@ export class RawViewport {
   private readonly verticalScrollbar: HTMLElement;
   private readonly verticalThumb: HTMLElement;
   private readonly crosshair: HTMLElement;
+  private readonly imageBoundary: SVGSVGElement;
+  private readonly imageBoundaryRects: NodeListOf<SVGRectElement>;
   private readonly resizeObserver: ResizeObserver;
   private document: DocumentInfo | null = null;
   private frame = 0;
@@ -150,6 +152,8 @@ export class RawViewport {
     this.verticalScrollbar = container.querySelector<HTMLElement>(".image-scrollbar.vertical")!;
     this.verticalThumb = this.verticalScrollbar.querySelector<HTMLElement>(".scroll-thumb")!;
     this.crosshair = container.querySelector<HTMLElement>(".canvas-crosshair")!;
+    this.imageBoundary = container.querySelector<SVGSVGElement>(".image-boundary")!;
+    this.imageBoundaryRects = this.imageBoundary.querySelectorAll<SVGRectElement>("rect");
     this.initializeGl();
     this.bindEvents();
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -477,6 +481,7 @@ export class RawViewport {
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
+    this.updateImageBoundary();
     if (!this.document) {
       this.pixelValueOverlay.clear();
       this.updateScrollbars();
@@ -514,6 +519,24 @@ export class RawViewport {
       width: this.width,
       height: this.height,
     });
+  }
+
+  private updateImageBoundary(): void {
+    if (!this.document) {
+      this.imageBoundary.classList.remove("visible");
+      return;
+    }
+    const x = this.cameraX;
+    const y = this.cameraY;
+    const width = this.document.descriptor.width * this.zoom;
+    const height = this.document.descriptor.height * this.zoom;
+    for (const rect of this.imageBoundaryRects) {
+      rect.setAttribute("x", String(x));
+      rect.setAttribute("y", String(y));
+      rect.setAttribute("width", String(width));
+      rect.setAttribute("height", String(height));
+    }
+    this.imageBoundary.classList.add("visible");
   }
 
   private queueTile(key: string, level: number, tileX: number, tileY: number): void {
