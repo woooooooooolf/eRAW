@@ -185,7 +185,7 @@ export class ErawApp {
     this.viewport = new RawViewport(this.get("viewport"), {
       onZoomChange: (zoom) => { this.get("zoom-status").textContent = `${(zoom * 100).toFixed(zoom < 0.1 ? 2 : 1)}%`; },
       onSampleChange: (sample) => this.updateSample(sample),
-      onRenderStats: (level, loaded, pending) => { this.get("render-status").textContent = `L${level} · ${loaded} tiles · ${pending} loading`; },
+      onRenderStats: (levelLabel, loaded, pending) => { this.get("render-status").textContent = `${levelLabel} · ${loaded} tiles · ${pending} loading`; },
       onError: (message) => this.reportRuntimeError(message),
     });
     this.applySettings();
@@ -274,8 +274,9 @@ export class ErawApp {
               <canvas class="raw-canvas"></canvas>
               <canvas class="pixel-value-overlay" aria-hidden="true"></canvas>
               <svg class="image-boundary" aria-hidden="true" width="100%" height="100%" preserveAspectRatio="none">
-                <rect class="image-boundary-shadow"></rect>
-                <rect class="image-boundary-line"></rect>
+                <rect class="image-boundary-rect image-boundary-shadow"></rect>
+                <rect class="image-boundary-rect image-boundary-line"></rect>
+                <rect class="image-selection"></rect>
               </svg>
               <div class="canvas-crosshair" aria-hidden="true"><i class="crosshair-horizontal"></i><i class="crosshair-vertical"></i></div>
               <div class="empty-state" id="empty-state">
@@ -308,7 +309,7 @@ export class ErawApp {
           <button id="status-warning" class="status-warning" aria-expanded="false" aria-controls="diagnostics-drawer">${icons.warning}<span>诊断</span><b id="diagnostics-count" hidden>0</b></button>
           <i></i><span id="file-status" class="file-status">未打开文件</span><div class="status-spacer"></div>
           <button id="pixel-status" class="status-pixel" title="输入坐标并定位像素" aria-haspopup="dialog" disabled>X — · Y —</button><i></i>
-          <span id="render-status" class="status-help" data-help="L 表示当前预览层级；tiles 是当前视野中已完成渲染的瓦片数；loading 是正在解析并上传到 WebGL 的瓦片数。">L0 · 0 tiles · 0 loading</span>
+          <span id="render-status" class="status-help" data-help="L 表示当前预览层级；Lx↔Ly 表示正在平滑混合相邻层级。tiles 是当前视野中已完成的瓦片数，loading 是正在聚合并上传到 WebGL 的瓦片数。">L0 · 0 tiles · 0 loading</span>
           <i></i><span id="zoom-status">100.0%</span>
         </footer>
         <div class="toast" id="toast" role="status"></div>

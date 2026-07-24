@@ -5,6 +5,7 @@ import type {
   DocumentInfo,
   PixelInspectionRequest,
 } from "./types";
+import type { ViewportTransform } from "./viewport-transform";
 
 const BYTES_PER_PIXEL = 10;
 const GUARD_PIXELS = 3;
@@ -22,9 +23,7 @@ export interface PixelOverlayView {
   document: DocumentInfo;
   frame: number;
   displayMode: DisplayMode;
-  zoom: number;
-  cameraX: number;
-  cameraY: number;
+  transform: ViewportTransform;
   width: number;
   height: number;
 }
@@ -120,7 +119,7 @@ export class PixelValueOverlay {
   private layout(view: PixelOverlayView): { active: boolean; fontSize: number; lineHeight: number; rgbRows: boolean } {
     if (!this.enabled) return { active: false, fontSize: 10, lineHeight: 13, rgbRows: false };
     const rgbRows = view.displayMode === "demosaic" && this.demosaicValues === "rgb";
-    const fontSize = Math.min(12, Math.max(10, view.zoom * 0.19));
+    const fontSize = Math.min(12, Math.max(10, view.transform.zoom * 0.19));
     const lineHeight = fontSize + 2;
     const maxValue = this.maxValue(view);
     this.context.font = `600 ${fontSize}px "Cascadia Mono", Consolas, monospace`;
@@ -128,22 +127,24 @@ export class PixelValueOverlay {
     const requiredWidth = this.context.measureText(widestText).width + 10;
     const requiredHeight = (rgbRows ? lineHeight * 3 : lineHeight) + 10;
     const requiredSize = Math.max(requiredWidth, requiredHeight);
-    const active = this.visible ? view.zoom >= requiredSize - 4 : view.zoom >= requiredSize;
+    const active = this.visible
+      ? view.transform.zoom >= requiredSize - 4
+      : view.transform.zoom >= requiredSize;
     return { active, fontSize, lineHeight, rgbRows };
   }
 
   private visibleRect(view: PixelOverlayView): { x: number; y: number; width: number; height: number } | null {
-    const left = Math.max(0, Math.floor(-view.cameraX / view.zoom));
-    const top = Math.max(0, Math.floor(-view.cameraY / view.zoom));
-    const right = Math.min(
+    const visible = view.transform.visibleImageRect(
+      view.width,
+      view.height,
       view.document.descriptor.width,
-      Math.ceil((view.width - view.cameraX) / view.zoom),
-    );
-    const bottom = Math.min(
       view.document.descriptor.height,
-      Math.ceil((view.height - view.cameraY) / view.zoom),
     );
-    if (right <= left || bottom <= top) return null;
+    if (!visible) return null;
+    const left = Math.max(0, Math.floor(visible.x));
+    const top = Math.max(0, Math.floor(visible.y));
+    const right = Math.min(view.document.descriptor.width, Math.ceil(visible.x + visible.width));
+    const bottom = Math.min(view.document.descriptor.height, Math.ceil(visible.y + visible.height));
     return { x: left, y: top, width: right - left, height: bottom - top };
   }
 
@@ -180,8 +181,9 @@ export class PixelValueOverlay {
       : ((value + 0.055) / 1.055) ** 2.4;
     for (let y = rect.y; y < rect.y + rect.height; y += 1) {
       for (let x = rect.x; x < rect.x + rect.width; x += 1) {
-        const screenX = view.cameraX + x * view.zoom;
-        const screenY = view.cameraY + y * view.zoom;
+        const screen = view.transform.imageToScreen({ x, y });
+        const screenX = screen.x;
+        const screenY = screen.y;
         const offset = ((y - cache.y) * cache.width + x - cache.x) * BYTES_PER_PIXEL;
         const flags = cache.bytes[offset];
         const raw = this.readU16(cache.bytes, offset + 2);
@@ -197,15 +199,20 @@ export class PixelValueOverlay {
         const lightBackground = luminance > 0.179;
         this.context.strokeStyle = "rgba(142,205,228,.22)";
         this.context.lineWidth = 1;
-        this.context.strokeRect(screenX + 0.5, screenY + 0.5, view.zoom - 1, view.zoom - 1);
+        this.context.strokeRect(
+          screenX + 0.5,
+          screenY + 0.5,
+          view.transform.zoom - 1,
+          view.transform.zoom - 1,
+        );
         this.context.strokeStyle = lightBackground ? "rgba(255,255,255,.58)" : "rgba(0,0,0,.72)";
         this.context.fillStyle = lightBackground ? "rgba(7,10,14,.94)" : "rgba(244,250,253,.96)";
         this.context.lineWidth = Math.max(1.5, layout.fontSize * 0.18);
         const lines = layout.rgbRows
           ? rgbValid ? [`R ${red}`, `G ${green}`, `B ${blue}`] : ["R —", "G —", "B —"]
           : [(flags & 0b1) !== 0 ? String(raw) : "—"];
-        const centerX = screenX + view.zoom / 2;
-        const centerY = screenY + view.zoom / 2;
+        const centerX = screenX + view.transform.zoom / 2;
+        const centerY = screenY + view.transform.zoom / 2;
         const firstY = centerY - (lines.length - 1) * layout.lineHeight / 2;
         lines.forEach((line, index) => {
           const textY = firstY + index * layout.lineHeight;

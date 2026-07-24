@@ -506,6 +506,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 .image-boundary rect { fill: none; vector-effect: non-scaling-stroke; }
 .image-boundary-shadow { stroke: var(--image-edge-shadow); stroke-width: 3px; }
 .image-boundary-line { stroke: var(--image-edge); stroke-width: 1px; }
+.image-selection { opacity: 0; fill: rgb(var(--accent-rgb) / .1) !important; stroke: rgb(var(--accent-rgb) / .9); stroke-width: 1px; stroke-dasharray: 5 3; }
+.image-selection.visible { opacity: 1; }
 .canvas-crosshair { position: absolute; z-index: 6; inset: 0; opacity: 0; transition: opacity .08s ease; pointer-events: none; }
 .canvas-crosshair.visible { opacity: 1; }
 .canvas-crosshair i { position: absolute; display: block; margin: 0; background: rgb(var(--accent-rgb) / .34); box-shadow: 0 0 5px rgb(var(--accent-rgb) / .13); }

@@ -1,6 +1,10 @@
 import { renderTile } from "./api";
 import { PixelValueOverlay } from "./pixel-overlay";
 import type { DemosaicPixelValueMode, DisplayMode, DocumentInfo, TileRequest } from "./types";
+import { ViewportOverlayLayer } from "./viewport-overlay";
+import { ViewportTransform, type ImagePoint } from "./viewport-transform";
+
+export type { ImagePoint } from "./viewport-transform";
 
 const TILE_SIZE = 256;
 const MAX_IN_FLIGHT = 8;
@@ -22,16 +26,17 @@ interface TextureEntry {
   lastUsed: number;
 }
 
+interface LodPlan {
+  fineLevel: number;
+  coarseLevel: number | null;
+  blend: number;
+}
+
 export interface ViewportCallbacks {
   onZoomChange(zoom: number): void;
   onSampleChange(sample: ImagePoint | null): void;
-  onRenderStats(level: number, loaded: number, pending: number): void;
+  onRenderStats(levelLabel: string, loaded: number, pending: number): void;
   onError(message: string): void;
-}
-
-export interface ImagePoint {
-  x: number;
-  y: number;
 }
 
 const vertexShaderSource = `#version 300 es
@@ -52,9 +57,13 @@ void main() {
 const fragmentShaderSource = `#version 300 es
 precision highp float;
 uniform sampler2D u_texture;
+uniform float u_opacity;
 in vec2 v_uv;
 out vec4 outColor;
-void main() { outColor = texture(u_texture, v_uv); }`;
+void main() {
+  vec4 color = texture(u_texture, v_uv);
+  outColor = vec4(color.rgb, color.a * u_opacity);
+}`;
 
 function createShader(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
   const shader = gl.createShader(type);
@@ -96,13 +105,14 @@ export class RawViewport {
   private readonly viewportLocation: WebGLUniformLocation;
   private readonly cameraLocation: WebGLUniformLocation;
   private readonly zoomLocation: WebGLUniformLocation;
+  private readonly opacityLocation: WebGLUniformLocation;
   private readonly horizontalScrollbar: HTMLElement;
   private readonly horizontalThumb: HTMLElement;
   private readonly verticalScrollbar: HTMLElement;
   private readonly verticalThumb: HTMLElement;
   private readonly crosshair: HTMLElement;
-  private readonly imageBoundary: SVGSVGElement;
-  private readonly imageBoundaryRects: NodeListOf<SVGRectElement>;
+  private readonly overlayLayer: ViewportOverlayLayer;
+  private readonly transform = new ViewportTransform();
   private readonly resizeObserver: ResizeObserver;
   private document: DocumentInfo | null = null;
   private frame = 0;
@@ -111,13 +121,12 @@ export class RawViewport {
   private inFlight = new Set<string>();
   private failedTiles = new Set<string>();
   private failureReported = false;
-  private zoom = 1;
   private fitScale = 1;
-  private cameraX = 0;
-  private cameraY = 0;
   private width = 1;
   private height = 1;
   private dragging = false;
+  private selecting = false;
+  private interactionMode: "pan" | "select" = "pan";
   private dragX = 0;
   private dragY = 0;
   private dragCameraX = 0;
@@ -127,6 +136,13 @@ export class RawViewport {
   private animationFrame = 0;
   private lastSampleKey = "";
   private renderCounter = 0;
+
+  private get zoom(): number { return this.transform.zoom; }
+  private set zoom(value: number) { this.transform.zoom = value; }
+  private get cameraX(): number { return this.transform.cameraX; }
+  private set cameraX(value: number) { this.transform.cameraX = value; }
+  private get cameraY(): number { return this.transform.cameraY; }
+  private set cameraY(value: number) { this.transform.cameraY = value; }
 
   constructor(container: HTMLElement, callbacks: ViewportCallbacks) {
     this.container = container;
@@ -147,13 +163,15 @@ export class RawViewport {
     this.viewportLocation = this.requireUniform("u_viewport");
     this.cameraLocation = this.requireUniform("u_camera");
     this.zoomLocation = this.requireUniform("u_zoom");
+    this.opacityLocation = this.requireUniform("u_opacity");
     this.horizontalScrollbar = container.querySelector<HTMLElement>(".image-scrollbar.horizontal")!;
     this.horizontalThumb = this.horizontalScrollbar.querySelector<HTMLElement>(".scroll-thumb")!;
     this.verticalScrollbar = container.querySelector<HTMLElement>(".image-scrollbar.vertical")!;
     this.verticalThumb = this.verticalScrollbar.querySelector<HTMLElement>(".scroll-thumb")!;
     this.crosshair = container.querySelector<HTMLElement>(".canvas-crosshair")!;
-    this.imageBoundary = container.querySelector<SVGSVGElement>(".image-boundary")!;
-    this.imageBoundaryRects = this.imageBoundary.querySelectorAll<SVGRectElement>("rect");
+    this.overlayLayer = new ViewportOverlayLayer(
+      container.querySelector<SVGSVGElement>(".image-boundary")!,
+    );
     this.initializeGl();
     this.bindEvents();
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -234,6 +252,7 @@ export class RawViewport {
       || document.descriptor.width !== this.document.descriptor.width
       || document.descriptor.height !== this.document.descriptor.height;
     this.document = document;
+    if (dimensionsChanged) this.overlayLayer.clearSelection();
     this.updatePointerPosition(null);
     this.frame = Math.min(this.frame, Math.max(0, document.layout.frameCount - 1));
     this.clearTextures();
@@ -263,6 +282,13 @@ export class RawViewport {
 
   setPixelInspectionPreferences(preferences: { enabled: boolean; demosaicValues: DemosaicPixelValueMode }): void {
     this.pixelValueOverlay.setPreferences(preferences);
+  }
+
+  setInteractionMode(mode: "pan" | "select"): void {
+    this.interactionMode = mode;
+    this.dragging = false;
+    this.selecting = false;
+    this.canvas.classList.remove("dragging");
   }
 
   fit(): void {
@@ -337,13 +363,12 @@ export class RawViewport {
     const rect = this.canvas.getBoundingClientRect();
     const pointerX = event.clientX - rect.left;
     const pointerY = event.clientY - rect.top;
-    const imageX = (pointerX - this.cameraX) / this.zoom;
-    const imageY = (pointerY - this.cameraY) / this.zoom;
+    const imagePoint = this.transform.screenToImage({ x: pointerX, y: pointerY });
     const factor = Math.exp(-event.deltaY * this.wheelSensitivity);
     const minZoom = Math.max(this.fitScale * 0.08, 0.0005);
     const newZoom = Math.max(minZoom, Math.min(MAX_ZOOM, this.zoom * factor));
-    this.cameraX = pointerX - imageX * newZoom;
-    this.cameraY = pointerY - imageY * newZoom;
+    this.cameraX = pointerX - imagePoint.x * newZoom;
+    this.cameraY = pointerY - imagePoint.y * newZoom;
     this.zoom = newZoom;
     this.constrainCamera();
     this.updatePointerPosition(this.updateCrosshair(event));
@@ -353,6 +378,18 @@ export class RawViewport {
 
   private onPointerDown(event: PointerEvent): void {
     if (!this.document || event.button !== 0) return;
+    const point = this.eventPoint(event);
+    if (this.interactionMode === "select") {
+      this.selecting = true;
+      this.overlayLayer.beginSelection(
+        this.transform.screenToImage(point),
+        this.document.descriptor.width,
+        this.document.descriptor.height,
+      );
+      this.canvas.setPointerCapture(event.pointerId);
+      this.requestDraw();
+      return;
+    }
     this.dragging = true;
     this.updatePointerPosition(null);
     this.dragX = event.clientX;
@@ -365,6 +402,16 @@ export class RawViewport {
 
   private onPointerMove(event: PointerEvent): void {
     if (!this.document) return;
+    if (this.selecting) {
+      this.overlayLayer.updateSelection(
+        this.transform.screenToImage(this.eventPoint(event)),
+        this.document.descriptor.width,
+        this.document.descriptor.height,
+      );
+      this.updatePointerPosition(this.updateCrosshair(event));
+      this.requestDraw();
+      return;
+    }
     if (this.dragging) {
       this.cameraX = this.dragCameraX + event.clientX - this.dragX;
       this.cameraY = this.dragCameraY + event.clientY - this.dragY;
@@ -377,6 +424,14 @@ export class RawViewport {
   }
 
   private onPointerUp(event: PointerEvent): void {
+    if (this.selecting) {
+      this.selecting = false;
+      this.overlayLayer.endSelection();
+      if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
+      this.updatePointerPosition(this.updateCrosshair(event));
+      this.requestDraw();
+      return;
+    }
     if (!this.dragging) return;
     this.dragging = false;
     this.canvas.classList.remove("dragging");
@@ -396,18 +451,27 @@ export class RawViewport {
       this.hideCrosshair();
       return null;
     }
-    const x = Math.floor((pointerX - this.cameraX) / this.zoom);
-    const y = Math.floor((pointerY - this.cameraY) / this.zoom);
-    if (x < 0 || y < 0 || x >= this.document.descriptor.width || y >= this.document.descriptor.height) {
+    const pixel = this.transform.screenToPixel(
+      { x: pointerX, y: pointerY },
+      this.document.descriptor.width,
+      this.document.descriptor.height,
+    );
+    if (!pixel) {
       this.hideCrosshair();
       return null;
     }
-    const screenX = this.cameraX + (x + 0.5) * this.zoom;
-    const screenY = this.cameraY + (y + 0.5) * this.zoom;
+    const screen = this.transform.imageToScreen({ x: pixel.x + 0.5, y: pixel.y + 0.5 });
+    const screenX = screen.x;
+    const screenY = screen.y;
     this.crosshair.style.setProperty("--crosshair-x", `${screenX}px`);
     this.crosshair.style.setProperty("--crosshair-y", `${screenY}px`);
     this.crosshair.classList.add("visible");
-    return { x, y };
+    return pixel;
+  }
+
+  private eventPoint(event: MouseEvent): ImagePoint {
+    const rect = this.canvas.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }
 
   private hideCrosshair(): void {
@@ -443,11 +507,27 @@ export class RawViewport {
     });
   }
 
-  private currentLevel(): number {
-    if (!this.document || this.zoom >= 1) return 0;
-    const ideal = Math.max(0, Math.floor(Math.log2(1 / this.zoom)));
-    const maxLevel = Math.max(0, Math.ceil(Math.log2(Math.max(this.document.descriptor.width, this.document.descriptor.height) / TILE_SIZE)));
-    return Math.min(ideal, maxLevel, 30);
+  private maximumLevel(): number {
+    if (!this.document) return 0;
+    const maxLevel = Math.max(
+      0,
+      Math.ceil(Math.log2(Math.max(this.document.descriptor.width, this.document.descriptor.height))),
+    );
+    return Math.min(maxLevel, 30);
+  }
+
+  private lodPlan(): LodPlan {
+    const maxLevel = this.maximumLevel();
+    if (!this.document || this.zoom >= 1 || maxLevel === 0) {
+      return { fineLevel: 0, coarseLevel: null, blend: 0 };
+    }
+    const ideal = Math.max(0, Math.min(maxLevel, Math.log2(1 / this.zoom)));
+    const fineLevel = Math.floor(ideal);
+    const blend = ideal - fineLevel;
+    if (fineLevel >= maxLevel || blend < 0.015) {
+      return { fineLevel, coarseLevel: null, blend: 0 };
+    }
+    return { fineLevel, coarseLevel: fineLevel + 1, blend };
   }
 
   private tileKey(level: number, x: number, y: number): string {
@@ -459,10 +539,17 @@ export class RawViewport {
     if (!this.document) return [];
     const scale = 2 ** level;
     const span = TILE_SIZE * scale;
-    const left = Math.max(0, (-this.cameraX / this.zoom));
-    const top = Math.max(0, (-this.cameraY / this.zoom));
-    const right = Math.min(this.document.descriptor.width, (this.width - this.cameraX) / this.zoom);
-    const bottom = Math.min(this.document.descriptor.height, (this.height - this.cameraY) / this.zoom);
+    const visibleRect = this.transform.visibleImageRect(
+      this.width,
+      this.height,
+      this.document.descriptor.width,
+      this.document.descriptor.height,
+    );
+    if (!visibleRect) return [];
+    const left = visibleRect.x;
+    const top = visibleRect.y;
+    const right = visibleRect.x + visibleRect.width;
+    const bottom = visibleRect.y + visibleRect.height;
     const startX = Math.max(0, Math.floor(left / span) - 1);
     const startY = Math.max(0, Math.floor(top / span) - 1);
     const endX = Math.min(Math.ceil(this.document.descriptor.width / span) - 1, Math.floor(right / span) + 1);
@@ -487,13 +574,37 @@ export class RawViewport {
       this.updateScrollbars();
       return;
     }
-    const level = this.currentLevel();
-    const visible = this.visibleTiles(level);
-    const scale = 2 ** level;
+    const plan = this.lodPlan();
+    const fineVisible = this.visibleTiles(plan.fineLevel);
+    const coarseVisible = plan.coarseLevel === null ? [] : this.visibleTiles(plan.coarseLevel);
     gl.useProgram(this.program);
     gl.uniform2f(this.viewportLocation, this.width * dpr, this.height * dpr);
     gl.uniform2f(this.cameraLocation, this.cameraX * dpr, this.cameraY * dpr);
     gl.uniform1f(this.zoomLocation, this.zoom * dpr);
+    const fineLoaded = this.drawLayer(plan.fineLevel, fineVisible, 1);
+    const coarseLoaded = plan.coarseLevel === null
+      ? 0
+      : this.drawLayer(plan.coarseLevel, coarseVisible, plan.blend);
+    this.updateScrollbars();
+    const levelLabel = plan.coarseLevel === null
+      ? `L${plan.fineLevel}`
+      : `L${plan.fineLevel}↔L${plan.coarseLevel}`;
+    this.callbacks.onRenderStats(levelLabel, fineLoaded + coarseLoaded, this.inFlight.size);
+    this.pixelValueOverlay.draw({
+      document: this.document,
+      frame: this.frame,
+      displayMode: this.settings.mode,
+      transform: this.transform,
+      width: this.width,
+      height: this.height,
+    });
+  }
+
+  private drawLayer(level: number, visible: Array<{ x: number; y: number }>, opacity: number): number {
+    const { gl } = this;
+    const scale = 2 ** level;
+    let loaded = 0;
+    gl.uniform1f(this.opacityLocation, opacity);
     for (const tile of visible) {
       const key = this.tileKey(level, tile.x, tile.y);
       const entry = this.textures.get(key);
@@ -501,42 +612,26 @@ export class RawViewport {
         this.queueTile(key, level, tile.x, tile.y);
         continue;
       }
+      loaded += 1;
       entry.lastUsed = ++this.renderCounter;
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, entry.texture);
       gl.uniform4f(this.rectLocation, tile.x * TILE_SIZE * scale, tile.y * TILE_SIZE * scale, TILE_SIZE * scale, TILE_SIZE * scale);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
-    this.updateScrollbars();
-    this.callbacks.onRenderStats(level, visible.filter((tile) => this.textures.has(this.tileKey(level, tile.x, tile.y))).length, this.inFlight.size);
-    this.pixelValueOverlay.draw({
-      document: this.document,
-      frame: this.frame,
-      displayMode: this.settings.mode,
-      zoom: this.zoom,
-      cameraX: this.cameraX,
-      cameraY: this.cameraY,
-      width: this.width,
-      height: this.height,
-    });
+    return loaded;
   }
 
   private updateImageBoundary(): void {
     if (!this.document) {
-      this.imageBoundary.classList.remove("visible");
+      this.overlayLayer.hide();
       return;
     }
-    const x = this.cameraX;
-    const y = this.cameraY;
-    const width = this.document.descriptor.width * this.zoom;
-    const height = this.document.descriptor.height * this.zoom;
-    for (const rect of this.imageBoundaryRects) {
-      rect.setAttribute("x", String(x));
-      rect.setAttribute("y", String(y));
-      rect.setAttribute("width", String(width));
-      rect.setAttribute("height", String(height));
-    }
-    this.imageBoundary.classList.add("visible");
+    this.overlayLayer.update(
+      this.transform,
+      this.document.descriptor.width,
+      this.document.descriptor.height,
+    );
   }
 
   private queueTile(key: string, level: number, tileX: number, tileY: number): void {
