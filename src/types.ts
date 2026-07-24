@@ -76,13 +76,22 @@ export interface PixelSample {
   channel: string;
 }
 
-export type FrameSelection = "current" | "all";
 export type ValueMapping = "preserve" | "scaleFullRange";
+
+export interface MissingPixelFill {
+  mono: number;
+  red: number;
+  greenBlue: number;
+  greenRed: number;
+  blue: number;
+}
 
 export interface ExportRequest {
   path: string;
+  sourcePath: string;
+  sourceGeneration: number;
+  sourceDescriptor: RawDescriptor;
   currentFrame: number;
-  frameSelection: FrameSelection;
   cropX: number;
   cropY: number;
   cropWidth: number;
@@ -94,12 +103,21 @@ export interface ExportRequest {
   rowAlignment: number;
   frameAlignment: number;
   valueMapping: ValueMapping;
+  missingPixelFill: MissingPixelFill;
+}
+
+export interface MissingPixelCounts {
+  mono: number;
+  red: number;
+  greenBlue: number;
+  greenRed: number;
+  blue: number;
 }
 
 export interface ExportResult {
   bytesWritten: number;
-  framesWritten: number;
   clippedValues: number;
+  filledPixels: MissingPixelCounts;
   outputCfa: CfaPattern;
 }
 

@@ -1,6 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import erawIconUrl from "./assets/eraw-icon.svg";
-import { chooseExportFile, chooseRawFile, exportDocument, openDocument, updateDescriptor } from "./api";
+import { chooseRawFile, openDocument, updateDescriptor } from "./api";
+import { ExportDialog, exportDialogTemplate } from "./export-dialog";
 import { RawViewport, type ImagePoint } from "./viewport";
 import type {
   BitAlignment,
@@ -9,7 +10,6 @@ import type {
   DisplayMode,
   DocumentInfo,
   Endianness,
-  ExportRequest,
   Packing,
   RawDescriptor,
 } from "./types";
@@ -76,15 +76,6 @@ const icons = {
   warning: icon("M12 3 2 21h20L12 3Zm0 4 6.6 12H5.4L12 7Zm-1 3v5h2v-5h-2Zm0 6.5v2h2v-2h-2Z"),
 };
 
-function formatBytes(value: number): string {
-  if (!Number.isFinite(value)) return "—";
-  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
-  let size = Math.max(0, value);
-  let unit = 0;
-  while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit += 1; }
-  return `${size >= 100 || unit === 0 ? size.toFixed(0) : size.toFixed(2)} ${units[unit]}`;
-}
-
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]!);
 }
@@ -127,6 +118,7 @@ function loadDescriptor(remember: boolean): RawDescriptor {
 export class ErawApp {
   private readonly root: HTMLElement;
   private readonly viewport: RawViewport;
+  private readonly exportDialog: ExportDialog;
   private settings = loadSettings();
   private descriptor = loadDescriptor(this.settings.rememberDescriptor);
   private document: DocumentInfo | null = null;
@@ -147,6 +139,9 @@ export class ErawApp {
     this.root = root;
     root.innerHTML = this.template();
     this.writeDescriptor(this.descriptor);
+    this.exportDialog = new ExportDialog(root, {
+      onSuccess: (message) => this.showToast(message, "success", 6000),
+    });
     this.viewport = new RawViewport(this.get("viewport"), {
       onZoomChange: (zoom) => { this.get("zoom-status").textContent = `${(zoom * 100).toFixed(zoom < 0.1 ? 2 : 1)}%`; },
       onSampleChange: (sample) => this.updateSample(sample),
@@ -262,7 +257,7 @@ export class ErawApp {
         <div class="toast" id="toast" role="status"></div>
         <div class="parameter-tooltip" id="parameter-tooltip" role="tooltip"></div>
 
-        ${this.exportDialogTemplate()}
+        ${exportDialogTemplate()}
         ${this.pixelLocatorDialogTemplate()}
         ${this.settingsDialogTemplate()}
         ${this.aboutDialogTemplate()}
@@ -308,31 +303,6 @@ export class ErawApp {
       frameStride: "相邻两帧起点之间的字节距离；0 表示根据帧数据大小和帧对齐自动计算。",
     };
     return escapeHtml(descriptions[field] ?? "");
-  }
-
-  private exportDialogTemplate(): string {
-    return `<dialog id="export-dialog" class="modal export-modal">
-      <form method="dialog"><header><div><small>DETERMINISTIC CONVERSION</small><h2>导出 RAW 数据</h2></div><button value="cancel" class="dialog-close">×</button></header>
-      <div class="dialog-body">
-        <section><h3>有效区域</h3><div class="export-grid">
-          ${this.exportNumber("crop-x", "起点 X", 0)}${this.exportNumber("crop-y", "起点 Y", 0)}${this.exportNumber("crop-width", "宽度", 1)}${this.exportNumber("crop-height", "高度", 1)}
-        </div><div class="phase-note">输出 CFA：<strong id="export-cfa">—</strong><span>奇数坐标裁剪会自动改变 CFA 相位</span></div></section>
-        <section><h3>输出编码</h3><div class="export-grid">
-          <label><span>存储方式</span><select id="export-packing"><option value="unpacked8">Unpacked 8</option><option value="unpacked16">Unpacked 16</option><option value="mipiRaw10">MIPI RAW10</option><option value="mipiRaw12">MIPI RAW12</option><option value="mipiRaw14">MIPI RAW14</option></select></label>
-          <label><span>位深</span><select id="export-depth"><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option></select></label>
-          <label><span>字节序</span><select id="export-endian"><option value="little">Little endian</option><option value="big">Big endian</option></select></label>
-          <label><span>有效位位置</span><select id="export-bit-alignment"><option value="lsb">容器低位 LSB</option><option value="msb">容器高位 MSB</option></select></label>
-          ${this.exportNumber("export-row-alignment", "行对齐", 1)}${this.exportNumber("export-frame-alignment", "帧对齐", 1)}
-          <label><span>像素值映射</span><select id="export-mapping"><option value="preserve">保持数值，超限裁剪</option><option value="scaleFullRange">按满量程缩放</option></select></label>
-          <label><span>帧范围</span><select id="export-frames"><option value="current">仅当前帧</option><option value="all">全部帧</option></select></label>
-        </div></section>
-      </div>
-      <footer><p id="export-summary">输出不包含源文件头，仅包含所选 RAW 帧。</p><div><button value="cancel" class="secondary-button">取消</button><button id="confirm-export" value="default" class="primary-button">选择位置并导出</button></div></footer></form>
-    </dialog>`;
-  }
-
-  private exportNumber(id: string, label: string, min: number): string {
-    return `<label><span>${label}</span><div class="number-input"><input id="${id}" type="number" min="${min}" step="1"/><b>${id.includes("alignment") ? "B" : "px"}</b></div></label>`;
   }
 
   private pixelLocatorDialogTemplate(): string {
@@ -391,7 +361,7 @@ export class ErawApp {
   private bindEvents(): void {
     this.get("open-button").addEventListener("click", () => void this.openFile());
     this.get("empty-open-button").addEventListener("click", () => void this.openFile());
-    this.get<HTMLButtonElement>("export-button").addEventListener("click", () => this.openExportDialog());
+    this.get<HTMLButtonElement>("export-button").addEventListener("click", () => void this.openExport());
     this.get("fit-button").addEventListener("click", () => this.viewport.fit());
     this.get("actual-button").addEventListener("click", () => this.viewport.actualSize());
     this.get("panel-button").addEventListener("click", () => {
@@ -441,21 +411,12 @@ export class ErawApp {
     this.get("next-frame").addEventListener("click", () => this.setFrame(this.frame + 1));
     this.get("last-frame").addEventListener("click", () => this.setFrame((this.document?.layout.frameCount ?? 1) - 1));
     this.get<HTMLInputElement>("frame-input").addEventListener("change", (event) => this.setFrame(Number((event.currentTarget as HTMLInputElement).value) - 1));
-    this.get("confirm-export").addEventListener("click", (event) => { event.preventDefault(); void this.performExport(); });
     this.get("confirm-settings").addEventListener("click", () => this.saveSettingsFromDialog());
     this.get("reset-settings").addEventListener("click", () => this.writeSettingsForm(DEFAULT_SETTINGS));
     this.get<HTMLInputElement>("setting-pixel-values").addEventListener("change", () => this.updatePixelSettingsAvailability());
     this.get("pixel-locator-form").addEventListener("submit", (event) => { event.preventDefault(); this.locatePixel(); });
     this.get("close-pixel-locator").addEventListener("click", () => this.get<HTMLDialogElement>("pixel-locator-dialog").close());
     this.get("cancel-pixel-locator").addEventListener("click", () => this.get<HTMLDialogElement>("pixel-locator-dialog").close());
-    ["crop-x", "crop-y", "crop-width", "crop-height"].forEach((id) => this.get<HTMLInputElement>(id).addEventListener("input", () => this.updateExportPhase()));
-    this.get<HTMLSelectElement>("export-packing").addEventListener("change", (event) => {
-      const packing = (event.currentTarget as HTMLSelectElement).value;
-      if (packing === "mipiRaw10") this.get<HTMLSelectElement>("export-depth").value = "10";
-      if (packing === "mipiRaw12") this.get<HTMLSelectElement>("export-depth").value = "12";
-      if (packing === "mipiRaw14") this.get<HTMLSelectElement>("export-depth").value = "14";
-      if (packing === "unpacked8") this.get<HTMLSelectElement>("export-depth").value = "8";
-    });
     window.addEventListener("keydown", (event) => this.onKeyDown(event));
     window.addEventListener("resize", () => this.setSidebarWidth(this.settings.sidebarWidth, false));
   }
@@ -603,7 +564,7 @@ export class ErawApp {
     emptyState.classList.toggle("hidden", Boolean(info));
     emptyState.setAttribute("aria-hidden", String(Boolean(info)));
     this.get<HTMLButtonElement>("empty-open-button").disabled = Boolean(info);
-    this.get<HTMLButtonElement>("export-button").disabled = !info;
+    this.get<HTMLButtonElement>("export-button").disabled = !info || info.layout.frameCount === 0;
     this.get<HTMLButtonElement>("pixel-status").disabled = !info;
     const fileStatus = this.get("file-status");
     fileStatus.textContent = info?.path ?? "未打开文件";
@@ -787,70 +748,24 @@ export class ErawApp {
     this.get<HTMLDialogElement>("pixel-locator-dialog").close();
   }
 
-  private openExportDialog(): void {
-    if (!this.document) return;
-    this.get<HTMLInputElement>("crop-x").value = "0";
-    this.get<HTMLInputElement>("crop-y").value = "0";
-    this.get<HTMLInputElement>("crop-width").value = String(this.document.descriptor.width);
-    this.get<HTMLInputElement>("crop-height").value = String(this.document.descriptor.height);
-    this.get<HTMLSelectElement>("export-packing").value = this.document.descriptor.packing;
-    this.get<HTMLSelectElement>("export-depth").value = String(this.document.descriptor.bitDepth);
-    this.get<HTMLSelectElement>("export-endian").value = this.document.descriptor.endianness;
-    this.get<HTMLSelectElement>("export-bit-alignment").value = this.document.descriptor.bitAlignment;
-    this.get<HTMLInputElement>("export-row-alignment").value = "1";
-    this.get<HTMLInputElement>("export-frame-alignment").value = "1";
-    this.updateExportPhase();
-    this.get<HTMLDialogElement>("export-dialog").showModal();
-  }
-
-  private shiftedCfa(cfa: CfaPattern, x: number, y: number): CfaPattern {
-    if (cfa === "MONO") return cfa;
-    const grid: Record<CfaPattern, CfaPattern[][]> = {
-      MONO: [["MONO"]], RGGB: [["RGGB", "GRBG"], ["GBRG", "BGGR"]], BGGR: [["BGGR", "GBRG"], ["GRBG", "RGGB"]],
-      GBRG: [["GBRG", "BGGR"], ["RGGB", "GRBG"]], GRBG: [["GRBG", "RGGB"], ["BGGR", "GBRG"]],
-    };
-    return grid[cfa][Math.abs(y) % 2][Math.abs(x) % 2];
-  }
-
-  private updateExportPhase(): void {
-    if (!this.document) return;
-    const x = Number(this.get<HTMLInputElement>("crop-x").value) || 0;
-    const y = Number(this.get<HTMLInputElement>("crop-y").value) || 0;
-    this.get("export-cfa").textContent = this.shiftedCfa(this.document.descriptor.cfa, x, y);
-  }
-
-  private async performExport(): Promise<void> {
-    if (!this.document) return;
-    const defaultPath = this.document.path.replace(/(?:\.[^\\/.]+)?$/, "_extracted.raw");
-    try {
-      const path = await chooseExportFile(defaultPath);
-      if (!path) return;
-      const num = (id: string) => Math.max(0, Math.trunc(Number(this.get<HTMLInputElement>(id).value) || 0));
-      const request: ExportRequest = {
-        path, currentFrame: this.frame, frameSelection: this.get<HTMLSelectElement>("export-frames").value as "current" | "all",
-        cropX: num("crop-x"), cropY: num("crop-y"), cropWidth: num("crop-width"), cropHeight: num("crop-height"),
-        packing: this.get<HTMLSelectElement>("export-packing").value as Packing, bitDepth: Number(this.get<HTMLSelectElement>("export-depth").value),
-        endianness: this.get<HTMLSelectElement>("export-endian").value as Endianness, bitAlignment: this.get<HTMLSelectElement>("export-bit-alignment").value as BitAlignment,
-        rowAlignment: Math.max(1, num("export-row-alignment")), frameAlignment: Math.max(1, num("export-frame-alignment")),
-        valueMapping: this.get<HTMLSelectElement>("export-mapping").value as "preserve" | "scaleFullRange",
-      };
-      this.showToast("正在转换并写入 RAW 数据…", "busy", 15000);
-      const result = await exportDocument(request);
-      this.get<HTMLDialogElement>("export-dialog").close();
-      const clipped = result.clippedValues ? `，${result.clippedValues} 个像素被裁剪` : "";
-      this.showToast(`已导出 ${result.framesWritten} 帧 · ${formatBytes(result.bytesWritten)} · ${result.outputCfa}${clipped}`, "success", 6000);
-    } catch (error) {
-      this.reportRuntimeError(String(error), 6000);
-    }
-  }
-
   private onKeyDown(event: KeyboardEvent): void {
     if (event.key === "Escape" && this.root.querySelector(".app-shell")!.classList.contains("diagnostics-open")) { event.preventDefault(); this.setDiagnosticsOpen(false); }
     else if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); void this.openFile(); }
-    else if (event.ctrlKey && event.key.toLowerCase() === "e" && this.document) { event.preventDefault(); this.openExportDialog(); }
+    else if (event.ctrlKey && event.key.toLowerCase() === "e" && this.document?.layout.frameCount && !this.exportDialog.isOpen) {
+      event.preventDefault();
+      void this.openExport();
+    }
     else if (event.ctrlKey && event.key === "0") { event.preventDefault(); this.viewport.fit(); }
     else if (event.ctrlKey && event.key === "1") { event.preventDefault(); this.viewport.actualSize(); }
     else if (event.key === "F11") { event.preventDefault(); void this.toggleFullscreen(); }
+  }
+
+  private async openExport(): Promise<void> {
+    await this.commitDescriptor();
+    while (this.committing) {
+      await new Promise((resolve) => window.setTimeout(resolve, 16));
+    }
+    if (this.document?.layout.frameCount) this.exportDialog.open(this.document, this.frame);
   }
 
   private async toggleFullscreen(): Promise<void> {

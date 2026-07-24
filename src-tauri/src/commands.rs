@@ -216,24 +216,29 @@ pub async fn export_document(
     request: ExportRequest,
     state: State<'_, AppState>,
 ) -> Result<ExportResult, String> {
-    let (map, descriptor, layout, source_path) = {
+    let (map, file_size, source_path, generation) = {
         let guard = lock_document(&state)?;
         let document = guard.as_ref().ok_or("尚未打开 RAW 文件")?;
         (
             document.map.clone(),
-            document.descriptor.clone(),
-            document.layout,
+            document.file_size,
             document.path.clone(),
+            document.generation,
         )
     };
+    if request.source_path != source_path || request.source_generation != generation {
+        return Err("导出来源快照已失效，请关闭导出窗口后重新打开".into());
+    }
     if let (Ok(source), Ok(target)) = (
-        std::fs::canonicalize(source_path),
+        std::fs::canonicalize(&source_path),
         std::fs::canonicalize(&request.path),
     ) {
         if source == target {
             return Err("导出路径不能覆盖当前打开的源 RAW 文件".into());
         }
     }
+    let descriptor = request.source_descriptor.clone();
+    let layout = calculate_layout(&descriptor, file_size).0;
     tauri::async_runtime::spawn_blocking(move || {
         let bytes: &[u8] = match map.as_ref() {
             Some(value) => value.as_ref(),

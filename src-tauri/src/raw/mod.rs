@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::min,
-    fs::File,
+    fs::{self, File, OpenOptions},
     io::{BufWriter, Write},
-    path::Path,
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -403,6 +404,15 @@ enum CfaChannel {
     Blue,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CfaSite {
+    Mono,
+    Red,
+    GreenBlue,
+    GreenRed,
+    Blue,
+}
+
 fn cfa_channel(pattern: CfaPattern, x: u32, y: u32) -> CfaChannel {
     let i = ((y & 1) << 1) | (x & 1);
     match pattern {
@@ -431,6 +441,37 @@ fn cfa_channel(pattern: CfaPattern, x: u32, y: u32) -> CfaChannel {
             CfaChannel::Blue,
             CfaChannel::Green,
         ][i as usize],
+    }
+}
+
+fn cfa_site(pattern: CfaPattern, x: u32, y: u32) -> CfaSite {
+    let i = (((y & 1) << 1) | (x & 1)) as usize;
+    match pattern {
+        CfaPattern::Mono => CfaSite::Mono,
+        CfaPattern::Rggb => [
+            CfaSite::Red,
+            CfaSite::GreenRed,
+            CfaSite::GreenBlue,
+            CfaSite::Blue,
+        ][i],
+        CfaPattern::Bggr => [
+            CfaSite::Blue,
+            CfaSite::GreenBlue,
+            CfaSite::GreenRed,
+            CfaSite::Red,
+        ][i],
+        CfaPattern::Gbrg => [
+            CfaSite::GreenBlue,
+            CfaSite::Blue,
+            CfaSite::Red,
+            CfaSite::GreenRed,
+        ][i],
+        CfaPattern::Grbg => [
+            CfaSite::GreenRed,
+            CfaSite::Red,
+            CfaSite::Blue,
+            CfaSite::GreenBlue,
+        ][i],
     }
 }
 
@@ -705,19 +746,14 @@ pub enum ValueMapping {
     ScaleFullRange,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum FrameSelection {
-    Current,
-    All,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportRequest {
     pub path: String,
+    pub source_path: String,
+    pub source_generation: u64,
+    pub source_descriptor: RawDescriptor,
     pub current_frame: u64,
-    pub frame_selection: FrameSelection,
     pub crop_x: u32,
     pub crop_y: u32,
     pub crop_width: u32,
@@ -729,14 +765,87 @@ pub struct ExportRequest {
     pub row_alignment: u64,
     pub frame_alignment: u64,
     pub value_mapping: ValueMapping,
+    pub missing_pixel_fill: MissingPixelFill,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MissingPixelFill {
+    pub mono: u32,
+    pub red: u32,
+    pub green_blue: u32,
+    pub green_red: u32,
+    pub blue: u32,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MissingPixelCounts {
+    pub mono: u64,
+    pub red: u64,
+    pub green_blue: u64,
+    pub green_red: u64,
+    pub blue: u64,
+}
+
+impl MissingPixelFill {
+    fn value_for(
+        &self,
+        pattern: CfaPattern,
+        x: u32,
+        y: u32,
+        counts: &mut MissingPixelCounts,
+    ) -> u16 {
+        match cfa_site(pattern, x, y) {
+            CfaSite::Mono => {
+                counts.mono += 1;
+                self.mono as u16
+            }
+            CfaSite::Red => {
+                counts.red += 1;
+                self.red as u16
+            }
+            CfaSite::GreenBlue => {
+                counts.green_blue += 1;
+                self.green_blue as u16
+            }
+            CfaSite::GreenRed => {
+                counts.green_red += 1;
+                self.green_red as u16
+            }
+            CfaSite::Blue => {
+                counts.blue += 1;
+                self.blue as u16
+            }
+        }
+    }
+
+    fn validate(&self, pattern: CfaPattern, maximum: u32) -> Result<(), String> {
+        let values: &[(&str, u32)] = if pattern == CfaPattern::Mono {
+            &[("MONO", self.mono)]
+        } else {
+            &[
+                ("R", self.red),
+                ("Gb", self.green_blue),
+                ("Gr", self.green_red),
+                ("B", self.blue),
+            ]
+        };
+        if let Some((name, value)) = values.iter().find(|(_, value)| *value > maximum) {
+            return Err(format!(
+                "{name} 缺失像素填充值 {value} 超出当前输出位深允许的 0–{maximum}"
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportResult {
     pub bytes_written: u64,
-    pub frames_written: u64,
     pub clipped_values: u64,
+    pub filled_pixels: MissingPixelCounts,
     pub output_cfa: CfaPattern,
 }
 
@@ -867,6 +976,63 @@ fn write_zeroes(writer: &mut impl Write, mut count: usize, context: &str) -> Res
     Ok(())
 }
 
+static TEMPORARY_FILE_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+fn sibling_path(target: &Path, purpose: &str) -> PathBuf {
+    let parent = target
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let name = target
+        .file_name()
+        .map(|value| value.to_string_lossy())
+        .unwrap_or_else(|| "output.raw".into());
+    let sequence = TEMPORARY_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+    parent.join(format!(
+        ".{name}.eraw-{}-{sequence}.{purpose}",
+        std::process::id()
+    ))
+}
+
+fn create_temporary_output(target: &Path) -> Result<(PathBuf, File), String> {
+    for _ in 0..100 {
+        let path = sibling_path(target, "tmp");
+        match OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(file) => return Ok((path, file)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(format!("无法在输出目录创建临时文件：{error}")),
+        }
+    }
+    Err("无法为导出任务分配唯一临时文件".into())
+}
+
+fn commit_temporary_output(temporary: &Path, target: &Path) -> Result<(), String> {
+    if !target.exists() {
+        return fs::rename(temporary, target).map_err(|error| format!("无法完成输出文件：{error}"));
+    }
+    if target.is_dir() {
+        return Err("所选输出路径是目录，无法写入 RAW 文件".into());
+    }
+    let backup = loop {
+        let candidate = sibling_path(target, "backup");
+        if !candidate.exists() {
+            break candidate;
+        }
+    };
+    fs::rename(target, &backup).map_err(|error| format!("无法暂存已有输出文件：{error}"))?;
+    if let Err(error) = fs::rename(temporary, target) {
+        let restore_error = fs::rename(&backup, target).err();
+        return Err(match restore_error {
+            Some(restore) => {
+                format!("无法完成输出文件：{error}；恢复原文件也失败：{restore}")
+            }
+            None => format!("无法完成输出文件：{error}；原文件已恢复"),
+        });
+    }
+    let _ = fs::remove_file(backup);
+    Ok(())
+}
+
 pub fn export_raw(
     data: &[u8],
     source: &RawDescriptor,
@@ -890,18 +1056,35 @@ pub fn export_raw(
     if !(8..=16).contains(&request.bit_depth) {
         return Err("输出位深必须在 8 到 16 bit 之间".into());
     }
-    if request.packing == Packing::Unpacked8 && request.bit_depth > 8 {
-        return Err("8-bit 容器不能保存超过 8 bit 的输出".into());
+    match request.packing {
+        Packing::Unpacked8 if request.bit_depth != 8 => {
+            return Err("Unpacked 8 输出固定使用 8 bit 位深".into());
+        }
+        Packing::MipiRaw10 if request.bit_depth != 10 => {
+            return Err("MIPI RAW10 输出固定使用 10 bit 位深".into());
+        }
+        Packing::MipiRaw12 if request.bit_depth != 12 => {
+            return Err("MIPI RAW12 输出固定使用 12 bit 位深".into());
+        }
+        Packing::MipiRaw14 if request.bit_depth != 14 => {
+            return Err("MIPI RAW14 输出固定使用 14 bit 位深".into());
+        }
+        _ => {}
     }
-    let frame_range: Box<dyn Iterator<Item = u64>> = match request.frame_selection {
-        FrameSelection::Current => Box::new(std::iter::once(request.current_frame)),
-        FrameSelection::All => Box::new(0..layout.frame_count),
+    if request.row_alignment == 0 || request.frame_alignment == 0 {
+        return Err("输出行对齐和帧对齐必须大于 0".into());
+    }
+    if request.current_frame >= layout.frame_count {
+        return Err(format!("当前帧索引 {} 超出范围", request.current_frame));
+    }
+    let output_maximum = if request.bit_depth >= 16 {
+        u16::MAX as u32
+    } else {
+        (1u32 << request.bit_depth) - 1
     };
-    let path = Path::new(&request.path);
-    let mut writer = BufWriter::with_capacity(
-        1024 * 1024,
-        File::create(path).map_err(|e| format!("无法创建输出文件：{e}"))?,
-    );
+    request
+        .missing_pixel_fill
+        .validate(source.cfa, output_maximum)?;
     let row_bytes = output_row_bytes(request.crop_width, request.packing)?;
     let row_stride =
         usize::try_from(align_up(row_bytes as u64, request.row_alignment).ok_or("输出行对齐溢出")?)
@@ -913,23 +1096,29 @@ pub fn export_raw(
         align_up(frame_bytes as u64, request.frame_alignment).ok_or("输出帧对齐溢出")?,
     )
     .map_err(|_| "输出帧步长过大")?;
-    let mut clipped = 0u64;
-    let mut frames_written = 0u64;
-    for frame in frame_range {
-        if frame >= layout.frame_count {
-            return Err(format!("帧索引 {frame} 超出范围"));
-        }
+
+    let path = Path::new(&request.path);
+    let (temporary_path, temporary_file) = create_temporary_output(path)?;
+    let write_result = (|| {
+        let mut writer = BufWriter::with_capacity(1024 * 1024, temporary_file);
+        let mut clipped = 0u64;
+        let mut filled = MissingPixelCounts::default();
         for y in request.crop_y..request.crop_y + request.crop_height {
             let mut values = Vec::with_capacity(request.crop_width as usize);
             for x in request.crop_x..request.crop_x + request.crop_width {
-                let value = read_pixel(data, source, layout, frame, x, y).unwrap_or(0);
-                values.push(map_value(
-                    value,
-                    source.bit_depth,
-                    request.bit_depth,
-                    request.value_mapping,
-                    &mut clipped,
-                ));
+                let value = match read_pixel(data, source, layout, request.current_frame, x, y) {
+                    Some(value) => map_value(
+                        value,
+                        source.bit_depth,
+                        request.bit_depth,
+                        request.value_mapping,
+                        &mut clipped,
+                    ),
+                    None => request
+                        .missing_pixel_fill
+                        .value_for(source.cfa, x, y, &mut filled),
+                };
+                values.push(value);
             }
             let row = encode_row(
                 &values,
@@ -944,15 +1133,27 @@ pub fn export_raw(
             write_zeroes(&mut writer, row_stride - row_bytes, "行填充")?;
         }
         write_zeroes(&mut writer, frame_stride - frame_bytes, "帧填充")?;
-        frames_written += 1;
+        writer
+            .flush()
+            .map_err(|error| format!("刷新输出文件失败：{error}"))?;
+        Ok::<_, String>((clipped, filled))
+    })();
+
+    let (clipped_values, filled_pixels) = match write_result {
+        Ok(result) => result,
+        Err(error) => {
+            let _ = fs::remove_file(&temporary_path);
+            return Err(error);
+        }
+    };
+    if let Err(error) = commit_temporary_output(&temporary_path, path) {
+        let _ = fs::remove_file(&temporary_path);
+        return Err(error);
     }
-    writer
-        .flush()
-        .map_err(|e| format!("刷新输出文件失败：{e}"))?;
     Ok(ExportResult {
-        bytes_written: frames_written.saturating_mul(frame_stride as u64),
-        frames_written,
-        clipped_values: clipped,
+        bytes_written: frame_stride as u64,
+        clipped_values,
+        filled_pixels,
         output_cfa: shifted_cfa(source.cfa, request.crop_x, request.crop_y),
     })
 }
@@ -1171,6 +1372,122 @@ mod tests {
         let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
         assert_eq!(tile.len(), 64 * 64 * 4);
         assert!(tile.chunks_exact(4).any(|pixel| pixel[3] == 255));
+    }
+
+    #[test]
+    fn bayer_fill_classifies_green_sites_by_colored_row() {
+        assert_eq!(cfa_site(CfaPattern::Mono, 1, 1), CfaSite::Mono);
+        let expected = [
+            (
+                CfaPattern::Rggb,
+                [
+                    CfaSite::Red,
+                    CfaSite::GreenRed,
+                    CfaSite::GreenBlue,
+                    CfaSite::Blue,
+                ],
+            ),
+            (
+                CfaPattern::Bggr,
+                [
+                    CfaSite::Blue,
+                    CfaSite::GreenBlue,
+                    CfaSite::GreenRed,
+                    CfaSite::Red,
+                ],
+            ),
+            (
+                CfaPattern::Gbrg,
+                [
+                    CfaSite::GreenBlue,
+                    CfaSite::Blue,
+                    CfaSite::Red,
+                    CfaSite::GreenRed,
+                ],
+            ),
+            (
+                CfaPattern::Grbg,
+                [
+                    CfaSite::GreenRed,
+                    CfaSite::Red,
+                    CfaSite::Blue,
+                    CfaSite::GreenBlue,
+                ],
+            ),
+        ];
+        for (pattern, sites) in expected {
+            assert_eq!(cfa_site(pattern, 0, 0), sites[0]);
+            assert_eq!(cfa_site(pattern, 1, 0), sites[1]);
+            assert_eq!(cfa_site(pattern, 0, 1), sites[2]);
+            assert_eq!(cfa_site(pattern, 1, 1), sites[3]);
+        }
+    }
+
+    #[test]
+    fn missing_fill_respects_output_bit_depth() {
+        let fill = MissingPixelFill {
+            mono: 256,
+            red: 1,
+            green_blue: 2,
+            green_red: 3,
+            blue: 4,
+        };
+        assert!(fill.validate(CfaPattern::Mono, 255).is_err());
+        assert!(fill.validate(CfaPattern::Rggb, 255).is_ok());
+    }
+
+    #[test]
+    fn export_uses_per_site_output_dn_for_missing_pixels() {
+        let descriptor = RawDescriptor {
+            width: 2,
+            height: 2,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Rggb,
+            ..RawDescriptor::default()
+        };
+        let source = [9u8];
+        let layout = calculate_layout(&descriptor, source.len() as u64).0;
+        let output = sibling_path(
+            &std::env::temp_dir().join("eraw-export-fill-test.raw"),
+            "test",
+        );
+        let request = ExportRequest {
+            path: output.to_string_lossy().into_owned(),
+            source_path: "source.raw".into(),
+            source_generation: 1,
+            source_descriptor: descriptor.clone(),
+            current_frame: 0,
+            crop_x: 0,
+            crop_y: 0,
+            crop_width: 2,
+            crop_height: 2,
+            packing: Packing::Unpacked8,
+            bit_depth: 8,
+            endianness: Endianness::Little,
+            bit_alignment: BitAlignment::Lsb,
+            row_alignment: 1,
+            frame_alignment: 1,
+            value_mapping: ValueMapping::ScaleFullRange,
+            missing_pixel_fill: MissingPixelFill {
+                mono: 1,
+                red: 10,
+                green_blue: 30,
+                green_red: 20,
+                blue: 40,
+            },
+        };
+        let result = export_raw(&source, &descriptor, &layout, &request).unwrap();
+        let exported = fs::read(&output).unwrap();
+        fs::remove_file(&output).unwrap();
+
+        assert_eq!(exported, [9, 20, 30, 40]);
+        assert_eq!(result.bytes_written, 4);
+        assert_eq!(result.filled_pixels.red, 0);
+        assert_eq!(result.filled_pixels.green_red, 1);
+        assert_eq!(result.filled_pixels.green_blue, 1);
+        assert_eq!(result.filled_pixels.blue, 1);
+        assert_eq!(result.output_cfa, CfaPattern::Rggb);
     }
 
     #[test]
