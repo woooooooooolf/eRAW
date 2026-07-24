@@ -1,6 +1,6 @@
 [package]
 name = "eraw"
-version = "0.0.8"
+version = "0.0.9"
 description = "RAW sensor data viewer and converter"
 authors = ["eRAW contributors"]
 license = "GPL-3.0-or-later"
