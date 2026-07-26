@@ -393,9 +393,9 @@ export class ErawApp {
       <form id="zoom-form" novalidate>
         <header><div><small>VIEWPORT SCALE</small><h2>设置缩放比例</h2></div><button id="close-zoom-dialog" type="button" class="dialog-close" aria-label="关闭">×</button></header>
         <div class="zoom-body">
-          <p>输入画布缩放百分比。缩放以当前画布中心为锚点，不改变 RAW 数据或显示模式。</p>
+          <p>输入画布缩放百分比。画布支持连续缩放，并以当前画布中心为锚点，不改变 RAW 数据或显示模式。</p>
           <label><span>缩放比例</span><div class="number-input"><input id="zoom-input" type="number" step="0.01" required aria-describedby="zoom-effective zoom-range"/><b>%</b></div></label>
-          <p id="zoom-effective" class="zoom-effective" aria-live="polite">实际使用：—</p>
+          <p id="zoom-effective" class="zoom-effective" aria-live="polite">支持连续缩放，将按输入比例应用</p>
         </div>
         <footer><p id="zoom-range">—</p><div><button id="cancel-zoom-dialog" type="button" class="secondary-button">取消</button><button type="submit" class="primary-button">应用缩放</button></div></footer>
       </form>
@@ -936,7 +936,7 @@ export class ErawApp {
     };
   }
 
-  private resolveZoomPercent(rawValue: string): { value: number | null; adjustment: "min" | "max" | null } {
+  private resolveZoomPercent(rawValue: string): { value: number | null; adjustment: "min" | "max" | "rounded" | null } {
     if (!rawValue.trim()) return { value: null, adjustment: null };
     const inputPercent = Number(rawValue);
     if (!Number.isFinite(inputPercent)) return { value: null, adjustment: null };
@@ -944,7 +944,10 @@ export class ErawApp {
     if (inputPercent < range.min) return { value: range.min, adjustment: "min" };
     if (inputPercent > range.max) return { value: range.max, adjustment: "max" };
     const rounded = Math.round(inputPercent * 100) / 100;
-    return { value: Math.min(range.max, Math.max(range.min, rounded)), adjustment: null };
+    return {
+      value: Math.min(range.max, Math.max(range.min, rounded)),
+      adjustment: rounded === inputPercent ? null : "rounded",
+    };
   }
 
   private updateZoomInputPreview(): void {
@@ -955,13 +958,18 @@ export class ErawApp {
       preview.dataset.state = "invalid";
       return;
     }
+    if (resolved.adjustment === null) {
+      preview.textContent = "支持连续缩放，将按输入比例应用";
+      preview.dataset.state = "valid";
+      return;
+    }
     const adjustment = resolved.adjustment === "min"
-      ? "（已调整至下限）"
+      ? "已调整至下限"
       : resolved.adjustment === "max"
-        ? "（已调整至上限）"
-        : "";
-    preview.textContent = `实际使用：${resolved.value.toFixed(2)}%${adjustment}`;
-    preview.dataset.state = resolved.adjustment ? "adjusted" : "valid";
+        ? "已调整至上限"
+        : "已保留两位小数";
+    preview.textContent = `实际应用：${resolved.value.toFixed(2)}%（${adjustment}）`;
+    preview.dataset.state = "adjusted";
   }
 
   private openZoomDialog(): void {
@@ -970,7 +978,7 @@ export class ErawApp {
     const range = this.getZoomPercentRange();
     const input = this.get<HTMLInputElement>("zoom-input");
     input.value = (zoom * 100).toFixed(2);
-    this.get("zoom-range").textContent = `有效范围：${range.min.toFixed(2)}%–${range.max.toFixed(2)}%`;
+    this.get("zoom-range").textContent = `可设置范围：${range.min.toFixed(2)}%–${range.max.toFixed(2)}%`;
     this.updateZoomInputPreview();
     this.get<HTMLDialogElement>("zoom-dialog").showModal();
     requestAnimationFrame(() => { input.focus(); input.select(); });
