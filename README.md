@@ -37,6 +37,14 @@ npm.cmd run tauri dev
 npm.cmd run check
 ```
 
+生成包含前端资源、可独立运行的 Windows Release EXE：
+
+```powershell
+npm.cmd run release
+```
+
+请勿使用裸 `cargo build --release` 作为发布命令；它不会执行 Tauri CLI 的前端构建与资源嵌入流程。
+
 Rust 测试：
 
 ```powershell
