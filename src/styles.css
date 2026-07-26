@@ -679,6 +679,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 .zoom-body > label { display: flex; align-items: center; gap: 16px; }
 .zoom-body > label > span { flex: 1; }
 .zoom-body .number-input { width: 190px; }
+.zoom-effective { margin: 10px 0 0; color: var(--muted); font: 500 var(--font-xs)/1.4 "Cascadia Mono", Consolas, monospace; text-align: right; }
+.zoom-effective[data-state="adjusted"] { color: var(--amber); }
+.zoom-effective[data-state="invalid"] { color: var(--red); }
 .zoom-modal footer p { font-family: "Cascadia Mono", Consolas, monospace; }
 
 .shortcuts-modal { width: min(570px, calc(100vw - 60px)); }

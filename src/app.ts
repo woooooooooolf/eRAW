@@ -317,7 +317,7 @@ export class ErawApp {
           <i></i><span id="file-status" class="file-status">未打开文件</span>
           <button id="pixel-status" class="status-pixel" title="输入坐标并定位像素" aria-haspopup="dialog" disabled>X — · Y —</button><i></i>
           <span id="render-status" class="status-help" data-help="L 表示当前预览层级；Lx↔Ly 表示正在平滑混合相邻层级。tiles 是当前视野中已完成的瓦片数；loading 是正在解码、传输或上传纹理的请求数，0 表示已完成或命中缓存。">L0 · 0 tiles · 0 loading</span>
-          <i></i><button id="zoom-status" class="status-zoom" title="输入画布缩放比例" aria-haspopup="dialog" disabled>100.0%</button>
+          <i></i><button id="zoom-status" class="status-zoom" title="输入画布缩放比例" aria-haspopup="dialog" disabled>100.00%</button>
         </footer>
         <div class="toast" id="toast" role="status"></div>
         <div class="parameter-tooltip" id="parameter-tooltip" role="tooltip"></div>
@@ -390,11 +390,12 @@ export class ErawApp {
 
   private zoomDialogTemplate(): string {
     return `<dialog id="zoom-dialog" class="modal zoom-modal">
-      <form id="zoom-form">
+      <form id="zoom-form" novalidate>
         <header><div><small>VIEWPORT SCALE</small><h2>设置缩放比例</h2></div><button id="close-zoom-dialog" type="button" class="dialog-close" aria-label="关闭">×</button></header>
         <div class="zoom-body">
           <p>输入画布缩放百分比。缩放以当前画布中心为锚点，不改变 RAW 数据或显示模式。</p>
-          <label><span>缩放比例</span><div class="number-input"><input id="zoom-input" type="number" min="0.05" max="6400" step="0.01" required/><b>%</b></div></label>
+          <label><span>缩放比例</span><div class="number-input"><input id="zoom-input" type="number" step="0.01" required aria-describedby="zoom-effective zoom-range"/><b>%</b></div></label>
+          <p id="zoom-effective" class="zoom-effective" aria-live="polite">实际使用：—</p>
         </div>
         <footer><p id="zoom-range">—</p><div><button id="cancel-zoom-dialog" type="button" class="secondary-button">取消</button><button type="submit" class="primary-button">应用缩放</button></div></footer>
       </form>
@@ -582,6 +583,7 @@ export class ErawApp {
     this.get("close-pixel-locator").addEventListener("click", () => this.get<HTMLDialogElement>("pixel-locator-dialog").close());
     this.get("cancel-pixel-locator").addEventListener("click", () => this.get<HTMLDialogElement>("pixel-locator-dialog").close());
     this.get("zoom-form").addEventListener("submit", (event) => { event.preventDefault(); this.applyZoomFromDialog(); });
+    this.get<HTMLInputElement>("zoom-input").addEventListener("input", () => this.updateZoomInputPreview());
     this.get("close-zoom-dialog").addEventListener("click", () => this.get<HTMLDialogElement>("zoom-dialog").close());
     this.get("cancel-zoom-dialog").addEventListener("click", () => this.get<HTMLDialogElement>("zoom-dialog").close());
     window.addEventListener("keydown", (event) => this.onKeyDown(event));
@@ -923,20 +925,53 @@ export class ErawApp {
   }
 
   private formatZoom(zoom: number): string {
-    const percent = zoom * 100;
-    const decimals = percent < 0.1 ? 3 : percent < 10 ? 2 : 1;
-    return `${percent.toFixed(decimals)}%`;
+    return `${(zoom * 100).toFixed(2)}%`;
+  }
+
+  private getZoomPercentRange(): { min: number; max: number } {
+    const range = this.viewport.getZoomRange();
+    return {
+      min: Math.ceil(range.min * 10_000 - 1e-9) / 100,
+      max: Math.floor(range.max * 10_000 + 1e-9) / 100,
+    };
+  }
+
+  private resolveZoomPercent(rawValue: string): { value: number | null; adjustment: "min" | "max" | null } {
+    if (!rawValue.trim()) return { value: null, adjustment: null };
+    const inputPercent = Number(rawValue);
+    if (!Number.isFinite(inputPercent)) return { value: null, adjustment: null };
+    const range = this.getZoomPercentRange();
+    if (inputPercent < range.min) return { value: range.min, adjustment: "min" };
+    if (inputPercent > range.max) return { value: range.max, adjustment: "max" };
+    const rounded = Math.round(inputPercent * 100) / 100;
+    return { value: Math.min(range.max, Math.max(range.min, rounded)), adjustment: null };
+  }
+
+  private updateZoomInputPreview(): void {
+    const preview = this.get("zoom-effective");
+    const resolved = this.resolveZoomPercent(this.get<HTMLInputElement>("zoom-input").value);
+    if (resolved.value === null) {
+      preview.textContent = "请输入有效的缩放值";
+      preview.dataset.state = "invalid";
+      return;
+    }
+    const adjustment = resolved.adjustment === "min"
+      ? "（已调整至下限）"
+      : resolved.adjustment === "max"
+        ? "（已调整至上限）"
+        : "";
+    preview.textContent = `实际使用：${resolved.value.toFixed(2)}%${adjustment}`;
+    preview.dataset.state = resolved.adjustment ? "adjusted" : "valid";
   }
 
   private openZoomDialog(): void {
     if (!this.document) return;
     const zoom = this.viewport.getZoom();
-    const range = this.viewport.getZoomRange();
+    const range = this.getZoomPercentRange();
     const input = this.get<HTMLInputElement>("zoom-input");
-    input.min = String(range.min * 100);
-    input.max = String(range.max * 100);
-    input.value = String(Number((zoom * 100).toFixed(5)));
-    this.get("zoom-range").textContent = `有效范围：${this.formatZoom(range.min)}–${this.formatZoom(range.max)}`;
+    input.value = (zoom * 100).toFixed(2);
+    this.get("zoom-range").textContent = `有效范围：${range.min.toFixed(2)}%–${range.max.toFixed(2)}%`;
+    this.updateZoomInputPreview();
     this.get<HTMLDialogElement>("zoom-dialog").showModal();
     requestAnimationFrame(() => { input.focus(); input.select(); });
   }
@@ -944,17 +979,15 @@ export class ErawApp {
   private applyZoomFromDialog(): void {
     if (!this.document) return;
     const input = this.get<HTMLInputElement>("zoom-input");
-    const percent = Number(input.value);
-    const range = this.viewport.getZoomRange();
-    const minPercent = range.min * 100;
-    const maxPercent = range.max * 100;
-    if (!Number.isFinite(percent) || percent < minPercent || percent > maxPercent) {
-      this.showToast(`缩放比例必须在 ${this.formatZoom(range.min)}–${this.formatZoom(range.max)} 之间`, "error");
+    const resolved = this.resolveZoomPercent(input.value);
+    if (resolved.value === null) {
+      this.updateZoomInputPreview();
       input.focus();
       input.select();
       return;
     }
-    this.viewport.setZoom(percent / 100);
+    input.value = resolved.value.toFixed(2);
+    this.viewport.setZoom(resolved.value / 100);
     this.get<HTMLDialogElement>("zoom-dialog").close();
   }
 
