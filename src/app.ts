@@ -183,7 +183,7 @@ export class ErawApp {
       onSuccess: (message) => this.showToast(message, "success", 6000),
     });
     this.viewport = new RawViewport(this.get("viewport"), {
-      onZoomChange: (zoom) => { this.get("zoom-status").textContent = `${(zoom * 100).toFixed(zoom < 0.1 ? 2 : 1)}%`; },
+      onZoomChange: (zoom) => this.updateZoomStatus(zoom),
       onSampleChange: (sample) => this.updateSample(sample),
       onRenderStats: (levelLabel, loaded, pending) => { this.get("render-status").textContent = `${levelLabel} · ${loaded} tiles · ${pending} loading`; },
       onError: (message) => this.reportRuntimeError(message),
@@ -235,7 +235,14 @@ export class ErawApp {
               </div>
             </div>
             <button id="settings-button" class="icon-button" title="设置">${icons.settings}</button>
-            <button id="about-button" class="icon-button" title="关于 eRAW">${icons.about}</button>
+            <div id="utility-control" class="utility-control">
+              <button id="about-button" class="icon-button" title="帮助与关于" aria-label="帮助与关于" aria-haspopup="menu" aria-expanded="false">${icons.about}</button>
+              <div id="utility-popover" class="utility-popover" role="menu" aria-label="帮助与关于" hidden>
+                <button type="button" role="menuitem" disabled><i>?</i><span><strong>帮助</strong><small>帮助中心将在后续版本提供</small></span><em>规划中</em></button>
+                <button id="shortcuts-menu-item" type="button" role="menuitem"><i>⌨</i><span><strong>快捷键</strong><small>查看键盘与画布操作速查</small></span><b>›</b></button>
+                <button id="about-menu-item" type="button" role="menuitem"><i>i</i><span><strong>关于</strong><small>版本、实现者与开源组件</small></span><b>›</b></button>
+              </div>
+            </div>
           </div>
         </header>
 
@@ -307,17 +314,19 @@ export class ErawApp {
 
         <footer class="statusbar">
           <button id="status-warning" class="status-warning" aria-expanded="false" aria-controls="diagnostics-drawer">${icons.warning}<span>诊断</span><b id="diagnostics-count" hidden>0</b></button>
-          <i></i><span id="file-status" class="file-status">未打开文件</span><div class="status-spacer"></div>
+          <i></i><span id="file-status" class="file-status">未打开文件</span>
           <button id="pixel-status" class="status-pixel" title="输入坐标并定位像素" aria-haspopup="dialog" disabled>X — · Y —</button><i></i>
-          <span id="render-status" class="status-help" data-help="L 表示当前预览层级；Lx↔Ly 表示正在平滑混合相邻层级。tiles 是当前视野中已完成的瓦片数，loading 是正在聚合并上传到 WebGL 的瓦片数。">L0 · 0 tiles · 0 loading</span>
-          <i></i><span id="zoom-status">100.0%</span>
+          <span id="render-status" class="status-help" data-help="L 表示当前预览层级；Lx↔Ly 表示正在平滑混合相邻层级。tiles 是当前视野中已完成的瓦片数；loading 是正在解码、传输或上传纹理的请求数，0 表示已完成或命中缓存。">L0 · 0 tiles · 0 loading</span>
+          <i></i><button id="zoom-status" class="status-zoom" title="输入画布缩放比例" aria-haspopup="dialog" disabled>100.0%</button>
         </footer>
         <div class="toast" id="toast" role="status"></div>
         <div class="parameter-tooltip" id="parameter-tooltip" role="tooltip"></div>
 
         ${exportDialogTemplate()}
         ${this.pixelLocatorDialogTemplate()}
+        ${this.zoomDialogTemplate()}
         ${this.settingsDialogTemplate()}
+        ${this.shortcutsDialogTemplate()}
         ${this.aboutDialogTemplate()}
       </div>`;
   }
@@ -377,6 +386,45 @@ export class ErawApp {
         <footer><p id="pixel-locator-range">—</p><div><button id="cancel-pixel-locator" type="button" class="secondary-button">取消</button><button type="submit" class="primary-button">定位并放大</button></div></footer>
       </form>
     </dialog>`;
+  }
+
+  private zoomDialogTemplate(): string {
+    return `<dialog id="zoom-dialog" class="modal zoom-modal">
+      <form id="zoom-form">
+        <header><div><small>VIEWPORT SCALE</small><h2>设置缩放比例</h2></div><button id="close-zoom-dialog" type="button" class="dialog-close" aria-label="关闭">×</button></header>
+        <div class="zoom-body">
+          <p>输入画布缩放百分比。缩放以当前画布中心为锚点，不改变 RAW 数据或显示模式。</p>
+          <label><span>缩放比例</span><div class="number-input"><input id="zoom-input" type="number" min="0.05" max="6400" step="0.01" required/><b>%</b></div></label>
+        </div>
+        <footer><p id="zoom-range">—</p><div><button id="cancel-zoom-dialog" type="button" class="secondary-button">取消</button><button type="submit" class="primary-button">应用缩放</button></div></footer>
+      </form>
+    </dialog>`;
+  }
+
+  private shortcutsDialogTemplate(): string {
+    return `<dialog id="shortcuts-dialog" class="modal shortcuts-modal"><form method="dialog">
+      <header><div><small>KEYBOARD & CANVAS REFERENCE</small><h2>快捷键</h2></div><button value="cancel" class="dialog-close">×</button></header>
+      <div class="shortcuts-body">
+        <section><h3>文件与视图</h3>
+          <div><span>打开 RAW 文件</span><kbd>Ctrl</kbd><kbd>O</kbd></div>
+          <div><span>导出当前帧</span><kbd>Ctrl</kbd><kbd>E</kbd></div>
+          <div><span>适应窗口</span><kbd>Ctrl</kbd><kbd>0</kbd></div>
+          <div><span>100% 实际像素</span><kbd>Ctrl</kbd><kbd>1</kbd></div>
+          <div><span>切换全屏</span><kbd>F11</kbd></div>
+        </section>
+        <section><h3>画布操作</h3>
+          <div><span>以指针位置连续缩放</span><kbd>滚轮</kbd></div>
+          <div><span>平移图像</span><kbd>左键拖动</kbd></div>
+          <div><span>切换适应窗口 / 100%</span><kbd>双击</kbd></div>
+          <div><span>关闭菜单或诊断面板</span><kbd>Esc</kbd></div>
+        </section>
+        <section><h3>参数输入</h3>
+          <div><span>提交当前输入并离开</span><kbd>Enter</kbd></div>
+          <div><span>提交并切换到下一项</span><kbd>Tab</kbd></div>
+        </section>
+      </div>
+      <footer><button value="cancel" class="primary-button">完成</button></footer>
+    </form></dialog>`;
   }
 
   private aboutDialogTemplate(): string {
@@ -458,13 +506,23 @@ export class ErawApp {
     }));
     document.addEventListener("pointerdown", (event) => {
       if (!(event.target instanceof Element) || !event.target.closest("#theme-control")) this.setThemeMenuOpen(false);
+      if (!(event.target instanceof Element) || !event.target.closest("#utility-control")) this.setUtilityMenuOpen(false);
     });
     this.get("settings-button").addEventListener("click", () => {
       this.setThemeMenuOpen(false);
+      this.setUtilityMenuOpen(false);
       this.openSettingsDialog();
     });
-    this.get("about-button").addEventListener("click", () => {
-      this.setThemeMenuOpen(false);
+    this.get("about-button").addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.setUtilityMenuOpen(this.get("utility-popover").hidden);
+    });
+    this.get("shortcuts-menu-item").addEventListener("click", () => {
+      this.setUtilityMenuOpen(false);
+      this.get<HTMLDialogElement>("shortcuts-dialog").showModal();
+    });
+    this.get("about-menu-item").addEventListener("click", () => {
+      this.setUtilityMenuOpen(false);
       this.get<HTMLDialogElement>("about-dialog").showModal();
     });
     this.get("open-source-components").addEventListener("click", () => {
@@ -509,6 +567,7 @@ export class ErawApp {
     }));
     this.get("status-warning").addEventListener("click", () => this.toggleDiagnostics());
     this.get("pixel-status").addEventListener("click", () => this.openPixelLocator());
+    this.get("zoom-status").addEventListener("click", () => this.openZoomDialog());
     this.get("close-diagnostics").addEventListener("click", () => this.setDiagnosticsOpen(false));
     this.bindSidebarResize();
     this.get("first-frame").addEventListener("click", () => this.setFrame(0));
@@ -522,6 +581,9 @@ export class ErawApp {
     this.get("pixel-locator-form").addEventListener("submit", (event) => { event.preventDefault(); this.locatePixel(); });
     this.get("close-pixel-locator").addEventListener("click", () => this.get<HTMLDialogElement>("pixel-locator-dialog").close());
     this.get("cancel-pixel-locator").addEventListener("click", () => this.get<HTMLDialogElement>("pixel-locator-dialog").close());
+    this.get("zoom-form").addEventListener("submit", (event) => { event.preventDefault(); this.applyZoomFromDialog(); });
+    this.get("close-zoom-dialog").addEventListener("click", () => this.get<HTMLDialogElement>("zoom-dialog").close());
+    this.get("cancel-zoom-dialog").addEventListener("click", () => this.get<HTMLDialogElement>("zoom-dialog").close());
     window.addEventListener("keydown", (event) => this.onKeyDown(event));
     window.addEventListener("resize", () => this.setSidebarWidth(this.settings.sidebarWidth, false));
   }
@@ -671,6 +733,7 @@ export class ErawApp {
     this.get<HTMLButtonElement>("empty-open-button").disabled = Boolean(info);
     this.get<HTMLButtonElement>("export-button").disabled = !info || info.layout.frameCount === 0;
     this.get<HTMLButtonElement>("pixel-status").disabled = !info;
+    this.get<HTMLButtonElement>("zoom-status").disabled = !info;
     const fileStatus = this.get("file-status");
     fileStatus.textContent = info?.path ?? "未打开文件";
     fileStatus.title = info?.path ?? "";
@@ -799,7 +862,7 @@ export class ErawApp {
     document.documentElement.dataset.theme = this.settings.theme;
     const selected = THEMES.find((theme) => theme.id === this.settings.theme)!;
     const button = this.get("theme-button");
-    button.classList.toggle("active", this.settings.theme !== DEFAULT_SETTINGS.theme);
+    button.classList.remove("active");
     button.setAttribute("title", `切换界面主题（当前：${selected.name}）`);
     button.setAttribute("aria-label", `切换界面主题，当前为${selected.name}`);
     this.root.querySelectorAll<HTMLButtonElement>("[data-theme-value]").forEach((option) => {
@@ -810,9 +873,20 @@ export class ErawApp {
   }
 
   private setThemeMenuOpen(open: boolean): void {
+    if (open) this.setUtilityMenuOpen(false);
     const popover = this.get("theme-popover");
     popover.hidden = !open;
     this.get("theme-button").setAttribute("aria-expanded", String(open));
+  }
+
+  private setUtilityMenuOpen(open: boolean): void {
+    if (open) {
+      const themePopover = this.get("theme-popover");
+      themePopover.hidden = true;
+      this.get("theme-button").setAttribute("aria-expanded", "false");
+    }
+    this.get("utility-popover").hidden = !open;
+    this.get("about-button").setAttribute("aria-expanded", String(open));
   }
 
   private setDisplayMode(mode: DisplayMode): void {
@@ -842,6 +916,46 @@ export class ErawApp {
   private updateSample(sample: ImagePoint | null): void {
     if (sample) this.lastSample = sample;
     this.get("pixel-status").textContent = sample ? `X ${sample.x} · Y ${sample.y}` : "X — · Y —";
+  }
+
+  private updateZoomStatus(zoom: number): void {
+    this.get("zoom-status").textContent = this.formatZoom(zoom);
+  }
+
+  private formatZoom(zoom: number): string {
+    const percent = zoom * 100;
+    const decimals = percent < 0.1 ? 3 : percent < 10 ? 2 : 1;
+    return `${percent.toFixed(decimals)}%`;
+  }
+
+  private openZoomDialog(): void {
+    if (!this.document) return;
+    const zoom = this.viewport.getZoom();
+    const range = this.viewport.getZoomRange();
+    const input = this.get<HTMLInputElement>("zoom-input");
+    input.min = String(range.min * 100);
+    input.max = String(range.max * 100);
+    input.value = String(Number((zoom * 100).toFixed(5)));
+    this.get("zoom-range").textContent = `有效范围：${this.formatZoom(range.min)}–${this.formatZoom(range.max)}`;
+    this.get<HTMLDialogElement>("zoom-dialog").showModal();
+    requestAnimationFrame(() => { input.focus(); input.select(); });
+  }
+
+  private applyZoomFromDialog(): void {
+    if (!this.document) return;
+    const input = this.get<HTMLInputElement>("zoom-input");
+    const percent = Number(input.value);
+    const range = this.viewport.getZoomRange();
+    const minPercent = range.min * 100;
+    const maxPercent = range.max * 100;
+    if (!Number.isFinite(percent) || percent < minPercent || percent > maxPercent) {
+      this.showToast(`缩放比例必须在 ${this.formatZoom(range.min)}–${this.formatZoom(range.max)} 之间`, "error");
+      input.focus();
+      input.select();
+      return;
+    }
+    this.viewport.setZoom(percent / 100);
+    this.get<HTMLDialogElement>("zoom-dialog").close();
   }
 
   private openPixelLocator(): void {
@@ -889,7 +1003,11 @@ export class ErawApp {
   }
 
   private onKeyDown(event: KeyboardEvent): void {
-    if (event.key === "Escape" && !this.get("theme-popover").hidden) { event.preventDefault(); this.setThemeMenuOpen(false); }
+    if (event.key === "Escape" && (!this.get("theme-popover").hidden || !this.get("utility-popover").hidden)) {
+      event.preventDefault();
+      this.setThemeMenuOpen(false);
+      this.setUtilityMenuOpen(false);
+    }
     else if (event.key === "Escape" && this.root.querySelector(".app-shell")!.classList.contains("diagnostics-open")) { event.preventDefault(); this.setDiagnosticsOpen(false); }
     else if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); void this.openFile(); }
     else if (event.ctrlKey && event.key.toLowerCase() === "e" && this.document?.layout.frameCount && !this.exportDialog.isOpen) {

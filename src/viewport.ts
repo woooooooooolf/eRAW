@@ -307,15 +307,7 @@ export class RawViewport {
   }
 
   actualSize(): void {
-    if (!this.document) return;
-    const centerX = (this.width / 2 - this.cameraX) / this.zoom;
-    const centerY = (this.height / 2 - this.cameraY) / this.zoom;
-    this.zoom = 1;
-    this.cameraX = this.width / 2 - centerX;
-    this.cameraY = this.height / 2 - centerY;
-    this.constrainCamera();
-    this.callbacks.onZoomChange(this.zoom);
-    this.requestDraw();
+    this.setZoom(1);
   }
 
   focusPixel(point: ImagePoint): void {
@@ -334,6 +326,22 @@ export class RawViewport {
 
   getZoom(): number { return this.zoom; }
   getFrame(): number { return this.frame; }
+  getZoomRange(): { min: number; max: number } {
+    return { min: this.minimumZoom(), max: MAX_ZOOM };
+  }
+
+  setZoom(zoom: number): void {
+    if (!this.document || !Number.isFinite(zoom)) return;
+    const center = { x: this.width / 2, y: this.height / 2 };
+    const imagePoint = this.transform.screenToImage(center);
+    this.zoom = Math.max(this.minimumZoom(), Math.min(MAX_ZOOM, zoom));
+    this.cameraX = center.x - imagePoint.x * this.zoom;
+    this.cameraY = center.y - imagePoint.y * this.zoom;
+    if (Math.abs(this.zoom - 1) < 1e-9) this.snapCameraToPhysicalPixels();
+    this.constrainCamera();
+    this.callbacks.onZoomChange(this.zoom);
+    this.requestDraw();
+  }
 
   private resize(): void {
     const rect = this.container.getBoundingClientRect();
@@ -365,7 +373,7 @@ export class RawViewport {
     const pointerY = event.clientY - rect.top;
     const imagePoint = this.transform.screenToImage({ x: pointerX, y: pointerY });
     const factor = Math.exp(-event.deltaY * this.wheelSensitivity);
-    const minZoom = Math.max(this.fitScale * 0.08, 0.0005);
+    const minZoom = this.minimumZoom();
     const newZoom = Math.max(minZoom, Math.min(MAX_ZOOM, this.zoom * factor));
     this.cameraX = pointerX - imagePoint.x * newZoom;
     this.cameraY = pointerY - imagePoint.y * newZoom;
@@ -499,6 +507,17 @@ export class RawViewport {
     this.cameraY = Math.max(KEEP_VISIBLE - imageHeight, Math.min(this.height - KEEP_VISIBLE, this.cameraY));
   }
 
+  private minimumZoom(): number {
+    return Math.max(this.fitScale * 0.08, 0.0005);
+  }
+
+  private snapCameraToPhysicalPixels(): void {
+    const scaleX = this.canvas.width / this.width;
+    const scaleY = this.canvas.height / this.height;
+    this.cameraX = Math.round(this.cameraX * scaleX) / scaleX;
+    this.cameraY = Math.round(this.cameraY * scaleY) / scaleY;
+  }
+
   private requestDraw(): void {
     if (this.animationFrame) return;
     this.animationFrame = requestAnimationFrame(() => {
@@ -564,7 +583,6 @@ export class RawViewport {
 
   private draw(): void {
     const { gl } = this;
-    const dpr = this.canvas.width / this.width;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -578,9 +596,9 @@ export class RawViewport {
     const fineVisible = this.visibleTiles(plan.fineLevel);
     const coarseVisible = plan.coarseLevel === null ? [] : this.visibleTiles(plan.coarseLevel);
     gl.useProgram(this.program);
-    gl.uniform2f(this.viewportLocation, this.width * dpr, this.height * dpr);
-    gl.uniform2f(this.cameraLocation, this.cameraX * dpr, this.cameraY * dpr);
-    gl.uniform1f(this.zoomLocation, this.zoom * dpr);
+    gl.uniform2f(this.viewportLocation, this.width, this.height);
+    gl.uniform2f(this.cameraLocation, this.cameraX, this.cameraY);
+    gl.uniform1f(this.zoomLocation, this.zoom);
     const fineLoaded = this.drawLayer(plan.fineLevel, fineVisible, 1);
     const coarseLoaded = plan.coarseLevel === null
       ? 0
