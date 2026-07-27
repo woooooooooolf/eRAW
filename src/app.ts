@@ -10,15 +10,23 @@ import type {
   DisplayMode,
   DocumentInfo,
   Endianness,
+  ExportTarget,
   Packing,
+  ProcessingSettings,
   RawDescriptor,
 } from "./types";
-import { DEFAULT_DESCRIPTOR } from "./types";
+import {
+  DEFAULT_DESCRIPTOR,
+  DEFAULT_PROCESSING_SETTINGS,
+  isColorCfa,
+  isQuadCfa,
+} from "./types";
 
-const VERSION = "0.0.17";
+const VERSION = "0.1.0";
 const BUILD_TIME = formatBuildTime(__ERAW_BUILD_TIME__);
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
+const PROCESSING_KEY = "eraw.processingSettings.v1";
 
 type UiFontSize = "standard" | "large" | "extraLarge";
 type OpenView = "fit" | "actual";
@@ -155,12 +163,35 @@ function loadDescriptor(remember: boolean): RawDescriptor {
   return { ...DEFAULT_DESCRIPTOR };
 }
 
+function loadProcessingSettings(): ProcessingSettings {
+  try {
+    const saved = localStorage.getItem(PROCESSING_KEY);
+    if (saved) {
+      const value = JSON.parse(saved) as Partial<ProcessingSettings>;
+      return {
+        demosaicAlgorithm: "bilinear",
+        remosaic: {
+          sameColorReconstruction:
+            typeof value.remosaic?.sameColorReconstruction === "boolean"
+              ? value.remosaic.sameColorReconstruction
+              : DEFAULT_PROCESSING_SETTINGS.remosaic.sameColorReconstruction,
+        },
+      };
+    }
+  } catch { /* 使用安全默认值 */ }
+  return {
+    ...DEFAULT_PROCESSING_SETTINGS,
+    remosaic: { ...DEFAULT_PROCESSING_SETTINGS.remosaic },
+  };
+}
+
 export class ErawApp {
   private readonly root: HTMLElement;
   private readonly viewport: RawViewport;
   private readonly exportDialog: ExportDialog;
   private settings = loadSettings();
   private descriptor = loadDescriptor(this.settings.rememberDescriptor);
+  private processing = loadProcessingSettings();
   private document: DocumentInfo | null = null;
   private frame = 0;
   private displayMode: DisplayMode = "bayer";
@@ -188,8 +219,12 @@ export class ErawApp {
       onRenderStats: (levelLabel, loaded, pending) => { this.get("render-status").textContent = `${levelLabel} · ${loaded} tiles · ${pending} loading`; },
       onError: (message) => this.reportRuntimeError(message),
     });
+    this.get<HTMLInputElement>("processing-same-color-reconstruction").checked =
+      this.processing.remosaic.sameColorReconstruction;
     this.applySettings();
     this.bindEvents();
+    this.updateCfaDependentUi(false);
+    this.updateDisplay();
     this.updateDocumentUi();
   }
 
@@ -205,12 +240,21 @@ export class ErawApp {
         <header class="topbar">
           <div class="toolbar primary-actions">
             <button id="open-button" class="tool-button accent">${icons.open}<span>打开</span><kbd>Ctrl O</kbd></button>
-            <button id="export-button" class="tool-button" disabled>${icons.export}<span>导出</span><kbd>Ctrl E</kbd></button>
+            <div id="export-control" class="export-control">
+              <button id="export-button" class="tool-button" disabled aria-haspopup="menu" aria-expanded="false">${icons.export}<span>导出</span><kbd>Ctrl E</kbd></button>
+              <div id="export-popover" class="export-popover" role="menu" aria-label="选择导出内容" hidden>
+                <header><strong>导出当前帧</strong><span>冻结当前参数与处理设置</span></header>
+                <button type="button" role="menuitem" data-export-target="originalCfa"><i>CFA</i><span><strong>原始 CFA</strong><small>Packing 转换、裁剪与有效像素提取</small></span><b>›</b></button>
+                <button id="export-remosaic-item" type="button" role="menuitem" data-export-target="remosaic"><i>RM</i><span><strong>Remosaic Bayer</strong><small>按当前 Remosaic 设置输出标准 Bayer</small></span><b>›</b></button>
+                <button id="export-demosaic-item" type="button" role="menuitem" data-export-target="demosaic"><i>RGB</i><span><strong>Demosaic RGB</strong><small>输出 RGB48 Interleaved RAW</small></span><b>›</b></button>
+              </div>
+            </div>
           </div>
           <div class="toolbar display-modes" role="group" aria-label="显示模式">
             <button data-mode="raw">RAW 强度</button>
-            <button class="active" data-mode="bayer">Bayer 点阵</button>
-            <button data-mode="demosaic">Demosaic</button>
+            <button class="active" data-mode="bayer">CFA 点阵</button>
+            <button id="remosaic-mode" data-mode="remosaic" hidden>Remosaic</button>
+            <button id="demosaic-mode" data-mode="demosaic">Demosaic</button>
             <div class="channel-menu">
               <select id="channel-mode" aria-label="通道显示">
                 <option value="bayer">全部通道</option><option value="red">R 平面</option><option value="green">G 平面</option><option value="blue">B 平面</option>
@@ -257,7 +301,22 @@ export class ErawApp {
                   ${this.selectField("packing", "存储方式", `<option value="unpacked8">Unpacked 8</option><option value="unpacked16">Unpacked 16</option><option value="mipiRaw10">MIPI RAW10</option><option value="mipiRaw12">MIPI RAW12</option><option value="mipiRaw14">MIPI RAW14</option>`)}
                   ${this.segmentedField("endianness", "字节序", [["little", "Little"], ["big", "Big"]])}
                   ${this.segmentedField("bitAlignment", "有效位位置", [["lsb", "低位 LSB"], ["msb", "高位 MSB"]])}
-                  ${this.selectField("cfa", "CFA 排列", `<option value="MONO">Mono</option><option value="RGGB">RGGB</option><option value="BGGR">BGGR</option><option value="GBRG">GBRG</option><option value="GRBG">GRBG</option>`)}
+                  ${this.selectField("cfa", "CFA 排列", `<option value="MONO">Mono</option><optgroup label="标准 Bayer"><option value="RGGB">RGGB</option><option value="BGGR">BGGR</option><option value="GBRG">GBRG</option><option value="GRBG">GRBG</option></optgroup><optgroup label="Quad CFA"><option value="QRGGB">Quad RGGB</option><option value="QBGGR">Quad BGGR</option><option value="QGBRG">Quad GBRG</option><option value="QGRBG">Quad GRBG</option></optgroup>`)}
+                  ${this.cfaPhaseField()}
+                </div>
+              </section>
+
+              <section class="parameter-section open" id="image-processing-section" hidden>
+                <button class="section-title"><span>图像处理</span><i>−</i></button>
+                <div class="section-content field-grid">
+                  <div class="parameter-row" id="demosaic-processing-row">
+                    <span class="field-label" data-help="当前彩色 CFA 的 Demosaic 使用双线性插值；后续算法将在此扩展。">Demosaic 算法</span>
+                    <span class="processing-value">双线性</span>
+                  </div>
+                  <label class="parameter-row processing-toggle-row" id="remosaic-processing-row" hidden>
+                    <span class="field-label" data-help="关闭时仅在相位对齐的 4×4 块内重排原始 DN；开启时按目标 Bayer 站点，从相同颜色的 QCFA 样本进行双线性重建。">同色双线性重建</span>
+                    <input id="processing-same-color-reconstruction" type="checkbox" role="switch"/>
+                  </label>
                 </div>
               </section>
 
@@ -339,6 +398,18 @@ export class ErawApp {
     </div></div>`;
   }
 
+  private cfaPhaseField(): string {
+    const phaseControl = (axis: "X" | "Y", field: "cfaPhaseX" | "cfaPhaseY") => `
+      <div class="phase-axis"><i>${axis}</i><button type="button" data-step-target="${field}" data-step="-1" aria-label="减小 CFA Phase ${axis}">−</button>
+        <input id="descriptor-${field}" data-field="${field}" type="number" min="0" max="3" step="1" aria-label="CFA Phase ${axis}"/>
+        <button type="button" data-step-target="${field}" data-step="1" aria-label="增大 CFA Phase ${axis}">+</button>
+      </div>`;
+    return `<div class="parameter-row cfa-phase-row" id="cfa-phase-row" hidden>
+      <span class="field-label" data-help="${this.parameterHelp("cfaPhase")}">CFA Phase X/Y</span>
+      <div class="cfa-phase-control">${phaseControl("X", "cfaPhaseX")}${phaseControl("Y", "cfaPhaseY")}</div>
+    </div>`;
+  }
+
   private selectField(field: string, label: string, options: string): string {
     return `<div class="parameter-row"><span class="field-label" data-help="${this.parameterHelp(field)}">${label}</span><select id="descriptor-${field}" data-field="${field}" aria-label="${label}">${options}</select></div>`;
   }
@@ -362,7 +433,8 @@ export class ErawApp {
       packing: "RAW 像素在文件中的字节排列方式；MIPI 格式会将多个像素紧凑打包。",
       endianness: "Unpacked 多字节像素在文件中的字节顺序；MIPI packed 格式不使用此设置。",
       bitAlignment: "有效像素位在 Unpacked 容器中靠低位或靠高位存放。",
-      cfa: "传感器彩色滤光阵列的 2×2 排列；Mono 表示单色传感器。",
+      cfa: "传感器彩色滤光阵列；Quad CFA 使用 4×4 周期，每种颜色以 2×2 同色块排列。",
+      cfaPhase: "文件坐标 (0,0) 相对于所选 Quad CFA 基准 4×4 阵列的 X/Y 偏移，范围均为 0–3。",
       headerOffset: "第一帧 RAW 像素数据相对于文件开头的字节偏移。",
       rowAlignment: "自动行步长使用的字节对齐值；仅在显式行步长为 0 时生效。",
       rowStride: "相邻两行起点之间的字节距离；0 表示根据有效行大小和行对齐自动计算。",
@@ -491,7 +563,16 @@ export class ErawApp {
   private bindEvents(): void {
     this.get("open-button").addEventListener("click", () => void this.openFile());
     this.get("empty-open-button").addEventListener("click", () => void this.openFile());
-    this.get<HTMLButtonElement>("export-button").addEventListener("click", () => void this.openExport());
+    this.get<HTMLButtonElement>("export-button").addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.setExportMenuOpen(this.get("export-popover").hidden);
+    });
+    this.root.querySelectorAll<HTMLButtonElement>("[data-export-target]").forEach((button) => {
+      button.addEventListener("click", () => {
+        this.setExportMenuOpen(false);
+        void this.openExport(button.dataset.exportTarget as ExportTarget);
+      });
+    });
     this.get("fit-button").addEventListener("click", () => this.viewport.fit());
     this.get("actual-button").addEventListener("click", () => this.viewport.actualSize());
     this.get("panel-button").addEventListener("click", () => {
@@ -508,6 +589,7 @@ export class ErawApp {
     document.addEventListener("pointerdown", (event) => {
       if (!(event.target instanceof Element) || !event.target.closest("#theme-control")) this.setThemeMenuOpen(false);
       if (!(event.target instanceof Element) || !event.target.closest("#utility-control")) this.setUtilityMenuOpen(false);
+      if (!(event.target instanceof Element) || !event.target.closest("#export-control")) this.setExportMenuOpen(false);
     });
     this.get("settings-button").addEventListener("click", () => {
       this.setThemeMenuOpen(false);
@@ -539,6 +621,7 @@ export class ErawApp {
     this.root.querySelectorAll<HTMLElement>("[data-field]").forEach((element) => {
       if (element instanceof HTMLSelectElement) element.addEventListener("change", () => {
         this.synchronizePackingAndDepth(element.dataset.field ?? "");
+        if (element.dataset.field === "cfa") this.updateCfaDependentUi();
         void this.commitDescriptor();
       });
       else if (element instanceof HTMLInputElement) {
@@ -560,6 +643,18 @@ export class ErawApp {
       input.value = String(next);
       void this.commitDescriptor();
     }));
+    this.get<HTMLInputElement>("processing-same-color-reconstruction").addEventListener("change", (event) => {
+      this.processing = {
+        ...this.processing,
+        remosaic: {
+          ...this.processing.remosaic,
+          sameColorReconstruction: (event.currentTarget as HTMLInputElement).checked,
+        },
+      };
+      localStorage.setItem(PROCESSING_KEY, JSON.stringify(this.processing));
+      this.updateCfaDependentUi(false);
+      this.updateDisplay();
+    });
     this.bindParameterHelp();
     this.root.querySelectorAll<HTMLButtonElement>(".section-title").forEach((button) => button.addEventListener("click", () => {
       const section = button.closest(".parameter-section")!;
@@ -671,6 +766,7 @@ export class ErawApp {
     return {
       width: number("width"), height: number("height"), bitDepth: Number(value("bitDepth")),
       packing: value<Packing>("packing"), endianness: value<Endianness>("endianness"), bitAlignment: value<BitAlignment>("bitAlignment"), cfa: value<CfaPattern>("cfa"),
+      cfaPhaseX: Math.min(3, number("cfaPhaseX")), cfaPhaseY: Math.min(3, number("cfaPhaseY")),
       rowAlignment: Math.max(1, number("rowAlignment")), rowStride: number("rowStride"), frameAlignment: Math.max(1, number("frameAlignment")), frameStride: number("frameStride"), headerOffset: number("headerOffset"),
     };
   }
@@ -715,6 +811,7 @@ export class ErawApp {
             this.descriptor = info.descriptor;
             this.frame = Math.min(this.frame, Math.max(0, info.layout.frameCount - 1));
             this.viewport.setDocument(info, true);
+            this.updateCfaDependentUi();
             this.updateDocumentUi();
           } catch (error) {
             this.reportRuntimeError(String(error));
@@ -734,6 +831,7 @@ export class ErawApp {
     emptyState.setAttribute("aria-hidden", String(Boolean(info)));
     this.get<HTMLButtonElement>("empty-open-button").disabled = Boolean(info);
     this.get<HTMLButtonElement>("export-button").disabled = !info || info.layout.frameCount === 0;
+    this.updateExportAvailability();
     this.get<HTMLButtonElement>("pixel-status").disabled = !info;
     this.get<HTMLButtonElement>("zoom-status").disabled = !info;
     const fileStatus = this.get("file-status");
@@ -875,7 +973,10 @@ export class ErawApp {
   }
 
   private setThemeMenuOpen(open: boolean): void {
-    if (open) this.setUtilityMenuOpen(false);
+    if (open) {
+      this.setUtilityMenuOpen(false);
+      this.setExportMenuOpen(false);
+    }
     const popover = this.get("theme-popover");
     popover.hidden = !open;
     this.get("theme-button").setAttribute("aria-expanded", String(open));
@@ -886,12 +987,65 @@ export class ErawApp {
       const themePopover = this.get("theme-popover");
       themePopover.hidden = true;
       this.get("theme-button").setAttribute("aria-expanded", "false");
+      this.setExportMenuOpen(false);
     }
     this.get("utility-popover").hidden = !open;
     this.get("about-button").setAttribute("aria-expanded", String(open));
   }
 
+  private setExportMenuOpen(open: boolean): void {
+    if (open) {
+      this.setThemeMenuOpen(false);
+      this.setUtilityMenuOpen(false);
+    }
+    this.get("export-popover").hidden = !open;
+    this.get("export-button").setAttribute("aria-expanded", String(open));
+  }
+
+  private updateExportAvailability(): void {
+    const available = Boolean(this.document?.layout.frameCount);
+    const cfa = this.descriptorFieldValue("cfa") as CfaPattern;
+    this.get<HTMLButtonElement>("export-remosaic-item").disabled = !available || !isQuadCfa(cfa);
+    this.get<HTMLButtonElement>("export-demosaic-item").disabled = !available || !isColorCfa(cfa);
+  }
+
+  private updateCfaDependentUi(allowModeFallback = true): void {
+    const cfa = this.descriptorFieldValue("cfa") as CfaPattern;
+    const quad = isQuadCfa(cfa);
+    const color = isColorCfa(cfa);
+    this.get("cfa-phase-row").toggleAttribute("hidden", !quad);
+    this.get("image-processing-section").toggleAttribute("hidden", !color);
+    this.get("remosaic-processing-row").toggleAttribute("hidden", !quad);
+    this.get("remosaic-mode").toggleAttribute("hidden", !quad);
+    this.get<HTMLButtonElement>("demosaic-mode").disabled = !color;
+    this.get<HTMLSelectElement>("channel-mode").disabled = !color;
+    this.updateExportAvailability();
+    this.get("remosaic-mode").setAttribute(
+      "title",
+      this.processing.remosaic.sameColorReconstruction
+        ? "查看同色双线性重建后的标准 Bayer 点阵"
+        : "查看 4×4 块内重排后的标准 Bayer 点阵",
+    );
+    this.get("demosaic-mode").setAttribute(
+      "title",
+      quad
+        ? "先应用当前 Remosaic 设置，再执行双线性 Demosaic"
+        : color
+          ? "对标准 Bayer 执行双线性 Demosaic"
+          : "Mono 图像不使用 Demosaic",
+    );
+    if (!allowModeFallback) return;
+    if (!color && ["demosaic", "red", "green", "blue"].includes(this.displayMode)) {
+      this.setDisplayMode("raw");
+    } else if (!quad && this.displayMode === "remosaic") {
+      this.setDisplayMode("bayer");
+    }
+  }
+
   private setDisplayMode(mode: DisplayMode): void {
+    const cfa = this.descriptorFieldValue("cfa") as CfaPattern;
+    if (mode === "remosaic" && !isQuadCfa(cfa)) return;
+    if (["demosaic", "red", "green", "blue"].includes(mode) && !isColorCfa(cfa)) return;
     this.displayMode = mode;
     this.root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => button.classList.toggle("active", button.dataset.mode === mode));
     if (["red", "green", "blue"].includes(mode)) this.get<HTMLSelectElement>("channel-mode").value = mode;
@@ -902,6 +1056,7 @@ export class ErawApp {
   private updateDisplay(): void {
     this.viewport.setDisplay({
       mode: this.displayMode,
+      processing: this.processing,
       displayMin: 0,
       displayMax: 0,
     });
@@ -1044,28 +1199,33 @@ export class ErawApp {
   }
 
   private onKeyDown(event: KeyboardEvent): void {
-    if (event.key === "Escape" && (!this.get("theme-popover").hidden || !this.get("utility-popover").hidden)) {
+    if (event.key === "Escape" && (!this.get("theme-popover").hidden || !this.get("utility-popover").hidden || !this.get("export-popover").hidden)) {
       event.preventDefault();
       this.setThemeMenuOpen(false);
       this.setUtilityMenuOpen(false);
+      this.setExportMenuOpen(false);
     }
     else if (event.key === "Escape" && this.root.querySelector(".app-shell")!.classList.contains("diagnostics-open")) { event.preventDefault(); this.setDiagnosticsOpen(false); }
     else if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); void this.openFile(); }
     else if (event.ctrlKey && event.key.toLowerCase() === "e" && this.document?.layout.frameCount && !this.exportDialog.isOpen) {
       event.preventDefault();
-      void this.openExport();
+      void this.openExport("originalCfa");
     }
     else if (event.ctrlKey && event.key === "0") { event.preventDefault(); this.viewport.fit(); }
     else if (event.ctrlKey && event.key === "1") { event.preventDefault(); this.viewport.actualSize(); }
     else if (event.key === "F11") { event.preventDefault(); void this.toggleFullscreen(); }
   }
 
-  private async openExport(): Promise<void> {
+  private async openExport(target: ExportTarget): Promise<void> {
     await this.commitDescriptor();
     while (this.committing) {
       await new Promise((resolve) => window.setTimeout(resolve, 16));
     }
-    if (this.document?.layout.frameCount) this.exportDialog.open(this.document, this.frame);
+    if (!this.document?.layout.frameCount) return;
+    const cfa = this.document.descriptor.cfa;
+    if (target === "remosaic" && !isQuadCfa(cfa)) return;
+    if (target === "demosaic" && !isColorCfa(cfa)) return;
+    this.exportDialog.open(this.document, this.frame, this.processing, target);
   }
 
   private async toggleFullscreen(): Promise<void> {

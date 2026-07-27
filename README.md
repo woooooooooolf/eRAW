@@ -2,24 +2,25 @@
 
 eRAW 是一个面向 SoC 与图像传感器适配工作的 RAW 图像查看、诊断与格式转换工具。
 
-它优先忠实呈现传感器输出，支持灰度、CFA 彩色点阵和可选 demosaic 预览；数据导出仅执行裁剪、去除填充、packing、字节序与对齐转换，不进行降噪、锐化或像素校正等图像质量处理。
+它优先忠实呈现传感器输出，支持灰度、标准 Bayer、Quad CFA 点阵，以及可控的 remosaic 和 demosaic 预览。导出既可保持“只转换原始 CFA 数据”的定位，也可为当前 remosaic 或 demosaic 结果创建单帧快照；工具不进行降噪、锐化、颜色校正或像素校正等图像质量优化。
 
 ## 当前版本
 
-`V0.0.17`（开发中）
+`V0.1.0`（开发中）
 
-V0.0.17 明确连续缩放的交互语义，仅在发生小数舍入或边界调整时提示实际应用值，避免将可设置范围误解为离散倍率列表。
+V0.1.0 增加 Quad CFA 与 CFA Phase 支持，引入可选同色双线性重建的 remosaic 处理链，并支持原始 CFA、Remosaic Bayer 与 Demosaic RGB48 三类当前帧导出。
 
 ## 规划中的首版能力
 
-- RAW8，以及 16-bit 容器中的 RAW10/12/14/16
-- MIPI RAW10、MIPI RAW12
-- Mono、RGGB、BGGR、GBRG、GRBG
+- RAW8，以及 16-bit 容器中的 RAW9–RAW16
+- MIPI RAW10、MIPI RAW12、MIPI RAW14
+- Mono、RGGB、BGGR、GBRG、GRBG 与四种对应 Quad CFA
 - 文件头偏移、行步长/对齐、帧步长/对齐和多帧浏览
-- 灰度、CFA 彩色点阵、可开关的双线性 demosaic
+- 灰度、CFA 彩色点阵、Quad CFA remosaic 和双线性 demosaic
 - 超大图像的分级分块渲染、缩放和平移
 - 原始像素坐标、CFA 通道和 DN 值读取
-- 裁剪、去 padding、packed/unpacked 与字节序转换
+- 原始 CFA 的裁剪、去 padding、packed/unpacked 与字节序转换
+- Remosaic Bayer 与 RGB48 Interleaved 单帧快照导出
 - 对异常和不完整数据尽可能显示并报告明确警告
 
 ## 开发

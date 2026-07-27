@@ -4,6 +4,7 @@ import type {
   DisplayMode,
   DocumentInfo,
   PixelInspectionRequest,
+  ProcessingSettings,
 } from "./types";
 import type { ViewportTransform } from "./viewport-transform";
 
@@ -23,6 +24,7 @@ export interface PixelOverlayView {
   document: DocumentInfo;
   frame: number;
   displayMode: DisplayMode;
+  processing: ProcessingSettings;
   transform: ViewportTransform;
   width: number;
   height: number;
@@ -113,7 +115,7 @@ export class PixelValueOverlay {
   }
 
   private key(view: PixelOverlayView): string {
-    return `${view.document.generation}:${view.frame}:${view.displayMode}`;
+    return `${view.document.generation}:${view.frame}:${view.displayMode}:${view.processing.demosaicAlgorithm}:${view.processing.remosaic.sameColorReconstruction}`;
   }
 
   private layout(view: PixelOverlayView): { active: boolean; fontSize: number; lineHeight: number; rgbRows: boolean } {
@@ -255,6 +257,7 @@ export class PixelValueOverlay {
       width: requestRect.width,
       height: requestRect.height,
       mode: view.displayMode,
+      processing: view.processing,
     };
     void inspectPixels(request).then((bytes) => {
       if (revision !== this.revision || !this.currentView || baseKey !== this.key(this.currentView)) return;
