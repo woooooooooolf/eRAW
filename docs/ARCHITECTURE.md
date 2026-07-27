@@ -1,36 +1,77 @@
-# eRAW 架构设计
+# 系统架构
 
-## 产品边界
+## 总体分层
 
-eRAW 是 RAW 数据调试工具，不是照片级 RAW 编辑器。显示调整不得修改源数据；导出只做可明确复现的数据变换。
+```mermaid
+flowchart LR
+    UI["应用编排与界面<br/>app.ts / export-dialog.ts"]
+    VP["视口与叠加层<br/>viewport*.ts / pixel-overlay.ts"]
+    API["类型化 IPC 适配<br/>api.ts / types.ts"]
+    CMD["Tauri 命令与会话<br/>commands.rs"]
+    RAW["RAW 领域引擎<br/>raw/mod.rs"]
+    FILE["只读内存映射 / 输出文件"]
 
-## 模块划分
+    UI --> VP
+    UI --> API
+    VP --> API
+    API --> CMD
+    CMD --> RAW
+    CMD --> FILE
+    RAW --> FILE
+```
 
-- `src-tauri/src/raw`：格式描述、布局计算、像素解码、警告与导出。
-- `src-tauri/src/commands`：Tauri IPC 边界与当前文档会话。
-- `src/viewport`：WebGL2 瓦片渲染、连续 LOD、缓存和画布交互。
-- `src/viewport-transform`：原图坐标与屏幕坐标之间的唯一变换来源。
-- `src/viewport-overlay`：图像边界及后续矩形选区等独立叠加内容。
-- `src/app`：参数提交、状态栏、对话框与应用状态。
+前端负责交互、可见瓦片调度和 GPU 合成；Rust 负责文件会话、格式计算、像素读取、处理算法和确定性导出。IPC 只传递结构化请求、文档信息和二进制结果，不传递整幅 RAW 副本。
 
-## 大图显示
+## 模块职责
 
-文件由 Rust 使用内存映射访问。前端根据视口和缩放级别请求固定大小的金字塔瓦片；L0 保持逐像素结果，L1 及以上对每个缩略像素覆盖的完整源区域进行聚合。RAW 强度按 DN 聚合，Bayer 与 demosaic 按 CFA 通道聚合，避免固定抽取某个 CFA 相位。
+| 模块 | 主要职责 |
+| --- | --- |
+| `src/app.ts` | 应用状态、参数提交、菜单、状态栏、诊断、设置与对话框编排 |
+| `src/export-dialog.ts` | 冻结导出快照、范围联动、字段校验和导出反馈 |
+| `src/viewport.ts` | WebGL2、LOD、瓦片队列、纹理缓存、缩放和平移 |
+| `src/viewport-transform.ts` | 屏幕、图像和像素坐标的唯一变换来源；选区模型 |
+| `src/viewport-overlay.ts` | 图像边界与矩形选区 SVG 叠加 |
+| `src/pixel-overlay.ts` | 高倍率像素网格与 DN/RGB 数字叠加 |
+| `src/api.ts` / `src/types.ts` | Tauri 调用封装及前后端共享数据契约 |
+| `src-tauri/src/commands.rs` | 当前文档会话、内存映射、缓存、任务快照和命令边界 |
+| `src-tauri/src/raw/mod.rs` | 布局、packing、CFA、预览、Remosaic、Demosaic、检查与导出 |
 
-前端通过二进制 IPC 接收 RGBA 瓦片并上传 WebGL2，避免 JSON 数组序列化。缩放位于两个金字塔层级之间时，WebGL 渐进混合相邻层级，避免跨越 50%、25% 等边界时突然改变观感。
+`raw/mod.rs` 是无 UI 的领域核心。新格式和算法应优先在这里形成可测试的纯逻辑；`app.ts` 不应承担像素语义。
 
-瓦片以源图像坐标定位。移动过程中先复用已有 GPU 纹理，缺失瓦片异步补齐；Rust 端保留有限的最近预览结果。请求带有全局递增的文档世代号，参数或文件变化会取消仍在执行的旧任务，过期结果不会覆盖新视图。
+## 文档会话与一致性
 
-## 线程与一致性
+Rust 端只维护一个当前文档：
 
-当前打开文件及其格式描述保存在 Rust 会话中。每次参数提交都会重新验证布局并增加世代号。渲染和导出读取不可变的会话快照，不在耗时任务中持有文档互斥锁；参数变化后前后端分别失效预览缓存。
+```text
+RawDocument
+├─ path / name / file_size
+├─ Arc<Mmap>                 只读文件映射
+├─ RawDescriptor / RawLayout
+├─ warnings
+└─ generation               文档世代号
+```
 
-## 视口与区域选择
+- 打开文件或提交新描述符会增加 `generation`，并清空预览缓存。
+- 耗时任务先复制不可变快照，再释放文档互斥锁。
+- 前端请求携带 `generation`；旧文档结果返回 `stale_generation`。
+- 预览另有 `renderRevision`；帧、模式、参数或 LOD 计划变化时，旧任务协作取消并返回 `stale_render`。
+- 前端 `inFlight` 记录 revision，旧任务结束时不会误删同键的新任务。
+- 导出同时校验来源路径和 `sourceGeneration`，防止对过期配置写文件。
 
-相机缩放和偏移由统一的 `ViewportTransform` 管理。图像边界、十字准星、高倍率像素值和后续选区均通过同一变换换算，避免各叠加层在缩放或高 DPI 下发生坐标漂移。
+## 缓存与数据传递
 
-矩形选区保存在原始图像坐标中，使用半开区间 `[x, x + width) × [y, y + height)`；缩放、平移、显示模式切换和同尺寸帧切换不改变选区。当前版本仅预留选择模型与独立 SVG 叠加层，后续统计任务必须读取 L0 原始 RAW 数据，不能以缩略瓦片代替。
+- Rust 使用只读内存映射按需访问 RAW，不复制完整文件。
+- Rust 预览缓存保存最近 128 个 RGBA 瓦片。
+- 前端纹理缓存按设置提供约 32/64/128 MiB 三档，并按最近使用顺序淘汰。
+- 每次最多并发 8 个前端瓦片请求。
+- RGBA 瓦片和像素检查结果通过二进制 IPC 返回，避免大型 JSON 数组开销。
 
-## CFA 扩展
+## 故障边界
 
-首版 UI 暴露 Mono 和四种 2×2 Bayer 排列。内部像素通道查询保持独立，后续可扩展为周期性 CFA 网格，为 Quad Bayer 和 remosaic 留出空间。
+查看路径允许部分帧、短数据和不合理布局继续尝试；警告进入诊断模型。相同失败瓦片不会无限自动重试，修改参数、帧或模式后才重新尝试。
+
+导出路径采用更严格的边界：
+
+- 前后端都验证范围、位深、packing、对齐和目标兼容性。
+- 不允许覆盖当前打开的源文件。
+- 先写同目录临时文件，再以可恢复方式替换目标，避免失败时留下半成品。

@@ -1,28 +1,86 @@
-# RAW 格式语义
+# RAW 格式与导出语义
 
-## 尺寸与步长
+## 描述符
 
-- `width`、`height`：有效像素区域。
-- `rowBytes`：仅存储一行有效像素所需的最小字节数。
-- `rowStride`：下一行相对当前行的字节距离。显式值为 0 时，由 `align_up(rowBytes, rowAlignment)` 得到。
-- `frameBytes`：`rowStride × height`。
-- `frameStride`：下一帧相对当前帧的字节距离。显式值为 0 时，由 `align_up(frameBytes, frameAlignment)` 得到。
-- `headerOffset`：第一帧相对文件起点的偏移。
+| 字段 | 语义 |
+| --- | --- |
+| `width` / `height` | 每帧有效像素尺寸；前端限制为 `1–100000` |
+| `bitDepth` | 有效 DN 位深，当前支持 8–16 bit |
+| `packing` | 像素在文件中的存储方式 |
+| `endianness` | Unpacked16 容器的大小端 |
+| `bitAlignment` | Unpacked 容器中的有效位位于 LSB 或 MSB |
+| `cfa` | MONO、四种标准 Bayer 或四种 Quad CFA |
+| `cfaPhaseX/Y` | Quad CFA 相位偏移，范围 0–3 |
+| `rowAlignment` / `rowStride` | 行对齐或显式行字节步长 |
+| `frameAlignment` / `frameStride` | 帧对齐或显式帧字节步长 |
+| `headerOffset` | 第一帧相对文件起点的字节偏移 |
 
-对齐全部以字节为单位，避免“像素宽度对齐”和“存储字节对齐”的歧义。
+对齐值和步长都以字节为单位。显式步长为 0 时：
 
-## 支持的存储方式
+```text
+rowBytes   = packing 所需的最小有效行字节数
+rowStride  = align_up(rowBytes, rowAlignment)
+frameBytes = rowStride × height
+frameStride = align_up(frameBytes, frameAlignment)
+```
 
-- `unpacked8`：每像素 1 字节。
-- `unpacked16`：每像素 2 字节，可选择大端或小端，有效位可位于容器低位或高位。
-- `mipiRaw10`：4 像素 5 字节。
-- `mipiRaw12`：2 像素 3 字节。
+## 存储方式
 
-MIPI packing 与通用连续位流 packing 不等价；后者将作为独立格式扩展，不能仅用一个 `packed` 布尔值描述。
+| Packing | 位深约束 | 组织方式 |
+| --- | --- | --- |
+| Unpacked8 | 8 bit | 每像素 1 字节；更高描述位深会产生容器不足警告 |
+| Unpacked16 | 8–16 bit | 每像素 2 字节；支持奇数位深、大小端和 LSB/MSB |
+| MIPI RAW10 | 10 bit | 4 像素 / 5 字节 |
+| MIPI RAW12 | 12 bit | 2 像素 / 3 字节 |
+| MIPI RAW14 | 14 bit | 4 像素 / 7 字节 |
 
-## 显示与导出
+MIPI packing 不是任意连续位流 packing，不能用单一 `packed` 布尔值替代具体格式。
 
-显示归一化、CFA 着色和 demosaic 只影响预览。RAW 导出默认保持数值语义；目标位深不足时必须使用显式的裁剪或全范围缩放策略，并报告被裁剪的像素数量。
+## CFA 与处理链
 
-从奇数 X/Y 坐标裁剪 Bayer 图像会改变 CFA 相位。导出不重排像素，但 UI 必须显示裁剪后的 CFA 排列。
+标准 Bayer 为 `RGGB/BGGR/GBRG/GRBG`；Quad CFA 为对应的 `QRGGB/QBGGR/QGBRG/QGRBG`，原始周期为 4×4、每种颜色形成 2×2 同色块。
 
+```mermaid
+flowchart LR
+    RAW["原始 DN"]
+    CFA["原始 CFA 点阵"]
+    REM["Remosaic Bayer"]
+    DEM["Demosaic RGB"]
+
+    RAW --> CFA
+    CFA -->|仅 Quad CFA| REM
+    REM --> DEM
+    CFA -->|标准 Bayer| DEM
+```
+
+Remosaic 只负责重排或同色站点重建，不包含颜色校正。预览归一化和 CFA 着色不会修改源 DN。
+
+## 多帧与不完整数据
+
+帧数由文件有效字节数和 `frameStride` 推导，没有独立的固定帧数上限。最后一段不足完整帧时仍作为可尝试的部分帧显示，并产生诊断警告。
+
+读取失败的像素在预览中使用缺失数据纹理表达；查看不会因为单个异常参数立即拒绝整个文档。
+
+## 导出
+
+导出只处理当前帧和所选矩形，不负责批量多帧转换。
+
+| 目标 | 输出语义 |
+| --- | --- |
+| 原始 CFA | 单通道 RAW；支持裁剪、padding 移除、packing、位深、端序和对齐转换 |
+| Remosaic | 单通道标准 Bayer；仅 Quad CFA；使用当前 Remosaic 选项 |
+| Demosaic | RGB48 Interleaved；每通道 16-bit，端序可选 |
+
+数值映射支持：
+
+- `Preserve`：保持 DN，超过目标位深时裁剪并统计数量。
+- `ScaleFullRange`：从源满量程线性映射到目标满量程。
+
+缺失像素填充值属于最终输出 DN，不再经过上述映射。MONO 使用一个值；彩色 CFA 使用独立的 R、Gb、Gr、B 值。Demosaic 缺失像素使用 R、B 和两个绿色填充值的平均。
+
+裁剪会更新输出 CFA 语义：
+
+- 标准 Bayer 根据裁剪起点切换排列。
+- Quad CFA 保持阵列类型并更新 0–3 相位。
+- Remosaic 输出报告裁剪后的标准 Bayer。
+- Demosaic 输出不再具有 CFA。
