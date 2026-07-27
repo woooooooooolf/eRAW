@@ -617,14 +617,15 @@ export class ExportDialog {
 
   private shiftedCfa(cfa: CfaPattern, x: number, y: number): CfaPattern {
     if (cfa === "MONO") return cfa;
-    const grid: Record<CfaPattern, CfaPattern[][]> = {
-      MONO: [["MONO"]],
+    if (cfa.startsWith("Q")) return cfa;
+    const grid: Record<Exclude<CfaPattern, "MONO" | "QRGGB" | "QBGGR" | "QGBRG" | "QGRBG">, CfaPattern[][]> = {
       RGGB: [["RGGB", "GRBG"], ["GBRG", "BGGR"]],
       BGGR: [["BGGR", "GBRG"], ["GRBG", "RGGB"]],
       GBRG: [["GBRG", "BGGR"], ["RGGB", "GRBG"]],
       GRBG: [["GRBG", "RGGB"], ["BGGR", "GBRG"]],
     };
-    return grid[cfa][Math.abs(y) % 2][Math.abs(x) % 2];
+    const bayer = cfa as keyof typeof grid;
+    return grid[bayer][Math.abs(y) % 2][Math.abs(x) % 2];
   }
 
   private integerValue(id: string): number | null {

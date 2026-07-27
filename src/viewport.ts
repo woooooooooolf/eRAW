@@ -1,6 +1,13 @@
 import { renderTile } from "./api";
 import { PixelValueOverlay } from "./pixel-overlay";
-import type { DemosaicPixelValueMode, DisplayMode, DocumentInfo, TileRequest } from "./types";
+import {
+  DEFAULT_PROCESSING_SETTINGS,
+  type DemosaicPixelValueMode,
+  type DisplayMode,
+  type DocumentInfo,
+  type ProcessingSettings,
+  type TileRequest,
+} from "./types";
 import { ViewportOverlayLayer } from "./viewport-overlay";
 import { ViewportTransform, type ImagePoint } from "./viewport-transform";
 
@@ -14,6 +21,7 @@ const MAX_ZOOM = 64;
 
 interface DisplaySettings {
   mode: DisplayMode;
+  processing: ProcessingSettings;
   displayMin: number;
   displayMax: number;
 }
@@ -116,7 +124,12 @@ export class RawViewport {
   private readonly resizeObserver: ResizeObserver;
   private document: DocumentInfo | null = null;
   private frame = 0;
-  private settings: DisplaySettings = { mode: "bayer", displayMin: 0, displayMax: 0 };
+  private settings: DisplaySettings = {
+    mode: "bayer",
+    processing: DEFAULT_PROCESSING_SETTINGS,
+    displayMin: 0,
+    displayMax: 0,
+  };
   private textures = new Map<string, TextureEntry>();
   private inFlight = new Set<string>();
   private failedTiles = new Set<string>();
@@ -268,7 +281,14 @@ export class RawViewport {
   }
 
   setDisplay(settings: DisplaySettings): void {
-    if (settings.mode === this.settings.mode && settings.displayMin === this.settings.displayMin && settings.displayMax === this.settings.displayMax) return;
+    if (
+      settings.mode === this.settings.mode
+      && settings.displayMin === this.settings.displayMin
+      && settings.displayMax === this.settings.displayMax
+      && settings.processing.demosaicAlgorithm === this.settings.processing.demosaicAlgorithm
+      && settings.processing.remosaic.sameColorReconstruction
+        === this.settings.processing.remosaic.sameColorReconstruction
+    ) return;
     this.settings = settings;
     this.clearTextures();
     this.requestDraw();
@@ -551,7 +571,7 @@ export class RawViewport {
 
   private tileKey(level: number, x: number, y: number): string {
     if (!this.document) return "";
-    return `${this.document.generation}:${this.frame}:${this.settings.mode}:${this.settings.displayMin}:${this.settings.displayMax}:${level}:${x}:${y}`;
+    return `${this.document.generation}:${this.frame}:${this.settings.mode}:${this.settings.processing.demosaicAlgorithm}:${this.settings.processing.remosaic.sameColorReconstruction}:${this.settings.displayMin}:${this.settings.displayMax}:${level}:${x}:${y}`;
   }
 
   private visibleTiles(level: number): Array<{ x: number; y: number }> {
@@ -612,6 +632,7 @@ export class RawViewport {
       document: this.document,
       frame: this.frame,
       displayMode: this.settings.mode,
+      processing: this.settings.processing,
       transform: this.transform,
       width: this.width,
       height: this.height,
@@ -663,6 +684,7 @@ export class RawViewport {
       tileY,
       tileSize: TILE_SIZE,
       mode: this.settings.mode,
+      processing: this.settings.processing,
       displayMin: this.settings.displayMin,
       displayMax: this.settings.displayMax,
     };

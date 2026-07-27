@@ -430,6 +430,7 @@ button:disabled { cursor: default; opacity: .36; }
 
 .sidebar-scroll { min-width: 0; overflow-x: hidden; overflow-y: auto; scrollbar-color: var(--surface-3) transparent; scrollbar-width: thin; }
 .parameter-section { border-bottom: 1px solid var(--border); }
+.parameter-section[hidden], .parameter-row[hidden], .display-modes button[hidden] { display: none !important; }
 .section-title {
   display: flex;
   align-items: center;
@@ -484,6 +485,18 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 .segmented-control button { min-width: 0; height: 27px; padding: 0 6px; overflow: hidden; border-radius: 4px; color: var(--muted); background: transparent; font-size: var(--font-xs); text-overflow: ellipsis; white-space: nowrap; }
 .segmented-control button:hover { color: var(--text); }
 .segmented-control button.active { color: var(--text); background: linear-gradient(180deg, rgb(var(--accent-rgb) / .27), rgb(var(--accent-rgb) / .16)); box-shadow: inset 0 0 0 1px rgb(var(--accent-rgb) / .17); }
+.cfa-phase-control { display: grid; gap: 5px; min-width: 0; }
+.phase-axis { display: grid; grid-template-columns: 13px 25px minmax(0, 1fr) 25px; align-items: center; gap: 4px; min-width: 0; }
+.phase-axis > i { color: var(--dim); font-size: var(--font-xs); font-style: normal; text-align: center; }
+.phase-axis > input { height: 25px; padding: 0 5px; text-align: center; }
+.phase-axis > button { display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); background: var(--control-surface); font-size: 15px; }
+.phase-axis > button:hover { color: var(--text); border-color: rgb(var(--accent-rgb) / .4); background: rgb(var(--accent-rgb) / .1); }
+.processing-value { display: flex; align-items: center; min-width: 0; height: 29px; padding: 0 8px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); background: var(--segment-surface); font-size: var(--font-sm); }
+.processing-toggle-row { cursor: default; }
+.processing-toggle-row > input { position: relative; justify-self: end; width: 38px; height: 21px; padding: 0; border: 0; border-radius: 12px; appearance: none; background: var(--surface-3); cursor: pointer; }
+.processing-toggle-row > input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 15px; height: 15px; border-radius: 50%; background: var(--muted); transition: .16s ease; }
+.processing-toggle-row > input:checked { background: rgb(var(--accent-rgb) / .54); }
+.processing-toggle-row > input:checked::after { left: 20px; background: var(--cyan-bright); }
 
 .warning-item { display: flex; gap: 8px; padding: 8px; border-radius: 5px; background: rgba(255, 255, 255, .018); }
 .warning-item > span { flex: 0 0 3px; align-self: stretch; border-radius: 2px; background: var(--dim); }

@@ -213,10 +213,11 @@ pub async fn render_raw_tile(
         return Err("stale_generation".into());
     }
     let cache_key = format!(
-        "{}:{}:{:?}:{}:{}:{}:{}:{}:{}",
+        "{}:{}:{:?}:{:?}:{}:{}:{}:{}:{}:{}",
         request.generation,
         request.frame,
         request.mode,
+        request.processing,
         request.display_min,
         request.display_max,
         request.level,
@@ -308,7 +309,7 @@ pub fn sample_raw_pixel(
         x,
         y,
         value: read_pixel(bytes, &descriptor, &layout, frame, x, y),
-        channel: cfa_name_at(descriptor.cfa, x, y),
+        channel: cfa_name_at(&descriptor, x, y),
     })
 }
 

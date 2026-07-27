@@ -1,10 +1,29 @@
 export type Packing = "unpacked8" | "unpacked16" | "mipiRaw10" | "mipiRaw12" | "mipiRaw14";
 export type Endianness = "little" | "big";
 export type BitAlignment = "lsb" | "msb";
-export type CfaPattern = "MONO" | "RGGB" | "BGGR" | "GBRG" | "GRBG";
+export type CfaPattern =
+  | "MONO"
+  | "RGGB"
+  | "BGGR"
+  | "GBRG"
+  | "GRBG"
+  | "QRGGB"
+  | "QBGGR"
+  | "QGBRG"
+  | "QGRBG";
 export type WarningSeverity = "info" | "warning" | "error";
-export type DisplayMode = "raw" | "bayer" | "demosaic" | "red" | "green" | "blue";
+export type DisplayMode = "raw" | "bayer" | "remosaic" | "demosaic" | "red" | "green" | "blue";
 export type DemosaicPixelValueMode = "rawDn" | "rgb";
+export type DemosaicAlgorithm = "bilinear";
+
+export interface RemosaicOptions {
+  sameColorReconstruction: boolean;
+}
+
+export interface ProcessingSettings {
+  demosaicAlgorithm: DemosaicAlgorithm;
+  remosaic: RemosaicOptions;
+}
 
 export interface RawDescriptor {
   width: number;
@@ -14,6 +33,8 @@ export interface RawDescriptor {
   endianness: Endianness;
   bitAlignment: BitAlignment;
   cfa: CfaPattern;
+  cfaPhaseX: number;
+  cfaPhaseY: number;
   rowAlignment: number;
   rowStride: number;
   frameAlignment: number;
@@ -55,6 +76,7 @@ export interface TileRequest {
   tileY: number;
   tileSize: number;
   mode: DisplayMode;
+  processing: ProcessingSettings;
   displayMin: number;
   displayMax: number;
 }
@@ -67,6 +89,7 @@ export interface PixelInspectionRequest {
   width: number;
   height: number;
   mode: DisplayMode;
+  processing: ProcessingSettings;
 }
 
 export interface PixelSample {
@@ -129,9 +152,26 @@ export const DEFAULT_DESCRIPTOR: RawDescriptor = {
   endianness: "little",
   bitAlignment: "lsb",
   cfa: "RGGB",
+  cfaPhaseX: 0,
+  cfaPhaseY: 0,
   rowAlignment: 1,
   rowStride: 0,
   frameAlignment: 1,
   frameStride: 0,
   headerOffset: 0,
 };
+
+export const DEFAULT_PROCESSING_SETTINGS: ProcessingSettings = {
+  demosaicAlgorithm: "bilinear",
+  remosaic: {
+    sameColorReconstruction: false,
+  },
+};
+
+export function isQuadCfa(cfa: CfaPattern): boolean {
+  return cfa.startsWith("Q");
+}
+
+export function isColorCfa(cfa: CfaPattern): boolean {
+  return cfa !== "MONO";
+}
