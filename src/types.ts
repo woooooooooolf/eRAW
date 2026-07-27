@@ -70,6 +70,7 @@ export interface DocumentInfo {
 
 export interface TileRequest {
   generation: number;
+  renderRevision: number;
   frame: number;
   level: number;
   tileX: number;

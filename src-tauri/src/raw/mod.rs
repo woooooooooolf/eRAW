@@ -403,6 +403,7 @@ impl Default for ProcessingSettings {
 #[serde(rename_all = "camelCase")]
 pub struct TileRequest {
     pub generation: u64,
+    pub render_revision: u64,
     pub frame: u64,
     pub level: u8,
     pub tile_x: u32,
@@ -1867,6 +1868,7 @@ mod tests {
         let (layout, _) = calculate_layout(&d, bytes.len() as u64);
         let request = TileRequest {
             generation: 1,
+            render_revision: 1,
             frame: 0,
             level: 0,
             tile_x: 0,
@@ -1900,6 +1902,7 @@ mod tests {
         let (layout, _) = calculate_layout(&d, bytes.len() as u64);
         let request = TileRequest {
             generation: 1,
+            render_revision: 1,
             frame: 0,
             level: 1,
             tile_x: 0,
@@ -1940,6 +1943,7 @@ mod tests {
         for level in [1, 2, 3] {
             let request = TileRequest {
                 generation: 1,
+                render_revision: 1,
                 frame: 0,
                 level,
                 tile_x: 0,
@@ -1952,6 +1956,87 @@ mod tests {
             };
             let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
             assert_eq!(&tile[0..4], &[200, 100, 50, 255], "level {level}");
+        }
+    }
+
+    #[test]
+    fn adjacent_mipi14_quad_tiles_keep_boundary_rows_exact() {
+        let descriptor = RawDescriptor {
+            width: 260,
+            height: 512,
+            bit_depth: 14,
+            packing: Packing::MipiRaw14,
+            cfa: CfaPattern::Qrggb,
+            ..RawDescriptor::default()
+        };
+        let mut bytes = Vec::new();
+        for y in 0..descriptor.height {
+            let values = (0..descriptor.width)
+                .map(|x| ((x * 17 + y * 31) & 0x3fff) as u16)
+                .collect::<Vec<_>>();
+            bytes.extend_from_slice(
+                &encode_row(
+                    &values,
+                    Packing::MipiRaw14,
+                    14,
+                    Endianness::Little,
+                    BitAlignment::Lsb,
+                )
+                .unwrap(),
+            );
+        }
+        let (layout, warnings) = calculate_layout(&descriptor, bytes.len() as u64);
+        assert!(warnings.is_empty());
+
+        for mode in [DisplayMode::Raw, DisplayMode::Bayer, DisplayMode::Remosaic] {
+            let render = |tile_y| {
+                render_tile(
+                    &bytes,
+                    &descriptor,
+                    &layout,
+                    &TileRequest {
+                        generation: 1,
+                        render_revision: 1,
+                        frame: 0,
+                        level: 0,
+                        tile_x: 0,
+                        tile_y,
+                        tile_size: 256,
+                        mode,
+                        processing: ProcessingSettings::default(),
+                        display_min: 0,
+                        display_max: 0x3fff,
+                    },
+                )
+                .unwrap()
+            };
+            let upper = render(0);
+            let lower = render(1);
+            for x in 0..256u32 {
+                for (tile, local_y, source_y) in [(&upper, 255u32, 255u32), (&lower, 0, 256)] {
+                    let expected = sampled_rgb_l0(
+                        &bytes,
+                        &descriptor,
+                        &layout,
+                        0,
+                        (x, source_y),
+                        mode,
+                        ProcessingSettings::default(),
+                    )
+                    .unwrap();
+                    let index = ((local_y * 256 + x) * 4) as usize;
+                    assert_eq!(
+                        &tile[index..index + 4],
+                        &[
+                            normalize(expected[0], 0, 0x3fff),
+                            normalize(expected[1], 0, 0x3fff),
+                            normalize(expected[2], 0, 0x3fff),
+                            255,
+                        ],
+                        "mode {mode:?}, source ({x}, {source_y})",
+                    );
+                }
+            }
         }
     }
 
@@ -1985,6 +2070,7 @@ mod tests {
                 &layout,
                 &TileRequest {
                     generation: 1,
+                    render_revision: 1,
                     frame: 0,
                     level,
                     tile_x: 0,
@@ -2017,6 +2103,7 @@ mod tests {
         let (layout, _) = calculate_layout(&d, bytes.len() as u64);
         let request = TileRequest {
             generation: 1,
+            render_revision: 1,
             frame: 0,
             level: 1,
             tile_x: 0,
@@ -2060,6 +2147,7 @@ mod tests {
         );
         let request = TileRequest {
             generation: 1,
+            render_revision: 1,
             frame: 1,
             level: 0,
             tile_x: 0,

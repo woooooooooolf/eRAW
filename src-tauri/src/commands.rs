@@ -63,6 +63,7 @@ impl PreviewCache {
 pub struct AppState {
     document: Mutex<Option<RawDocument>>,
     generation_clock: Arc<AtomicU64>,
+    preview_revision: Arc<AtomicU64>,
     preview_cache: Arc<Mutex<PreviewCache>>,
 }
 
@@ -71,6 +72,7 @@ impl Default for AppState {
         Self {
             document: Mutex::new(None),
             generation_clock: Arc::new(AtomicU64::new(0)),
+            preview_revision: Arc::new(AtomicU64::new(0)),
             preview_cache: Arc::new(Mutex::new(PreviewCache::default())),
         }
     }
@@ -199,6 +201,12 @@ pub async fn render_raw_tile(
     request: TileRequest,
     state: State<'_, AppState>,
 ) -> Result<Response, String> {
+    let previous_revision = state
+        .preview_revision
+        .fetch_max(request.render_revision, Ordering::AcqRel);
+    if previous_revision > request.render_revision {
+        return Err("stale_render".into());
+    }
     let (map, descriptor, layout, generation) = {
         let guard = lock_document(&state)?;
         let document = guard.as_ref().ok_or("尚未打开 RAW 文件")?;
@@ -234,6 +242,7 @@ pub async fn render_raw_tile(
         return Ok(Response::new(bytes));
     }
     let generation_clock = state.generation_clock.clone();
+    let preview_revision = state.preview_revision.clone();
     let preview_cache = state.preview_cache.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let bytes: &[u8] = match map.as_ref() {
@@ -242,9 +251,13 @@ pub async fn render_raw_tile(
         };
         let rendered = render_tile_cancellable(bytes, &descriptor, &layout, &request, || {
             generation_clock.load(Ordering::Acquire) == request.generation
+                && preview_revision.load(Ordering::Acquire) == request.render_revision
         })?;
         if generation_clock.load(Ordering::Acquire) != request.generation {
             return Err("stale_generation".into());
+        }
+        if preview_revision.load(Ordering::Acquire) != request.render_revision {
+            return Err("stale_render".into());
         }
         preview_cache
             .lock()

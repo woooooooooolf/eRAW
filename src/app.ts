@@ -2,7 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import erawIconUrl from "./assets/eraw-icon.svg";
 import { chooseRawFile, openDocument, updateDescriptor } from "./api";
 import { ExportDialog, exportDialogTemplate } from "./export-dialog";
-import { RawViewport, type ImagePoint } from "./viewport";
+import { RawViewport, type ImagePoint, type TileTimingStats } from "./viewport";
 import type {
   BitAlignment,
   CfaPattern,
@@ -60,6 +60,7 @@ interface RuntimeDiagnostic {
 const DEFAULT_SIDEBAR_WIDTH = 324;
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 560;
+const MAX_IMAGE_DIMENSION = 100_000;
 
 const THEMES: ReadonlyArray<{
   id: AppTheme;
@@ -130,6 +131,10 @@ function descriptorsEqual(left: RawDescriptor, right: RawDescriptor): boolean {
   return (Object.keys(DEFAULT_DESCRIPTOR) as Array<keyof RawDescriptor>).every((key) => left[key] === right[key]);
 }
 
+function clampImageDimension(value: number): number {
+  return Math.max(1, Math.min(MAX_IMAGE_DIMENSION, Number.isFinite(value) ? Math.trunc(value) : 1));
+}
+
 function loadSettings(): AppSettings {
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
@@ -158,7 +163,12 @@ function loadDescriptor(remember: boolean): RawDescriptor {
   if (!remember) return { ...DEFAULT_DESCRIPTOR };
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return { ...DEFAULT_DESCRIPTOR, ...JSON.parse(saved) as Partial<RawDescriptor> };
+    if (saved) {
+      const descriptor = { ...DEFAULT_DESCRIPTOR, ...JSON.parse(saved) as Partial<RawDescriptor> };
+      descriptor.width = clampImageDimension(descriptor.width);
+      descriptor.height = clampImageDimension(descriptor.height);
+      return descriptor;
+    }
   } catch { /* 使用安全默认值 */ }
   return { ...DEFAULT_DESCRIPTOR };
 }
@@ -216,7 +226,9 @@ export class ErawApp {
     this.viewport = new RawViewport(this.get("viewport"), {
       onZoomChange: (zoom) => this.updateZoomStatus(zoom),
       onSampleChange: (sample) => this.updateSample(sample),
-      onRenderStats: (levelLabel, loaded, pending) => { this.get("render-status").textContent = `${levelLabel} · ${loaded} tiles · ${pending} loading`; },
+      onRenderStats: (levelLabel, loaded, pending, timing) => {
+        this.updateRenderStatus(levelLabel, loaded, pending, timing);
+      },
       onError: (message) => this.reportRuntimeError(message),
     });
     this.get<HTMLInputElement>("processing-same-color-reconstruction").checked =
@@ -252,10 +264,10 @@ export class ErawApp {
           </div>
           <div class="toolbar display-modes" role="group" aria-label="显示模式">
             <button data-mode="raw">RAW 强度</button>
-            <button class="active" data-mode="bayer">CFA 点阵</button>
+            <button id="cfa-mode" class="active" data-mode="bayer">CFA 点阵</button>
             <button id="remosaic-mode" data-mode="remosaic" hidden>Remosaic</button>
             <button id="demosaic-mode" data-mode="demosaic">Demosaic</button>
-            <div class="channel-menu">
+            <div id="channel-menu" class="channel-menu">
               <select id="channel-mode" aria-label="通道显示">
                 <option value="bayer">全部通道</option><option value="red">R 平面</option><option value="green">G 平面</option><option value="blue">B 平面</option>
               </select>
@@ -314,7 +326,7 @@ export class ErawApp {
                     <span class="processing-value">双线性</span>
                   </div>
                   <label class="parameter-row processing-toggle-row" id="remosaic-processing-row" hidden>
-                    <span class="field-label" data-help="关闭时仅在相位对齐的 4×4 块内重排原始 DN；开启时按目标 Bayer 站点，从相同颜色的 QCFA 样本进行双线性重建。">同色双线性重建</span>
+                    <span class="field-label" data-help="按目标 Bayer 站点从相同颜色的 QCFA 样本进行双线性重建。相比仅重排需要更多 CPU 计算，超大图像或频繁缩放时，瓦片完成时间可能明显增加。">同色双线性重建（高计算量）</span>
                     <input id="processing-same-color-reconstruction" type="checkbox" role="switch"/>
                   </label>
                 </div>
@@ -392,9 +404,9 @@ export class ErawApp {
 
   private dimensionField(): string {
     return `<div class="parameter-row dimension-row"><span class="field-label" data-help="${this.parameterHelp("dimensions")}">有效分辨率</span><div class="dimension-control">
-      <div class="number-input"><input id="descriptor-width" data-field="width" type="number" min="1" max="100000" step="1" aria-label="有效宽度"/></div>
+      <div class="number-input"><input id="descriptor-width" data-field="width" type="number" min="1" max="${MAX_IMAGE_DIMENSION}" step="1" aria-label="有效宽度"/></div>
       <i>×</i>
-      <div class="number-input"><input id="descriptor-height" data-field="height" type="number" min="1" max="100000" step="1" aria-label="有效高度"/></div>
+      <div class="number-input"><input id="descriptor-height" data-field="height" type="number" min="1" max="${MAX_IMAGE_DIMENSION}" step="1" aria-label="有效高度"/></div>
     </div></div>`;
   }
 
@@ -428,7 +440,7 @@ export class ErawApp {
 
   private parameterHelp(field: string): string {
     const descriptions: Record<string, string> = {
-      dimensions: "图像中可见的有效像素宽度和高度，不包含每行或每帧末尾的填充数据。",
+      dimensions: `图像中可见的有效像素宽度和高度，不包含每行或每帧末尾的填充数据。当前前端允许范围为 1×1 至 ${MAX_IMAGE_DIMENSION}×${MAX_IMAGE_DIMENSION}。`,
       bitDepth: "每个像素实际使用的有效位数。9/11/13/15 bit 数据通常存放在 16-bit 容器中。",
       packing: "RAW 像素在文件中的字节排列方式；MIPI 格式会将多个像素紧凑打包。",
       endianness: "Unpacked 多字节像素在文件中的字节顺序；MIPI packed 格式不使用此设置。",
@@ -762,9 +774,15 @@ export class ErawApp {
       const value = Number(this.descriptorFieldValue(field));
       return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
     };
+    const dimension = (field: "width" | "height") => {
+      const clamped = clampImageDimension(number(field));
+      const input = this.root.querySelector<HTMLInputElement>(`input[data-field="${field}"]`);
+      if (input) input.value = String(clamped);
+      return clamped;
+    };
     const value = <T extends string>(field: string) => this.descriptorFieldValue(field) as T;
     return {
-      width: number("width"), height: number("height"), bitDepth: Number(value("bitDepth")),
+      width: dimension("width"), height: dimension("height"), bitDepth: Number(value("bitDepth")),
       packing: value<Packing>("packing"), endianness: value<Endianness>("endianness"), bitAlignment: value<BitAlignment>("bitAlignment"), cfa: value<CfaPattern>("cfa"),
       cfaPhaseX: Math.min(3, number("cfaPhaseX")), cfaPhaseY: Math.min(3, number("cfaPhaseY")),
       rowAlignment: Math.max(1, number("rowAlignment")), rowStride: number("rowStride"), frameAlignment: Math.max(1, number("frameAlignment")), frameStride: number("frameStride"), headerOffset: number("headerOffset"),
@@ -1015,8 +1033,11 @@ export class ErawApp {
     const color = isColorCfa(cfa);
     this.get("cfa-phase-row").toggleAttribute("hidden", !quad);
     this.get("image-processing-section").toggleAttribute("hidden", !color);
+    this.get("cfa-mode").toggleAttribute("hidden", !color);
     this.get("remosaic-processing-row").toggleAttribute("hidden", !quad);
     this.get("remosaic-mode").toggleAttribute("hidden", !quad);
+    this.get("demosaic-mode").toggleAttribute("hidden", !color);
+    this.get("channel-menu").toggleAttribute("hidden", !color);
     this.get<HTMLButtonElement>("demosaic-mode").disabled = !color;
     this.get<HTMLSelectElement>("channel-mode").disabled = !color;
     this.updateExportAvailability();
@@ -1034,10 +1055,12 @@ export class ErawApp {
           ? "对标准 Bayer 执行双线性 Demosaic"
           : "Mono 图像不使用 Demosaic",
     );
-    if (!allowModeFallback) return;
-    if (!color && ["demosaic", "red", "green", "blue"].includes(this.displayMode)) {
+    if (!color && this.displayMode !== "raw") {
       this.setDisplayMode("raw");
-    } else if (!quad && this.displayMode === "remosaic") {
+      return;
+    }
+    if (!allowModeFallback) return;
+    if (!quad && this.displayMode === "remosaic") {
       this.setDisplayMode("bayer");
     }
   }
@@ -1077,6 +1100,24 @@ export class ErawApp {
 
   private updateZoomStatus(zoom: number): void {
     this.get("zoom-status").textContent = this.formatZoom(zoom);
+  }
+
+  private updateRenderStatus(
+    levelLabel: string,
+    loaded: number,
+    pending: number,
+    timing: TileTimingStats,
+  ): void {
+    const status = this.get("render-status");
+    status.textContent = `${levelLabel} · ${loaded} tiles · ${pending} loading`;
+    const duration = (milliseconds: number) => milliseconds >= 1000
+      ? `${(milliseconds / 1000).toFixed(2)} s`
+      : `${milliseconds.toFixed(milliseconds >= 100 ? 0 : 1)} ms`;
+    const timingHelp = timing.samples
+      ? `当前视图已完成 ${timing.samples} 个瓦片；最近 ${duration(timing.lastMs)}，平均 ${duration(timing.averageMs)}，最慢 ${duration(timing.maxMs)}。`
+      : "当前视图尚无已完成瓦片。";
+    status.dataset.help =
+      `L 表示当前预览层级；Lx↔Ly 表示正在混合相邻层级。tiles 是当前视野中已完成的瓦片数；loading 是当前视野仍在解码、传输或上传纹理的请求数。${timingHelp}`;
   }
 
   private formatZoom(zoom: number): string {

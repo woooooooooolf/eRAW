@@ -40,10 +40,17 @@ interface LodPlan {
   blend: number;
 }
 
+export interface TileTimingStats {
+  samples: number;
+  lastMs: number;
+  averageMs: number;
+  maxMs: number;
+}
+
 export interface ViewportCallbacks {
   onZoomChange(zoom: number): void;
   onSampleChange(sample: ImagePoint | null): void;
-  onRenderStats(levelLabel: string, loaded: number, pending: number): void;
+  onRenderStats(levelLabel: string, loaded: number, pending: number, timing: TileTimingStats): void;
   onError(message: string): void;
 }
 
@@ -53,23 +60,27 @@ uniform vec4 u_rect;
 uniform vec2 u_viewport;
 uniform vec2 u_camera;
 uniform float u_zoom;
-out vec2 v_uv;
+out vec2 v_image_point;
 void main() {
   vec2 imagePoint = u_rect.xy + a_position * u_rect.zw;
   vec2 screenPoint = u_camera + imagePoint * u_zoom;
   vec2 clip = vec2(screenPoint.x / u_viewport.x * 2.0 - 1.0, 1.0 - screenPoint.y / u_viewport.y * 2.0);
   gl_Position = vec4(clip, 0.0, 1.0);
-  v_uv = a_position;
+  v_image_point = imagePoint;
 }`;
 
 const fragmentShaderSource = `#version 300 es
 precision highp float;
 uniform sampler2D u_texture;
+uniform vec4 u_rect;
 uniform float u_opacity;
-in vec2 v_uv;
+in vec2 v_image_point;
 out vec4 outColor;
 void main() {
-  vec4 color = texture(u_texture, v_uv);
+  ivec2 texture_size = textureSize(u_texture, 0);
+  vec2 local = (v_image_point - u_rect.xy) / u_rect.zw;
+  ivec2 texel = clamp(ivec2(floor(local * vec2(texture_size))), ivec2(0), texture_size - 1);
+  vec4 color = texelFetch(u_texture, texel, 0);
   outColor = vec4(color.rgb, color.a * u_opacity);
 }`;
 
@@ -131,7 +142,7 @@ export class RawViewport {
     displayMax: 0,
   };
   private textures = new Map<string, TextureEntry>();
-  private inFlight = new Set<string>();
+  private inFlight = new Map<string, number>();
   private failedTiles = new Set<string>();
   private failureReported = false;
   private fitScale = 1;
@@ -149,6 +160,12 @@ export class RawViewport {
   private animationFrame = 0;
   private lastSampleKey = "";
   private renderCounter = 0;
+  private renderRevision = 1;
+  private lodPlanKey = "";
+  private timingSamples = 0;
+  private timingTotalMs = 0;
+  private timingLastMs = 0;
+  private timingMaxMs = 0;
 
   private get zoom(): number { return this.transform.zoom; }
   private set zoom(value: number) { this.transform.zoom = value; }
@@ -613,6 +630,7 @@ export class RawViewport {
       return;
     }
     const plan = this.lodPlan();
+    this.updateLodRevision(plan);
     const fineVisible = this.visibleTiles(plan.fineLevel);
     const coarseVisible = plan.coarseLevel === null ? [] : this.visibleTiles(plan.coarseLevel);
     gl.useProgram(this.program);
@@ -627,7 +645,19 @@ export class RawViewport {
     const levelLabel = plan.coarseLevel === null
       ? `L${plan.fineLevel}`
       : `L${plan.fineLevel}↔L${plan.coarseLevel}`;
-    this.callbacks.onRenderStats(levelLabel, fineLoaded + coarseLoaded, this.inFlight.size);
+    const visibleKeys = new Set([
+      ...fineVisible.map((tile) => this.tileKey(plan.fineLevel, tile.x, tile.y)),
+      ...coarseVisible.map((tile) => this.tileKey(plan.coarseLevel!, tile.x, tile.y)),
+    ]);
+    const pending = [...this.inFlight.entries()].filter(
+      ([key, revision]) => revision === this.renderRevision && visibleKeys.has(key),
+    ).length;
+    this.callbacks.onRenderStats(levelLabel, fineLoaded + coarseLoaded, pending, {
+      samples: this.timingSamples,
+      lastMs: this.timingLastMs,
+      averageMs: this.timingSamples ? this.timingTotalMs / this.timingSamples : 0,
+      maxMs: this.timingMaxMs,
+    });
     this.pixelValueOverlay.draw({
       document: this.document,
       frame: this.frame,
@@ -675,9 +705,12 @@ export class RawViewport {
 
   private queueTile(key: string, level: number, tileX: number, tileY: number): void {
     if (!this.document || this.inFlight.has(key) || this.failedTiles.has(key) || this.inFlight.size >= MAX_IN_FLIGHT) return;
-    this.inFlight.add(key);
+    const revision = this.renderRevision;
+    const startedAt = performance.now();
+    this.inFlight.set(key, revision);
     const request: TileRequest = {
       generation: this.document.generation,
+      renderRevision: revision,
       frame: this.frame,
       level,
       tileX,
@@ -689,7 +722,7 @@ export class RawViewport {
       displayMax: this.settings.displayMax,
     };
     void renderTile(request).then((bytes) => {
-      if (!this.document || key !== this.tileKey(level, tileX, tileY)) return;
+      if (!this.document || revision !== this.renderRevision || key !== this.tileKey(level, tileX, tileY)) return;
       const texture = this.gl.createTexture();
       if (!texture) throw new Error("GPU 纹理分配失败");
       this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
@@ -700,11 +733,12 @@ export class RawViewport {
       this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
       this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, TILE_SIZE, TILE_SIZE, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, bytes);
       this.textures.set(key, { texture, level, tileX, tileY, lastUsed: ++this.renderCounter });
+      this.recordTileTiming(performance.now() - startedAt);
       this.evictTextures();
     }).catch((error: unknown) => {
       const message = String(error);
       const belongsToCurrentView = this.document && key === this.tileKey(level, tileX, tileY);
-      if (!message.includes("stale_generation") && belongsToCurrentView) {
+      if (!message.includes("stale_generation") && !message.includes("stale_render") && belongsToCurrentView) {
         this.failedTiles.add(key);
         if (!this.failureReported) {
           this.failureReported = true;
@@ -712,9 +746,37 @@ export class RawViewport {
         }
       }
     }).finally(() => {
-      this.inFlight.delete(key);
+      if (this.inFlight.get(key) === revision) this.inFlight.delete(key);
       this.requestDraw();
     });
+  }
+
+  private updateLodRevision(plan: LodPlan): void {
+    const key = `${plan.fineLevel}:${plan.coarseLevel ?? "-"}`;
+    if (!this.lodPlanKey) {
+      this.lodPlanKey = key;
+      return;
+    }
+    if (key === this.lodPlanKey) return;
+    this.lodPlanKey = key;
+    this.advanceRenderRevision();
+  }
+
+  private advanceRenderRevision(): void {
+    this.renderRevision += 1;
+    this.inFlight.clear();
+    this.timingSamples = 0;
+    this.timingTotalMs = 0;
+    this.timingLastMs = 0;
+    this.timingMaxMs = 0;
+  }
+
+  private recordTileTiming(durationMs: number): void {
+    if (!Number.isFinite(durationMs) || durationMs < 0) return;
+    this.timingSamples += 1;
+    this.timingTotalMs += durationMs;
+    this.timingLastMs = durationMs;
+    this.timingMaxMs = Math.max(this.timingMaxMs, durationMs);
   }
 
   private evictTextures(): void {
@@ -729,7 +791,8 @@ export class RawViewport {
   private clearTextures(): void {
     for (const entry of this.textures.values()) this.gl.deleteTexture(entry.texture);
     this.textures.clear();
-    this.inFlight.clear();
+    this.advanceRenderRevision();
+    this.lodPlanKey = "";
     this.failedTiles.clear();
     this.failureReported = false;
     this.pixelValueOverlay.invalidate();
