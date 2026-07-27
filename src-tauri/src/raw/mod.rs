@@ -894,6 +894,94 @@ fn average(sum: u64, count: u64) -> u16 {
     ((sum + count / 2) / count) as u16
 }
 
+fn uses_structural_lod(d: &RawDescriptor, mode: DisplayMode) -> bool {
+    d.cfa != CfaPattern::Mono
+        && matches!(
+            mode,
+            DisplayMode::Raw | DisplayMode::Bayer | DisplayMode::Remosaic
+        )
+}
+
+fn structural_preview_site(
+    d: &RawDescriptor,
+    mode: DisplayMode,
+    output_x: u32,
+    output_y: u32,
+) -> Option<CfaSite> {
+    if !uses_structural_lod(d, mode) {
+        return None;
+    }
+    match mode {
+        // One L1 texel represents one native 2x2 Quad block, so higher levels
+        // continue with the corresponding Bayer site instead of mixing RGB.
+        DisplayMode::Raw | DisplayMode::Bayer if is_quad_cfa(d.cfa) => Some(bayer_site(
+            bayer_base(d.cfa),
+            output_x + u32::from(d.cfa_phase_x % 4) / 2,
+            output_y + u32::from(d.cfa_phase_y % 4) / 2,
+        )),
+        DisplayMode::Raw | DisplayMode::Bayer => Some(bayer_site(d.cfa, output_x, output_y)),
+        DisplayMode::Remosaic => Some(remosaic_output_site(d, output_x, output_y)),
+        _ => None,
+    }
+}
+
+fn aggregate_structural_rgb(
+    data: &[u8],
+    d: &RawDescriptor,
+    l: &RawLayout,
+    frame: u64,
+    x0: u32,
+    y0: u32,
+    x1: u32,
+    y1: u32,
+    output_x: u32,
+    output_y: u32,
+    mode: DisplayMode,
+    processing: ProcessingSettings,
+) -> Option<[u16; 3]> {
+    let wanted = structural_preview_site(d, mode, output_x, output_y)?;
+    let mut sum = 0u64;
+    let mut count = 0u64;
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let site = if matches!(mode, DisplayMode::Remosaic) {
+                if is_quad_cfa(d.cfa) {
+                    remosaic_output_site(d, x, y)
+                } else {
+                    cfa_site(d, x, y)
+                }
+            } else {
+                cfa_site(d, x, y)
+            };
+            if site != wanted {
+                continue;
+            }
+            let value = if matches!(mode, DisplayMode::Remosaic) {
+                processed_bayer_value(data, d, l, frame, x, y, processing)
+            } else {
+                read_pixel(data, d, l, frame, x, y)
+            };
+            if let Some(value) = value {
+                sum += u64::from(value);
+                count += 1;
+            }
+        }
+    }
+    if count == 0 {
+        return sampled_rgb_l0(data, d, l, frame, (x0, y0), mode, processing);
+    }
+    let value = average(sum, count);
+    if matches!(mode, DisplayMode::Raw) {
+        return Some([value; 3]);
+    }
+    match wanted {
+        CfaSite::Red => Some([value, 0, 0]),
+        CfaSite::GreenBlue | CfaSite::GreenRed => Some([0, value, 0]),
+        CfaSite::Blue => Some([0, 0, value]),
+        CfaSite::Mono => Some([value; 3]),
+    }
+}
+
 fn aggregate_rgb(
     data: &[u8],
     d: &RawDescriptor,
@@ -1028,6 +1116,23 @@ pub fn render_tile_cancellable(
                     l,
                     request.frame,
                     (x0, y0),
+                    request.mode,
+                    request.processing,
+                )
+            } else if uses_structural_lod(d, request.mode) {
+                let output_x = request.tile_x.saturating_mul(tile_size).saturating_add(ox);
+                let output_y = request.tile_y.saturating_mul(tile_size).saturating_add(oy);
+                aggregate_structural_rgb(
+                    data,
+                    d,
+                    l,
+                    request.frame,
+                    x0,
+                    y0,
+                    x0.saturating_add(scale).min(d.width),
+                    y0.saturating_add(scale).min(d.height),
+                    output_x,
+                    output_y,
                     request.mode,
                     request.processing,
                 )
@@ -1918,7 +2023,7 @@ mod tests {
     }
 
     #[test]
-    fn bayer_preview_levels_preserve_all_cfa_channels() {
+    fn bayer_preview_levels_preserve_cfa_sites_instead_of_mixing_channels() {
         let d = RawDescriptor {
             width: 64,
             height: 64,
@@ -1940,7 +2045,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let (layout, _) = calculate_layout(&d, bytes.len() as u64);
-        for level in [1, 2, 3] {
+        for level in [1, 2, 3, 4] {
             let request = TileRequest {
                 generation: 1,
                 render_revision: 1,
@@ -1955,8 +2060,223 @@ mod tests {
                 display_max: 255,
             };
             let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
-            assert_eq!(&tile[0..4], &[200, 100, 50, 255], "level {level}");
+            let pixel = |x: usize, y: usize| {
+                let index = (y * 64 + x) * 4;
+                &tile[index..index + 4]
+            };
+            assert_eq!(pixel(0, 0), &[200, 0, 0, 255], "level {level}");
+            assert_eq!(pixel(1, 0), &[0, 100, 0, 255], "level {level}");
+            assert_eq!(pixel(0, 1), &[0, 100, 0, 255], "level {level}");
+            assert_eq!(pixel(1, 1), &[0, 0, 50, 255], "level {level}");
         }
+    }
+
+    #[test]
+    fn quad_preview_levels_reduce_same_color_blocks_to_a_bayer_mosaic() {
+        let d = RawDescriptor {
+            width: 64,
+            height: 64,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Qrggb,
+            ..RawDescriptor::default()
+        };
+        let mut bytes = Vec::with_capacity((d.width * d.height) as usize);
+        for y in 0..d.height {
+            for x in 0..d.width {
+                bytes.push(match cfa_site(&d, x, y) {
+                    CfaSite::Red => 220,
+                    CfaSite::GreenRed => 140,
+                    CfaSite::GreenBlue => 90,
+                    CfaSite::Blue => 40,
+                    CfaSite::Mono => unreachable!(),
+                });
+            }
+        }
+        let (layout, _) = calculate_layout(&d, bytes.len() as u64);
+        for (mode, expected) in [
+            (
+                DisplayMode::Raw,
+                [
+                    [220, 220, 220, 255],
+                    [140, 140, 140, 255],
+                    [90, 90, 90, 255],
+                    [40, 40, 40, 255],
+                ],
+            ),
+            (
+                DisplayMode::Bayer,
+                [
+                    [220, 0, 0, 255],
+                    [0, 140, 0, 255],
+                    [0, 90, 0, 255],
+                    [0, 0, 40, 255],
+                ],
+            ),
+        ] {
+            for level in [1, 2, 3, 4] {
+                let tile = render_tile(
+                    &bytes,
+                    &d,
+                    &layout,
+                    &TileRequest {
+                        generation: 1,
+                        render_revision: 1,
+                        frame: 0,
+                        level,
+                        tile_x: 0,
+                        tile_y: 0,
+                        tile_size: 64,
+                        mode,
+                        processing: ProcessingSettings::default(),
+                        display_min: 0,
+                        display_max: 255,
+                    },
+                )
+                .unwrap();
+                let pixel = |x: usize, y: usize| {
+                    let index = (y * 64 + x) * 4;
+                    &tile[index..index + 4]
+                };
+                assert_eq!(pixel(0, 0), expected[0], "mode {mode:?}, level {level}");
+                assert_eq!(pixel(1, 0), expected[1], "mode {mode:?}, level {level}");
+                assert_eq!(pixel(0, 1), expected[2], "mode {mode:?}, level {level}");
+                assert_eq!(pixel(1, 1), expected[3], "mode {mode:?}, level {level}");
+            }
+        }
+    }
+
+    #[test]
+    fn remosaic_preview_levels_keep_the_processed_bayer_mosaic() {
+        let d = RawDescriptor {
+            width: 64,
+            height: 64,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Qrggb,
+            ..RawDescriptor::default()
+        };
+        let mut bytes = Vec::with_capacity((d.width * d.height) as usize);
+        for y in 0..d.height {
+            for x in 0..d.width {
+                bytes.push(match cfa_site(&d, x, y) {
+                    CfaSite::Red => 220,
+                    CfaSite::GreenRed => 140,
+                    CfaSite::GreenBlue => 90,
+                    CfaSite::Blue => 40,
+                    CfaSite::Mono => unreachable!(),
+                });
+            }
+        }
+        let (layout, _) = calculate_layout(&d, bytes.len() as u64);
+        for level in [1, 2, 3, 4] {
+            let tile = render_tile(
+                &bytes,
+                &d,
+                &layout,
+                &TileRequest {
+                    generation: 1,
+                    render_revision: 1,
+                    frame: 0,
+                    level,
+                    tile_x: 0,
+                    tile_y: 0,
+                    tile_size: 64,
+                    mode: DisplayMode::Remosaic,
+                    processing: ProcessingSettings::default(),
+                    display_min: 0,
+                    display_max: 255,
+                },
+            )
+            .unwrap();
+            let pixel = |x: usize, y: usize| {
+                let index = (y * 64 + x) * 4;
+                &tile[index..index + 4]
+            };
+            assert_eq!(pixel(0, 0), &[220, 0, 0, 255], "level {level}");
+            assert_eq!(pixel(1, 0), &[0, 140, 0, 255], "level {level}");
+            assert_eq!(pixel(0, 1), &[0, 90, 0, 255], "level {level}");
+            assert_eq!(pixel(1, 1), &[0, 0, 40, 255], "level {level}");
+        }
+    }
+
+    #[test]
+    fn structural_quad_lod_collapses_phase_without_losing_site_order() {
+        for phase_y in 0..4 {
+            for phase_x in 0..4 {
+                let d = RawDescriptor {
+                    cfa: CfaPattern::Qrggb,
+                    cfa_phase_x: phase_x,
+                    cfa_phase_y: phase_y,
+                    ..RawDescriptor::default()
+                };
+                for output_y in 0..4 {
+                    for output_x in 0..4 {
+                        let expected = bayer_site(
+                            CfaPattern::Rggb,
+                            output_x + u32::from(phase_x) / 2,
+                            output_y + u32::from(phase_y) / 2,
+                        );
+                        assert_eq!(
+                            structural_preview_site(&d, DisplayMode::Bayer, output_x, output_y),
+                            Some(expected),
+                            "phase ({phase_x}, {phase_y}), output ({output_x}, {output_y})"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn structural_lod_keeps_cfa_phase_continuous_across_tile_boundaries() {
+        let d = RawDescriptor {
+            width: 512,
+            height: 256,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Qrggb,
+            cfa_phase_x: 3,
+            ..RawDescriptor::default()
+        };
+        let mut bytes = Vec::with_capacity((d.width * d.height) as usize);
+        for y in 0..d.height {
+            for x in 0..d.width {
+                bytes.push(match cfa_site(&d, x, y) {
+                    CfaSite::Red => 220,
+                    CfaSite::GreenRed => 140,
+                    CfaSite::GreenBlue => 90,
+                    CfaSite::Blue => 40,
+                    CfaSite::Mono => unreachable!(),
+                });
+            }
+        }
+        let (layout, _) = calculate_layout(&d, bytes.len() as u64);
+        let render = |tile_x| {
+            render_tile(
+                &bytes,
+                &d,
+                &layout,
+                &TileRequest {
+                    generation: 1,
+                    render_revision: 1,
+                    frame: 0,
+                    level: 2,
+                    tile_x,
+                    tile_y: 0,
+                    tile_size: 64,
+                    mode: DisplayMode::Bayer,
+                    processing: ProcessingSettings::default(),
+                    display_min: 0,
+                    display_max: 255,
+                },
+            )
+            .unwrap()
+        };
+        let left = render(0);
+        let right = render(1);
+        assert_eq!(&left[63 * 4..64 * 4], &[220, 0, 0, 255]);
+        assert_eq!(&right[0..4], &[0, 140, 0, 255]);
     }
 
     #[test]

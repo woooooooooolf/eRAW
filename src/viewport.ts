@@ -162,6 +162,7 @@ export class RawViewport {
   private renderCounter = 0;
   private renderRevision = 1;
   private lodPlanKey = "";
+  private structuralLodLevel: number | null = null;
   private timingSamples = 0;
   private timingTotalMs = 0;
   private timingLastMs = 0;
@@ -572,12 +573,33 @@ export class RawViewport {
     return Math.min(maxLevel, 30);
   }
 
+  private usesStructuralLod(): boolean {
+    return Boolean(
+      this.document
+      && this.document.descriptor.cfa !== "MONO"
+      && ["raw", "bayer", "remosaic"].includes(this.settings.mode),
+    );
+  }
+
   private lodPlan(): LodPlan {
     const maxLevel = this.maximumLevel();
     if (!this.document || this.zoom >= 1 || maxLevel === 0) {
+      if (this.usesStructuralLod()) this.structuralLodLevel = 0;
       return { fineLevel: 0, coarseLevel: null, blend: 0 };
     }
     const ideal = Math.max(0, Math.min(maxLevel, Math.log2(1 / this.zoom)));
+    if (this.usesStructuralLod()) {
+      // Cross-fading two differently sized CFA grids visually mixes their
+      // sites, so structural previews switch one complete level at a time.
+      let level = this.structuralLodLevel === null
+        ? Math.round(ideal)
+        : Math.max(0, Math.min(maxLevel, this.structuralLodLevel));
+      const hysteresis = 0.08;
+      while (level < maxLevel && ideal > level + 0.5 + hysteresis) level += 1;
+      while (level > 0 && ideal < level - 0.5 - hysteresis) level -= 1;
+      this.structuralLodLevel = level;
+      return { fineLevel: level, coarseLevel: null, blend: 0 };
+    }
     const fineLevel = Math.floor(ideal);
     const blend = ideal - fineLevel;
     if (fineLevel >= maxLevel || blend < 0.015) {
@@ -793,6 +815,7 @@ export class RawViewport {
     this.textures.clear();
     this.advanceRenderRevision();
     this.lodPlanKey = "";
+    this.structuralLodLevel = null;
     this.failedTiles.clear();
     this.failureReported = false;
     this.pixelValueOverlay.invalidate();
