@@ -6,8 +6,10 @@ import type {
   Endianness,
   ExportRequest,
   ExportResult,
+  ExportTarget,
   MissingPixelCounts,
   Packing,
+  ProcessingSettings,
   RawDescriptor,
   ValueMapping,
 } from "./types";
@@ -20,6 +22,8 @@ interface ExportSnapshot {
   name: string;
   generation: number;
   descriptor: RawDescriptor;
+  target: ExportTarget;
+  processing: ProcessingSettings;
   frame: number;
   partial: boolean;
 }
@@ -63,7 +67,7 @@ export function exportDialogTemplate(): string {
   return `<dialog id="export-dialog" class="modal export-modal">
     <form id="export-form" novalidate>
       <header>
-        <div><small>DETERMINISTIC CONVERSION</small><h2>导出 RAW 数据</h2></div>
+        <div><small>DETERMINISTIC CONVERSION</small><h2 id="export-title">导出 RAW 数据</h2></div>
         <button id="close-export" type="button" class="dialog-close" aria-label="关闭">×</button>
       </header>
       <div class="dialog-body">
@@ -100,7 +104,10 @@ export function exportDialogTemplate(): string {
         </section>
 
         <section>
-          <h3>输出编码</h3>
+          <div class="export-section-heading">
+            <h3>输出编码</h3>
+            <span id="export-target-note">—</span>
+          </div>
           <div class="export-grid">
             ${exportSelect("export-packing", "存储方式", `<option value="unpacked8">Unpacked 8</option><option value="unpacked16">Unpacked 16</option><option value="mipiRaw10">MIPI RAW10</option><option value="mipiRaw12">MIPI RAW12</option><option value="mipiRaw14">MIPI RAW14</option>`)}
             ${exportSelect("export-depth", "位深", `<option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option>`)}
@@ -157,12 +164,17 @@ export class ExportDialog {
     return this.get<HTMLDialogElement>("export-dialog").open;
   }
 
-  open(document: DocumentInfo, frame: number): void {
+  open(document: DocumentInfo, frame: number, processing: ProcessingSettings, target: ExportTarget): void {
     this.snapshot = {
       path: document.path,
       name: document.name,
       generation: document.generation,
       descriptor: { ...document.descriptor },
+      target,
+      processing: {
+        ...processing,
+        remosaic: { ...processing.remosaic },
+      },
       frame,
       partial: frame >= document.layout.completeFrameCount,
     };
@@ -171,9 +183,11 @@ export class ExportDialog {
     this.showMessage("", "info");
     this.setBusy(false);
 
+    const targetName = this.targetName(target);
+    this.get("export-title").textContent = targetName;
     this.get("export-source-name").textContent = document.name;
     this.get("export-source-summary").textContent =
-      `帧 ${frame + 1}/${document.layout.frameCount} · ${document.descriptor.width} × ${document.descriptor.height} · ${document.descriptor.bitDepth} bit · ${document.descriptor.packing} · ${document.descriptor.cfa}`;
+      `帧 ${frame + 1}/${document.layout.frameCount} · ${document.descriptor.width} × ${document.descriptor.height} · ${document.descriptor.bitDepth} bit · ${document.descriptor.packing} · ${this.sourceCfaLabel(document.descriptor)}`;
 
     this.setValue("crop-x", 0);
     this.setValue("crop-y", 0);
@@ -192,6 +206,7 @@ export class ExportDialog {
     this.setValue("export-frame-alignment", 1);
     FILL_IDS.forEach((id) => this.setValue(id, 0));
 
+    this.applyTargetRules();
     this.applyPackingRules();
     this.updateFillMode();
     this.normalizeAxis("x", "crop-x");
@@ -382,12 +397,18 @@ export class ExportDialog {
       this.get("export-range-summary").textContent = "范围尚未完成";
       return;
     }
-    this.get("export-cfa").textContent = this.shiftedCfa(this.snapshot.descriptor.cfa, x!, y!);
+    this.get("export-cfa").textContent = this.outputFormatLabel(x!, y!);
     this.get("export-range-summary").textContent =
       `(${x}, ${y}) → (${x! + width! - 1}, ${y! + height! - 1}) · ${width} × ${height}`;
   }
 
   private applyPackingRules(): void {
+    if (this.snapshot?.target === "demosaic") {
+      this.get<HTMLSelectElement>("export-depth").value = String(this.snapshot.descriptor.bitDepth);
+      this.get<HTMLSelectElement>("export-packing").value = "unpacked16";
+      this.get<HTMLSelectElement>("export-endian").disabled = false;
+      return;
+    }
     const packing = this.get<HTMLSelectElement>("export-packing").value as Packing;
     const depth = this.get<HTMLSelectElement>("export-depth");
     const fixedDepth: Partial<Record<Packing, number>> = {
@@ -403,14 +424,30 @@ export class ExportDialog {
     this.get<HTMLSelectElement>("export-bit-alignment").disabled = !containerOptionsApply;
   }
 
+  private applyTargetRules(): void {
+    if (!this.snapshot) return;
+    const rgb = this.snapshot.target === "demosaic";
+    this.toggleField("export-packing", !rgb);
+    this.toggleField("export-depth", !rgb);
+    this.toggleField("export-bit-alignment", !rgb);
+    this.toggleField("export-mapping", !rgb);
+    this.get("export-target-note").textContent = rgb
+      ? `固定 RGB48 Interleaved · R16 G16 B16 · DN 保持 ${this.snapshot.descriptor.bitDepth} bit 范围`
+      : this.snapshot.target === "remosaic"
+        ? `输出标准 Bayer · ${this.remosaicMethodLabel()}`
+        : "转换原始 CFA 数据，不执行图像处理";
+  }
+
   private updateFillMode(): void {
     if (!this.snapshot) return;
     const mono = this.snapshot.descriptor.cfa === "MONO";
     this.get("export-mono-fill").toggleAttribute("hidden", !mono);
     this.get("export-bayer-fill").toggleAttribute("hidden", mono);
     this.get("export-fill-format").textContent = mono
-      ? "当前源格式：MONO"
-      : `当前源格式：Bayer ${this.snapshot.descriptor.cfa}`;
+      ? "输出格式：MONO"
+      : this.snapshot.target === "demosaic"
+        ? "缺失 RGB 像素使用 R、(Gr+Gb)/2、B"
+        : `按输出 CFA 站点分别填充`;
     this.clampFillValues();
   }
 
@@ -439,7 +476,9 @@ export class ExportDialog {
   }
 
   private outputMaximum(): number {
-    const depth = Number(this.get<HTMLSelectElement>("export-depth").value);
+    const depth = this.snapshot?.target === "demosaic"
+      ? this.snapshot.descriptor.bitDepth
+      : Number(this.get<HTMLSelectElement>("export-depth").value);
     return depth >= 16 ? 65_535 : 2 ** depth - 1;
   }
 
@@ -489,6 +528,11 @@ export class ExportDialog {
       sourcePath: snapshot.path,
       sourceGeneration: snapshot.generation,
       sourceDescriptor: { ...snapshot.descriptor },
+      target: snapshot.target,
+      processing: {
+        ...snapshot.processing,
+        remosaic: { ...snapshot.processing.remosaic },
+      },
       currentFrame: snapshot.frame,
       cropX: this.value("crop-x"),
       cropY: this.value("crop-y"),
@@ -513,7 +557,12 @@ export class ExportDialog {
 
   private async performExport(): Promise<void> {
     if (this.busy || !this.snapshot || !this.validate()) return;
-    const defaultPath = this.snapshot.path.replace(/(?:\.[^\\/.]+)?$/, "_extracted.raw");
+    const suffix: Record<ExportTarget, string> = {
+      originalCfa: "_extracted.raw",
+      remosaic: "_remosaic.raw",
+      demosaic: "_demosaic_rgb48.raw",
+    };
+    const defaultPath = this.snapshot.path.replace(/(?:\.[^\\/.]+)?$/, suffix[this.snapshot.target]);
     try {
       const path = await chooseExportFile(defaultPath);
       if (!path) return;
@@ -535,11 +584,14 @@ export class ExportDialog {
     const filled = this.totalFilled(result.filledPixels);
     const clipped = result.clippedValues ? ` · 裁剪 ${result.clippedValues} 像素` : "";
     const missing = filled ? ` · 填充 ${filled} 像素` : "";
-    return `已导出当前帧 · ${formatBytes(result.bytesWritten)} · ${result.outputCfa}${missing}${clipped}`;
+    const format = result.outputCfa
+      ? `${result.outputCfa}${result.outputCfa.startsWith("Q") ? ` · Phase ${result.outputCfaPhaseX},${result.outputCfaPhaseY}` : ""} · ${result.outputBitDepth} bit`
+      : `RGB48 Interleaved · ${result.outputBitDepth} bit 有效 DN`;
+    return `已导出当前帧 · ${formatBytes(result.bytesWritten)} · ${format}${missing}${clipped}`;
   }
 
   private totalFilled(counts: MissingPixelCounts): number {
-    return counts.mono + counts.red + counts.greenBlue + counts.greenRed + counts.blue;
+    return counts.mono + counts.red + counts.greenBlue + counts.greenRed + counts.blue + counts.rgb;
   }
 
   private normalizeError(error: unknown): { field?: string; message: string } {
@@ -594,15 +646,17 @@ export class ExportDialog {
       return;
     }
     const packing = this.get<HTMLSelectElement>("export-packing").value as Packing;
-    const packedRow = packing === "unpacked8"
-      ? width
-      : packing === "unpacked16"
-        ? width * 2
-        : packing === "mipiRaw10"
-          ? Math.ceil(width / 4) * 5
-          : packing === "mipiRaw12"
-            ? Math.ceil(width / 2) * 3
-            : Math.ceil(width / 4) * 7;
+    const packedRow = this.snapshot?.target === "demosaic"
+      ? width * 6
+      : packing === "unpacked8"
+        ? width
+        : packing === "unpacked16"
+          ? width * 2
+          : packing === "mipiRaw10"
+            ? Math.ceil(width / 4) * 5
+            : packing === "mipiRaw12"
+              ? Math.ceil(width / 2) * 3
+              : Math.ceil(width / 4) * 7;
     const rowStride = this.alignUp(packedRow, rowAlignment);
     const bytes = this.alignUp(rowStride * height, frameAlignment);
     this.get("export-summary").textContent =
@@ -613,6 +667,55 @@ export class ExportDialog {
 
   private alignUp(value: number, alignment: number): number {
     return Math.ceil(value / alignment) * alignment;
+  }
+
+  private targetName(target: ExportTarget): string {
+    if (target === "remosaic") return "导出 Remosaic Bayer";
+    if (target === "demosaic") return "导出 Demosaic RGB";
+    return "导出原始 CFA";
+  }
+
+  private sourceCfaLabel(descriptor: RawDescriptor): string {
+    return descriptor.cfa.startsWith("Q")
+      ? `${descriptor.cfa} · Phase ${descriptor.cfaPhaseX},${descriptor.cfaPhaseY}`
+      : descriptor.cfa;
+  }
+
+  private remosaicMethodLabel(): string {
+    return this.snapshot?.processing.remosaic.sameColorReconstruction
+      ? "同色双线性重建"
+      : "仅 4×4 块内重排";
+  }
+
+  private outputFormatLabel(x: number, y: number): string {
+    if (!this.snapshot) return "—";
+    const { descriptor, target } = this.snapshot;
+    if (target === "demosaic") return "RGB48 Interleaved（R16 G16 B16）";
+    if (target === "originalCfa" && descriptor.cfa.startsWith("Q")) {
+      const phaseX = (descriptor.cfaPhaseX + x) % 4;
+      const phaseY = (descriptor.cfaPhaseY + y) % 4;
+      return `${descriptor.cfa} · Phase ${phaseX},${phaseY}`;
+    }
+    if (target === "remosaic") {
+      const bases: Record<"QRGGB" | "QBGGR" | "QGBRG" | "QGRBG", CfaPattern> = {
+        QRGGB: "RGGB",
+        QBGGR: "BGGR",
+        QGBRG: "GBRG",
+        QGRBG: "GRBG",
+      };
+      const quad = descriptor.cfa as keyof typeof bases;
+      return this.shiftedCfa(
+        bases[quad],
+        descriptor.cfaPhaseX % 2 + x,
+        descriptor.cfaPhaseY % 2 + y,
+      );
+    }
+    return this.shiftedCfa(descriptor.cfa, x, y);
+  }
+
+  private toggleField(id: string, visible: boolean): void {
+    this.root.querySelector<HTMLElement>(`[data-export-field="${id}"]`)
+      ?.toggleAttribute("hidden", !visible);
   }
 
   private shiftedCfa(cfa: CfaPattern, x: number, y: number): CfaPattern {

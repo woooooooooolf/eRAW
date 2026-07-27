@@ -100,6 +100,7 @@ export interface PixelSample {
 }
 
 export type ValueMapping = "preserve" | "scaleFullRange";
+export type ExportTarget = "originalCfa" | "remosaic" | "demosaic";
 
 export interface MissingPixelFill {
   mono: number;
@@ -114,6 +115,8 @@ export interface ExportRequest {
   sourcePath: string;
   sourceGeneration: number;
   sourceDescriptor: RawDescriptor;
+  target: ExportTarget;
+  processing: ProcessingSettings;
   currentFrame: number;
   cropX: number;
   cropY: number;
@@ -135,13 +138,18 @@ export interface MissingPixelCounts {
   greenBlue: number;
   greenRed: number;
   blue: number;
+  rgb: number;
 }
 
 export interface ExportResult {
   bytesWritten: number;
   clippedValues: number;
   filledPixels: MissingPixelCounts;
-  outputCfa: CfaPattern;
+  outputCfa: CfaPattern | null;
+  outputCfaPhaseX: number;
+  outputCfaPhaseY: number;
+  outputChannels: number;
+  outputBitDepth: number;
 }
 
 export const DEFAULT_DESCRIPTOR: RawDescriptor = {

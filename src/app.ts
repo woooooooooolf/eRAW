@@ -10,6 +10,7 @@ import type {
   DisplayMode,
   DocumentInfo,
   Endianness,
+  ExportTarget,
   Packing,
   ProcessingSettings,
   RawDescriptor,
@@ -239,7 +240,15 @@ export class ErawApp {
         <header class="topbar">
           <div class="toolbar primary-actions">
             <button id="open-button" class="tool-button accent">${icons.open}<span>打开</span><kbd>Ctrl O</kbd></button>
-            <button id="export-button" class="tool-button" disabled>${icons.export}<span>导出</span><kbd>Ctrl E</kbd></button>
+            <div id="export-control" class="export-control">
+              <button id="export-button" class="tool-button" disabled aria-haspopup="menu" aria-expanded="false">${icons.export}<span>导出</span><kbd>Ctrl E</kbd></button>
+              <div id="export-popover" class="export-popover" role="menu" aria-label="选择导出内容" hidden>
+                <header><strong>导出当前帧</strong><span>冻结当前参数与处理设置</span></header>
+                <button type="button" role="menuitem" data-export-target="originalCfa"><i>CFA</i><span><strong>原始 CFA</strong><small>Packing 转换、裁剪与有效像素提取</small></span><b>›</b></button>
+                <button id="export-remosaic-item" type="button" role="menuitem" data-export-target="remosaic"><i>RM</i><span><strong>Remosaic Bayer</strong><small>按当前 Remosaic 设置输出标准 Bayer</small></span><b>›</b></button>
+                <button id="export-demosaic-item" type="button" role="menuitem" data-export-target="demosaic"><i>RGB</i><span><strong>Demosaic RGB</strong><small>输出 RGB48 Interleaved RAW</small></span><b>›</b></button>
+              </div>
+            </div>
           </div>
           <div class="toolbar display-modes" role="group" aria-label="显示模式">
             <button data-mode="raw">RAW 强度</button>
@@ -554,7 +563,16 @@ export class ErawApp {
   private bindEvents(): void {
     this.get("open-button").addEventListener("click", () => void this.openFile());
     this.get("empty-open-button").addEventListener("click", () => void this.openFile());
-    this.get<HTMLButtonElement>("export-button").addEventListener("click", () => void this.openExport());
+    this.get<HTMLButtonElement>("export-button").addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.setExportMenuOpen(this.get("export-popover").hidden);
+    });
+    this.root.querySelectorAll<HTMLButtonElement>("[data-export-target]").forEach((button) => {
+      button.addEventListener("click", () => {
+        this.setExportMenuOpen(false);
+        void this.openExport(button.dataset.exportTarget as ExportTarget);
+      });
+    });
     this.get("fit-button").addEventListener("click", () => this.viewport.fit());
     this.get("actual-button").addEventListener("click", () => this.viewport.actualSize());
     this.get("panel-button").addEventListener("click", () => {
@@ -571,6 +589,7 @@ export class ErawApp {
     document.addEventListener("pointerdown", (event) => {
       if (!(event.target instanceof Element) || !event.target.closest("#theme-control")) this.setThemeMenuOpen(false);
       if (!(event.target instanceof Element) || !event.target.closest("#utility-control")) this.setUtilityMenuOpen(false);
+      if (!(event.target instanceof Element) || !event.target.closest("#export-control")) this.setExportMenuOpen(false);
     });
     this.get("settings-button").addEventListener("click", () => {
       this.setThemeMenuOpen(false);
@@ -812,6 +831,7 @@ export class ErawApp {
     emptyState.setAttribute("aria-hidden", String(Boolean(info)));
     this.get<HTMLButtonElement>("empty-open-button").disabled = Boolean(info);
     this.get<HTMLButtonElement>("export-button").disabled = !info || info.layout.frameCount === 0;
+    this.updateExportAvailability();
     this.get<HTMLButtonElement>("pixel-status").disabled = !info;
     this.get<HTMLButtonElement>("zoom-status").disabled = !info;
     const fileStatus = this.get("file-status");
@@ -953,7 +973,10 @@ export class ErawApp {
   }
 
   private setThemeMenuOpen(open: boolean): void {
-    if (open) this.setUtilityMenuOpen(false);
+    if (open) {
+      this.setUtilityMenuOpen(false);
+      this.setExportMenuOpen(false);
+    }
     const popover = this.get("theme-popover");
     popover.hidden = !open;
     this.get("theme-button").setAttribute("aria-expanded", String(open));
@@ -964,9 +987,26 @@ export class ErawApp {
       const themePopover = this.get("theme-popover");
       themePopover.hidden = true;
       this.get("theme-button").setAttribute("aria-expanded", "false");
+      this.setExportMenuOpen(false);
     }
     this.get("utility-popover").hidden = !open;
     this.get("about-button").setAttribute("aria-expanded", String(open));
+  }
+
+  private setExportMenuOpen(open: boolean): void {
+    if (open) {
+      this.setThemeMenuOpen(false);
+      this.setUtilityMenuOpen(false);
+    }
+    this.get("export-popover").hidden = !open;
+    this.get("export-button").setAttribute("aria-expanded", String(open));
+  }
+
+  private updateExportAvailability(): void {
+    const available = Boolean(this.document?.layout.frameCount);
+    const cfa = this.descriptorFieldValue("cfa") as CfaPattern;
+    this.get<HTMLButtonElement>("export-remosaic-item").disabled = !available || !isQuadCfa(cfa);
+    this.get<HTMLButtonElement>("export-demosaic-item").disabled = !available || !isColorCfa(cfa);
   }
 
   private updateCfaDependentUi(allowModeFallback = true): void {
@@ -979,6 +1019,7 @@ export class ErawApp {
     this.get("remosaic-mode").toggleAttribute("hidden", !quad);
     this.get<HTMLButtonElement>("demosaic-mode").disabled = !color;
     this.get<HTMLSelectElement>("channel-mode").disabled = !color;
+    this.updateExportAvailability();
     this.get("remosaic-mode").setAttribute(
       "title",
       this.processing.remosaic.sameColorReconstruction
@@ -1158,28 +1199,33 @@ export class ErawApp {
   }
 
   private onKeyDown(event: KeyboardEvent): void {
-    if (event.key === "Escape" && (!this.get("theme-popover").hidden || !this.get("utility-popover").hidden)) {
+    if (event.key === "Escape" && (!this.get("theme-popover").hidden || !this.get("utility-popover").hidden || !this.get("export-popover").hidden)) {
       event.preventDefault();
       this.setThemeMenuOpen(false);
       this.setUtilityMenuOpen(false);
+      this.setExportMenuOpen(false);
     }
     else if (event.key === "Escape" && this.root.querySelector(".app-shell")!.classList.contains("diagnostics-open")) { event.preventDefault(); this.setDiagnosticsOpen(false); }
     else if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); void this.openFile(); }
     else if (event.ctrlKey && event.key.toLowerCase() === "e" && this.document?.layout.frameCount && !this.exportDialog.isOpen) {
       event.preventDefault();
-      void this.openExport();
+      void this.openExport("originalCfa");
     }
     else if (event.ctrlKey && event.key === "0") { event.preventDefault(); this.viewport.fit(); }
     else if (event.ctrlKey && event.key === "1") { event.preventDefault(); this.viewport.actualSize(); }
     else if (event.key === "F11") { event.preventDefault(); void this.toggleFullscreen(); }
   }
 
-  private async openExport(): Promise<void> {
+  private async openExport(target: ExportTarget): Promise<void> {
     await this.commitDescriptor();
     while (this.committing) {
       await new Promise((resolve) => window.setTimeout(resolve, 16));
     }
-    if (this.document?.layout.frameCount) this.exportDialog.open(this.document, this.frame);
+    if (!this.document?.layout.frameCount) return;
+    const cfa = this.document.descriptor.cfa;
+    if (target === "remosaic" && !isQuadCfa(cfa)) return;
+    if (target === "demosaic" && !isColorCfa(cfa)) return;
+    this.exportDialog.open(this.document, this.frame, this.processing, target);
   }
 
   private async toggleFullscreen(): Promise<void> {

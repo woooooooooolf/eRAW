@@ -550,13 +550,7 @@ fn cfa_channel_with_phase(
     }
 }
 
-fn cfa_site_with_phase(
-    pattern: CfaPattern,
-    phase_x: u8,
-    phase_y: u8,
-    x: u32,
-    y: u32,
-) -> CfaSite {
+fn cfa_site_with_phase(pattern: CfaPattern, phase_x: u8, phase_y: u8, x: u32, y: u32) -> CfaSite {
     if is_quad_cfa(pattern) {
         let macro_x = ((x + u32::from(phase_x % 4)) % 4) / 2;
         let macro_y = ((y + u32::from(phase_y % 4)) % 4) / 2;
@@ -668,8 +662,7 @@ fn enclosing_coordinates(value: u32, limit: u32, allowed: [bool; 4]) -> Option<(
     let left = (0..=value.min(limit - 1))
         .rev()
         .find(|candidate| allowed[(*candidate % 4) as usize]);
-    let right = (value.min(limit - 1)..limit)
-        .find(|candidate| allowed[(*candidate % 4) as usize]);
+    let right = (value.min(limit - 1)..limit).find(|candidate| allowed[(*candidate % 4) as usize]);
     match (left, right) {
         (Some(left), Some(right)) => Some((left, right)),
         (Some(value), None) | (None, Some(value)) => Some((value, value)),
@@ -691,31 +684,17 @@ fn same_site_bilinear_pixel(
             return Some(value);
         }
     }
-    let (x0, x1) = enclosing_coordinates(
-        x,
-        d.width,
-        site_axis_residues(d, wanted, true),
-    )?;
-    let (y0, y1) = enclosing_coordinates(
-        y,
-        d.height,
-        site_axis_residues(d, wanted, false),
-    )?;
+    let (x0, x1) = enclosing_coordinates(x, d.width, site_axis_residues(d, wanted, true))?;
+    let (y0, y1) = enclosing_coordinates(y, d.height, site_axis_residues(d, wanted, false))?;
     let xs: &[(u32, u64)] = if x0 == x1 {
         &[(x0, 1)]
     } else {
-        &[
-            (x0, u64::from(x1 - x)),
-            (x1, u64::from(x - x0)),
-        ]
+        &[(x0, u64::from(x1 - x)), (x1, u64::from(x - x0))]
     };
     let ys: &[(u32, u64)] = if y0 == y1 {
         &[(y0, 1)]
     } else {
-        &[
-            (y0, u64::from(y1 - y)),
-            (y1, u64::from(y - y0)),
-        ]
+        &[(y0, u64::from(y1 - y)), (y1, u64::from(y - y0))]
     };
     let mut weighted_sum = 0u64;
     let mut total_weight = 0u64;
@@ -731,7 +710,11 @@ fn same_site_bilinear_pixel(
             }
         }
     }
-    (total_weight > 0).then_some(((weighted_sum + total_weight / 2) / total_weight) as u16)
+    if total_weight > 0 {
+        Some(((weighted_sum + total_weight / 2) / total_weight) as u16)
+    } else {
+        None
+    }
 }
 
 fn remosaic_pixel(
@@ -808,16 +791,18 @@ fn interpolate_processed_channel(
             let nx = nx as u32;
             let ny = ny as u32;
             if processed_bayer_channel(d, nx, ny) == wanted {
-                if let Some(v) =
-                    processed_bayer_value(data, d, l, frame, nx, ny, processing)
-                {
+                if let Some(v) = processed_bayer_value(data, d, l, frame, nx, ny, processing) {
                     sum += u32::from(v);
                     count += 1;
                 }
             }
         }
     }
-    (count > 0).then_some((sum / count) as u16)
+    if count > 0 {
+        Some((sum / count) as u16)
+    } else {
+        None
+    }
 }
 
 fn sampled_rgb_l0(
@@ -830,18 +815,24 @@ fn sampled_rgb_l0(
     processing: ProcessingSettings,
 ) -> Option<[u16; 3]> {
     let (x, y) = point;
-    let value = read_pixel(data, d, l, frame, x, y)?;
     if d.cfa == CfaPattern::Mono {
+        let value = read_pixel(data, d, l, frame, x, y)?;
         return Some([value; 3]);
     }
     match mode {
-        DisplayMode::Raw => Some([value; 3]),
-        DisplayMode::Bayer => match cfa_channel(d, x, y) {
-            CfaChannel::Red => Some([value, 0, 0]),
-            CfaChannel::Green => Some([0, value, 0]),
-            CfaChannel::Blue => Some([0, 0, value]),
-            CfaChannel::Mono => Some([value; 3]),
-        },
+        DisplayMode::Raw => {
+            let value = read_pixel(data, d, l, frame, x, y)?;
+            Some([value; 3])
+        }
+        DisplayMode::Bayer => {
+            let value = read_pixel(data, d, l, frame, x, y)?;
+            match cfa_channel(d, x, y) {
+                CfaChannel::Red => Some([value, 0, 0]),
+                CfaChannel::Green => Some([0, value, 0]),
+                CfaChannel::Blue => Some([0, 0, value]),
+                CfaChannel::Mono => Some([value; 3]),
+            }
+        }
         DisplayMode::Remosaic => {
             let value = remosaic_pixel(data, d, l, frame, x, y, processing.remosaic)?;
             match remosaic_output_channel(d, x, y) {
@@ -852,36 +843,9 @@ fn sampled_rgb_l0(
             }
         }
         DisplayMode::Demosaic => Some([
-            interpolate_processed_channel(
-                data,
-                d,
-                l,
-                frame,
-                x,
-                y,
-                CfaChannel::Red,
-                processing,
-            )?,
-            interpolate_processed_channel(
-                data,
-                d,
-                l,
-                frame,
-                x,
-                y,
-                CfaChannel::Green,
-                processing,
-            )?,
-            interpolate_processed_channel(
-                data,
-                d,
-                l,
-                frame,
-                x,
-                y,
-                CfaChannel::Blue,
-                processing,
-            )?,
+            interpolate_processed_channel(data, d, l, frame, x, y, CfaChannel::Red, processing)?,
+            interpolate_processed_channel(data, d, l, frame, x, y, CfaChannel::Green, processing)?,
+            interpolate_processed_channel(data, d, l, frame, x, y, CfaChannel::Blue, processing)?,
         ]),
         DisplayMode::Red => {
             let v = interpolate_processed_channel(
@@ -947,8 +911,8 @@ fn aggregate_rgb(
     let mut channel_counts = [0u64; 3];
     for y in y0..y1 {
         for x in x0..x1 {
-            let processed_mode = is_quad_cfa(d.cfa)
-                && !matches!(mode, DisplayMode::Raw | DisplayMode::Bayer);
+            let processed_mode =
+                is_quad_cfa(d.cfa) && !matches!(mode, DisplayMode::Raw | DisplayMode::Bayer);
             let value = if processed_mode {
                 processed_bayer_value(data, d, l, frame, x, y, processing)
             } else {
@@ -1165,6 +1129,14 @@ pub enum ValueMapping {
     ScaleFullRange,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportTarget {
+    OriginalCfa,
+    Remosaic,
+    Demosaic,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportRequest {
@@ -1172,6 +1144,8 @@ pub struct ExportRequest {
     pub source_path: String,
     pub source_generation: u64,
     pub source_descriptor: RawDescriptor,
+    pub target: ExportTarget,
+    pub processing: ProcessingSettings,
     pub current_frame: u64,
     pub crop_x: u32,
     pub crop_y: u32,
@@ -1205,6 +1179,7 @@ pub struct MissingPixelCounts {
     pub green_blue: u64,
     pub green_red: u64,
     pub blue: u64,
+    pub rgb: u64,
 }
 
 impl MissingPixelFill {
@@ -1265,7 +1240,11 @@ pub struct ExportResult {
     pub bytes_written: u64,
     pub clipped_values: u64,
     pub filled_pixels: MissingPixelCounts,
-    pub output_cfa: CfaPattern,
+    pub output_cfa: Option<CfaPattern>,
+    pub output_cfa_phase_x: u8,
+    pub output_cfa_phase_y: u8,
+    pub output_channels: u8,
+    pub output_bit_depth: u8,
 }
 
 fn output_row_bytes(width: u32, packing: Packing) -> Result<usize, String> {
@@ -1475,20 +1454,28 @@ pub fn export_raw(
     if !(8..=16).contains(&request.bit_depth) {
         return Err("输出位深必须在 8 到 16 bit 之间".into());
     }
-    match request.packing {
-        Packing::Unpacked8 if request.bit_depth != 8 => {
-            return Err("Unpacked 8 输出固定使用 8 bit 位深".into());
+    if request.target != ExportTarget::Demosaic {
+        match request.packing {
+            Packing::Unpacked8 if request.bit_depth != 8 => {
+                return Err("Unpacked 8 输出固定使用 8 bit 位深".into());
+            }
+            Packing::MipiRaw10 if request.bit_depth != 10 => {
+                return Err("MIPI RAW10 输出固定使用 10 bit 位深".into());
+            }
+            Packing::MipiRaw12 if request.bit_depth != 12 => {
+                return Err("MIPI RAW12 输出固定使用 12 bit 位深".into());
+            }
+            Packing::MipiRaw14 if request.bit_depth != 14 => {
+                return Err("MIPI RAW14 输出固定使用 14 bit 位深".into());
+            }
+            _ => {}
         }
-        Packing::MipiRaw10 if request.bit_depth != 10 => {
-            return Err("MIPI RAW10 输出固定使用 10 bit 位深".into());
-        }
-        Packing::MipiRaw12 if request.bit_depth != 12 => {
-            return Err("MIPI RAW12 输出固定使用 12 bit 位深".into());
-        }
-        Packing::MipiRaw14 if request.bit_depth != 14 => {
-            return Err("MIPI RAW14 输出固定使用 14 bit 位深".into());
-        }
-        _ => {}
+    }
+    if request.target == ExportTarget::Remosaic && !is_quad_cfa(source.cfa) {
+        return Err("只有 Quad CFA 来源可以导出 Remosaic Bayer".into());
+    }
+    if request.target == ExportTarget::Demosaic && source.cfa == CfaPattern::Mono {
+        return Err("Mono 来源不支持 Demosaic RGB 导出".into());
     }
     if request.row_alignment == 0 || request.frame_alignment == 0 {
         return Err("输出行对齐和帧对齐必须大于 0".into());
@@ -1496,15 +1483,42 @@ pub fn export_raw(
     if request.current_frame >= layout.frame_count {
         return Err(format!("当前帧索引 {} 超出范围", request.current_frame));
     }
-    let output_maximum = if request.bit_depth >= 16 {
+    let output_bit_depth = if request.target == ExportTarget::Demosaic {
+        source.bit_depth
+    } else {
+        request.bit_depth
+    };
+    let output_maximum = if output_bit_depth >= 16 {
         u16::MAX as u32
     } else {
-        (1u32 << request.bit_depth) - 1
+        (1u32 << output_bit_depth) - 1
+    };
+    let mut processed_descriptor = source.clone();
+    if is_quad_cfa(source.cfa) {
+        processed_descriptor.cfa = shifted_cfa(
+            bayer_base(source.cfa),
+            u32::from(source.cfa_phase_x % 2),
+            u32::from(source.cfa_phase_y % 2),
+        );
+        processed_descriptor.cfa_phase_x = 0;
+        processed_descriptor.cfa_phase_y = 0;
+    }
+    let fill_descriptor = if request.target == ExportTarget::OriginalCfa {
+        source
+    } else {
+        &processed_descriptor
     };
     request
         .missing_pixel_fill
-        .validate(source, output_maximum)?;
-    let row_bytes = output_row_bytes(request.crop_width, request.packing)?;
+        .validate(fill_descriptor, output_maximum)?;
+    let row_bytes = if request.target == ExportTarget::Demosaic {
+        usize::try_from(request.crop_width)
+            .ok()
+            .and_then(|width| width.checked_mul(6))
+            .ok_or("RGB48 输出行大小溢出")?
+    } else {
+        output_row_bytes(request.crop_width, request.packing)?
+    };
     let row_stride =
         usize::try_from(align_up(row_bytes as u64, request.row_alignment).ok_or("输出行对齐溢出")?)
             .map_err(|_| "输出行步长过大")?;
@@ -1523,29 +1537,80 @@ pub fn export_raw(
         let mut clipped = 0u64;
         let mut filled = MissingPixelCounts::default();
         for y in request.crop_y..request.crop_y + request.crop_height {
-            let mut values = Vec::with_capacity(request.crop_width as usize);
-            for x in request.crop_x..request.crop_x + request.crop_width {
-                let value = match read_pixel(data, source, layout, request.current_frame, x, y) {
-                    Some(value) => map_value(
-                        value,
-                        source.bit_depth,
-                        request.bit_depth,
-                        request.value_mapping,
-                        &mut clipped,
-                    ),
-                    None => request
-                        .missing_pixel_fill
-                        .value_for(source, x, y, &mut filled),
-                };
-                values.push(value);
-            }
-            let row = encode_row(
-                &values,
-                request.packing,
-                request.bit_depth,
-                request.endianness,
-                request.bit_alignment,
-            )?;
+            let row = if request.target == ExportTarget::Demosaic {
+                let mut row = Vec::with_capacity(row_bytes);
+                for x in request.crop_x..request.crop_x + request.crop_width {
+                    let rgb = sampled_rgb_l0(
+                        data,
+                        source,
+                        layout,
+                        request.current_frame,
+                        (x, y),
+                        DisplayMode::Demosaic,
+                        request.processing,
+                    )
+                    .unwrap_or_else(|| {
+                        filled.rgb += 1;
+                        [
+                            request.missing_pixel_fill.red as u16,
+                            ((request.missing_pixel_fill.green_red
+                                + request.missing_pixel_fill.green_blue
+                                + 1)
+                                / 2) as u16,
+                            request.missing_pixel_fill.blue as u16,
+                        ]
+                    });
+                    for value in rgb {
+                        let bytes = match request.endianness {
+                            Endianness::Little => value.to_le_bytes(),
+                            Endianness::Big => value.to_be_bytes(),
+                        };
+                        row.extend_from_slice(&bytes);
+                    }
+                }
+                row
+            } else {
+                let mut values = Vec::with_capacity(request.crop_width as usize);
+                for x in request.crop_x..request.crop_x + request.crop_width {
+                    let source_value = match request.target {
+                        ExportTarget::OriginalCfa => {
+                            read_pixel(data, source, layout, request.current_frame, x, y)
+                        }
+                        ExportTarget::Remosaic => remosaic_pixel(
+                            data,
+                            source,
+                            layout,
+                            request.current_frame,
+                            x,
+                            y,
+                            request.processing.remosaic,
+                        ),
+                        ExportTarget::Demosaic => unreachable!(),
+                    };
+                    let value = match source_value {
+                        Some(value) => map_value(
+                            value,
+                            source.bit_depth,
+                            request.bit_depth,
+                            request.value_mapping,
+                            &mut clipped,
+                        ),
+                        None => {
+                            request
+                                .missing_pixel_fill
+                                .value_for(fill_descriptor, x, y, &mut filled)
+                        }
+                    };
+                    values.push(value);
+                }
+                encode_row(
+                    &values,
+                    request.packing,
+                    request.bit_depth,
+                    request.endianness,
+                    request.bit_alignment,
+                )?
+            };
             writer
                 .write_all(&row)
                 .map_err(|e| format!("写入输出文件失败：{e}"))?;
@@ -1569,17 +1634,85 @@ pub fn export_raw(
         let _ = fs::remove_file(&temporary_path);
         return Err(error);
     }
+    let (output_cfa, output_cfa_phase_x, output_cfa_phase_y) = match request.target {
+        ExportTarget::OriginalCfa if is_quad_cfa(source.cfa) => (
+            Some(source.cfa),
+            ((u32::from(source.cfa_phase_x) + request.crop_x) % 4) as u8,
+            ((u32::from(source.cfa_phase_y) + request.crop_y) % 4) as u8,
+        ),
+        ExportTarget::OriginalCfa => (
+            Some(shifted_cfa(source.cfa, request.crop_x, request.crop_y)),
+            0,
+            0,
+        ),
+        ExportTarget::Remosaic => (
+            Some(shifted_cfa(
+                processed_descriptor.cfa,
+                request.crop_x,
+                request.crop_y,
+            )),
+            0,
+            0,
+        ),
+        ExportTarget::Demosaic => (None, 0, 0),
+    };
     Ok(ExportResult {
         bytes_written: frame_stride as u64,
         clipped_values,
         filled_pixels,
-        output_cfa: shifted_cfa(source.cfa, request.crop_x, request.crop_y),
+        output_cfa,
+        output_cfa_phase_x,
+        output_cfa_phase_y,
+        output_channels: if request.target == ExportTarget::Demosaic {
+            3
+        } else {
+            1
+        },
+        output_bit_depth,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_export_request(
+        descriptor: &RawDescriptor,
+        output: &Path,
+        target: ExportTarget,
+    ) -> ExportRequest {
+        ExportRequest {
+            path: output.to_string_lossy().into_owned(),
+            source_path: "source.raw".into(),
+            source_generation: 1,
+            source_descriptor: descriptor.clone(),
+            target,
+            processing: ProcessingSettings::default(),
+            current_frame: 0,
+            crop_x: 0,
+            crop_y: 0,
+            crop_width: descriptor.width,
+            crop_height: descriptor.height,
+            packing: if descriptor.bit_depth == 8 {
+                Packing::Unpacked8
+            } else {
+                Packing::Unpacked16
+            },
+            bit_depth: descriptor.bit_depth,
+            endianness: Endianness::Little,
+            bit_alignment: BitAlignment::Lsb,
+            row_alignment: 1,
+            frame_alignment: 1,
+            value_mapping: ValueMapping::Preserve,
+            missing_pixel_fill: MissingPixelFill {
+                mono: 0,
+                red: 0,
+                green_blue: 0,
+                green_red: 0,
+                blue: 0,
+            },
+        }
+    }
 
     #[test]
     fn layout_uses_byte_alignment_and_keeps_partial_frame() {
@@ -1793,17 +1926,13 @@ mod tests {
         };
         let bytes = (0..d.height)
             .flat_map(|y| {
-                (0..d.width).map(move |x| match cfa_channel_with_phase(
-                    d.cfa,
-                    d.cfa_phase_x,
-                    d.cfa_phase_y,
-                    x,
-                    y,
-                ) {
-                    CfaChannel::Red => 200,
-                    CfaChannel::Green => 100,
-                    CfaChannel::Blue => 50,
-                    CfaChannel::Mono => unreachable!(),
+                (0..d.width).map(move |x| {
+                    match cfa_channel_with_phase(d.cfa, d.cfa_phase_x, d.cfa_phase_y, x, y) {
+                        CfaChannel::Red => 200,
+                        CfaChannel::Green => 100,
+                        CfaChannel::Blue => 50,
+                        CfaChannel::Mono => unreachable!(),
+                    }
                 })
             })
             .collect::<Vec<_>>();
@@ -1838,17 +1967,13 @@ mod tests {
         };
         let bytes = (0..d.height)
             .flat_map(|y| {
-                (0..d.width).map(move |x| match cfa_channel_with_phase(
-                    d.cfa,
-                    d.cfa_phase_x,
-                    d.cfa_phase_y,
-                    x,
-                    y,
-                ) {
-                    CfaChannel::Red => 200,
-                    CfaChannel::Green => 100,
-                    CfaChannel::Blue => 50,
-                    CfaChannel::Mono => unreachable!(),
+                (0..d.width).map(move |x| {
+                    match cfa_channel_with_phase(d.cfa, d.cfa_phase_x, d.cfa_phase_y, x, y) {
+                        CfaChannel::Red => 200,
+                        CfaChannel::Green => 100,
+                        CfaChannel::Blue => 50,
+                        CfaChannel::Mono => unreachable!(),
+                    }
                 })
             })
             .collect::<Vec<_>>();
@@ -2008,14 +2133,37 @@ mod tests {
             ..RawDescriptor::default()
         };
         let expected = [
-            [CfaSite::Red, CfaSite::Red, CfaSite::GreenRed, CfaSite::GreenRed],
-            [CfaSite::Red, CfaSite::Red, CfaSite::GreenRed, CfaSite::GreenRed],
-            [CfaSite::GreenBlue, CfaSite::GreenBlue, CfaSite::Blue, CfaSite::Blue],
-            [CfaSite::GreenBlue, CfaSite::GreenBlue, CfaSite::Blue, CfaSite::Blue],
+            [
+                CfaSite::Red,
+                CfaSite::Red,
+                CfaSite::GreenRed,
+                CfaSite::GreenRed,
+            ],
+            [
+                CfaSite::Red,
+                CfaSite::Red,
+                CfaSite::GreenRed,
+                CfaSite::GreenRed,
+            ],
+            [
+                CfaSite::GreenBlue,
+                CfaSite::GreenBlue,
+                CfaSite::Blue,
+                CfaSite::Blue,
+            ],
+            [
+                CfaSite::GreenBlue,
+                CfaSite::GreenBlue,
+                CfaSite::Blue,
+                CfaSite::Blue,
+            ],
         ];
         for y in 0..4 {
             for x in 0..4 {
-                assert_eq!(cfa_site(&descriptor, x, y), expected[y as usize][x as usize]);
+                assert_eq!(
+                    cfa_site(&descriptor, x, y),
+                    expected[y as usize][x as usize]
+                );
             }
         }
         descriptor.cfa_phase_x = 1;
@@ -2037,12 +2185,7 @@ mod tests {
         };
         let bytes: Vec<u8> = (0..16).collect();
         let (layout, _) = calculate_layout(&descriptor, bytes.len() as u64);
-        let expected = [
-            [0, 2, 1, 3],
-            [8, 10, 9, 11],
-            [4, 6, 5, 7],
-            [12, 14, 13, 15],
-        ];
+        let expected = [[0, 2, 1, 3], [8, 10, 9, 11], [4, 6, 5, 7], [12, 14, 13, 15]];
         for y in 0..4 {
             for x in 0..4 {
                 assert_eq!(
@@ -2153,6 +2296,8 @@ mod tests {
             source_path: "source.raw".into(),
             source_generation: 1,
             source_descriptor: descriptor.clone(),
+            target: ExportTarget::OriginalCfa,
+            processing: ProcessingSettings::default(),
             current_frame: 0,
             crop_x: 0,
             crop_y: 0,
@@ -2183,7 +2328,286 @@ mod tests {
         assert_eq!(result.filled_pixels.green_red, 1);
         assert_eq!(result.filled_pixels.green_blue, 1);
         assert_eq!(result.filled_pixels.blue, 1);
-        assert_eq!(result.output_cfa, CfaPattern::Rggb);
+        assert_eq!(result.output_cfa, Some(CfaPattern::Rggb));
+    }
+
+    #[test]
+    fn original_quad_export_updates_phase_after_crop() {
+        let descriptor = RawDescriptor {
+            width: 4,
+            height: 4,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Qrggb,
+            cfa_phase_x: 1,
+            cfa_phase_y: 2,
+            ..RawDescriptor::default()
+        };
+        let source: Vec<u8> = (0..16).collect();
+        let layout = calculate_layout(&descriptor, source.len() as u64).0;
+        let output = sibling_path(
+            &std::env::temp_dir().join("eraw-export-quad-phase.raw"),
+            "test",
+        );
+        let mut request = test_export_request(&descriptor, &output, ExportTarget::OriginalCfa);
+        request.crop_x = 1;
+        request.crop_y = 1;
+        request.crop_width = 2;
+        request.crop_height = 2;
+
+        let result = export_raw(&source, &descriptor, &layout, &request).unwrap();
+        let exported = fs::read(&output).unwrap();
+        fs::remove_file(&output).unwrap();
+
+        assert_eq!(exported, [5, 6, 9, 10]);
+        assert_eq!(result.output_cfa, Some(CfaPattern::Qrggb));
+        assert_eq!(result.output_cfa_phase_x, 2);
+        assert_eq!(result.output_cfa_phase_y, 3);
+        assert_eq!(result.output_channels, 1);
+    }
+
+    #[test]
+    fn remosaic_export_writes_reordered_bayer_bytes() {
+        let descriptor = RawDescriptor {
+            width: 4,
+            height: 4,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Qrggb,
+            ..RawDescriptor::default()
+        };
+        let source: Vec<u8> = (0..16).collect();
+        let layout = calculate_layout(&descriptor, source.len() as u64).0;
+        let output = sibling_path(
+            &std::env::temp_dir().join("eraw-export-remosaic-reorder.raw"),
+            "test",
+        );
+        let request = test_export_request(&descriptor, &output, ExportTarget::Remosaic);
+
+        let result = export_raw(&source, &descriptor, &layout, &request).unwrap();
+        let exported = fs::read(&output).unwrap();
+        fs::remove_file(&output).unwrap();
+
+        assert_eq!(
+            exported,
+            [0, 2, 1, 3, 8, 10, 9, 11, 4, 6, 5, 7, 12, 14, 13, 15]
+        );
+        assert_eq!(result.output_cfa, Some(CfaPattern::Rggb));
+        assert_eq!(result.output_cfa_phase_x, 0);
+        assert_eq!(result.output_cfa_phase_y, 0);
+    }
+
+    #[test]
+    fn remosaic_export_reports_bayer_phase_after_source_phase_and_crop() {
+        let descriptor = RawDescriptor {
+            width: 8,
+            height: 8,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Qrggb,
+            cfa_phase_x: 1,
+            cfa_phase_y: 2,
+            ..RawDescriptor::default()
+        };
+        let source = vec![0; 64];
+        let layout = calculate_layout(&descriptor, source.len() as u64).0;
+        let output = sibling_path(
+            &std::env::temp_dir().join("eraw-export-remosaic-phase.raw"),
+            "test",
+        );
+        let mut request = test_export_request(&descriptor, &output, ExportTarget::Remosaic);
+        request.crop_x = 1;
+        request.crop_y = 1;
+        request.crop_width = 4;
+        request.crop_height = 4;
+
+        let result = export_raw(&source, &descriptor, &layout, &request).unwrap();
+        fs::remove_file(&output).unwrap();
+
+        assert_eq!(result.output_cfa, Some(CfaPattern::Gbrg));
+        assert_eq!(result.output_cfa_phase_x, 0);
+        assert_eq!(result.output_cfa_phase_y, 0);
+    }
+
+    #[test]
+    fn reconstructed_remosaic_export_preserves_flat_quad_channels() {
+        let descriptor = RawDescriptor {
+            width: 8,
+            height: 8,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Qbggr,
+            ..RawDescriptor::default()
+        };
+        let mut source = Vec::new();
+        for y in 0..descriptor.height {
+            for x in 0..descriptor.width {
+                source.push(match cfa_site(&descriptor, x, y) {
+                    CfaSite::Red => 40,
+                    CfaSite::GreenRed => 30,
+                    CfaSite::GreenBlue => 20,
+                    CfaSite::Blue => 10,
+                    CfaSite::Mono => unreachable!(),
+                });
+            }
+        }
+        let layout = calculate_layout(&descriptor, source.len() as u64).0;
+        let output = sibling_path(
+            &std::env::temp_dir().join("eraw-export-remosaic-reconstruct.raw"),
+            "test",
+        );
+        let mut request = test_export_request(&descriptor, &output, ExportTarget::Remosaic);
+        request.processing.remosaic.same_color_reconstruction = true;
+
+        let result = export_raw(&source, &descriptor, &layout, &request).unwrap();
+        let exported = fs::read(&output).unwrap();
+        fs::remove_file(&output).unwrap();
+
+        for y in 0..descriptor.height {
+            for x in 0..descriptor.width {
+                let expected = match remosaic_output_site(&descriptor, x, y) {
+                    CfaSite::Red => 40,
+                    CfaSite::GreenRed => 30,
+                    CfaSite::GreenBlue => 20,
+                    CfaSite::Blue => 10,
+                    CfaSite::Mono => unreachable!(),
+                };
+                assert_eq!(exported[(y * descriptor.width + x) as usize], expected);
+            }
+        }
+        assert_eq!(result.filled_pixels.red, 0);
+        assert_eq!(result.output_cfa, Some(CfaPattern::Bggr));
+    }
+
+    #[test]
+    fn demosaic_export_writes_rgb48_in_selected_endianness() {
+        let descriptor = RawDescriptor {
+            width: 2,
+            height: 2,
+            bit_depth: 10,
+            packing: Packing::Unpacked16,
+            cfa: CfaPattern::Rggb,
+            ..RawDescriptor::default()
+        };
+        let values = [10u16, 20, 30, 40];
+        let source = values
+            .iter()
+            .flat_map(|value| value.to_le_bytes())
+            .collect::<Vec<_>>();
+        let layout = calculate_layout(&descriptor, source.len() as u64).0;
+        let pixels = [[10u16, 25, 40], [10, 20, 40], [10, 30, 40], [10, 25, 40]];
+
+        for endianness in [Endianness::Little, Endianness::Big] {
+            let output = sibling_path(&std::env::temp_dir().join("eraw-export-rgb48.raw"), "test");
+            let mut request = test_export_request(&descriptor, &output, ExportTarget::Demosaic);
+            request.endianness = endianness;
+            let result = export_raw(&source, &descriptor, &layout, &request).unwrap();
+            let exported = fs::read(&output).unwrap();
+            fs::remove_file(&output).unwrap();
+            let expected = pixels
+                .iter()
+                .flatten()
+                .flat_map(|value| match endianness {
+                    Endianness::Little => value.to_le_bytes(),
+                    Endianness::Big => value.to_be_bytes(),
+                })
+                .collect::<Vec<_>>();
+
+            assert_eq!(exported, expected);
+            assert_eq!(result.bytes_written, 24);
+            assert_eq!(result.output_cfa, None);
+            assert_eq!(result.output_channels, 3);
+            assert_eq!(result.output_bit_depth, 10);
+        }
+    }
+
+    #[test]
+    fn quad_demosaic_export_uses_selected_remosaic_processing() {
+        let descriptor = RawDescriptor {
+            width: 8,
+            height: 8,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Qrggb,
+            ..RawDescriptor::default()
+        };
+        let mut source = Vec::new();
+        for y in 0..descriptor.height {
+            for x in 0..descriptor.width {
+                source.push(match cfa_channel(&descriptor, x, y) {
+                    CfaChannel::Red => 100,
+                    CfaChannel::Green => 50,
+                    CfaChannel::Blue => 20,
+                    CfaChannel::Mono => unreachable!(),
+                });
+            }
+        }
+        let layout = calculate_layout(&descriptor, source.len() as u64).0;
+        let output = sibling_path(
+            &std::env::temp_dir().join("eraw-export-quad-rgb48.raw"),
+            "test",
+        );
+        let mut request = test_export_request(&descriptor, &output, ExportTarget::Demosaic);
+        request.processing.remosaic.same_color_reconstruction = true;
+
+        let result = export_raw(&source, &descriptor, &layout, &request).unwrap();
+        let exported = fs::read(&output).unwrap();
+        fs::remove_file(&output).unwrap();
+
+        assert_eq!(result.filled_pixels.rgb, 0);
+        for pixel in exported.chunks_exact(6) {
+            assert_eq!(u16::from_le_bytes([pixel[0], pixel[1]]), 100);
+            assert_eq!(u16::from_le_bytes([pixel[2], pixel[3]]), 50);
+            assert_eq!(u16::from_le_bytes([pixel[4], pixel[5]]), 20);
+        }
+    }
+
+    #[test]
+    fn demosaic_export_rejects_mono_and_fills_incomplete_color_pixels() {
+        let mono = RawDescriptor {
+            width: 1,
+            height: 1,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Mono,
+            ..RawDescriptor::default()
+        };
+        let mono_layout = calculate_layout(&mono, 1).0;
+        let mono_output = sibling_path(
+            &std::env::temp_dir().join("eraw-export-mono-rgb.raw"),
+            "test",
+        );
+        let mono_request = test_export_request(&mono, &mono_output, ExportTarget::Demosaic);
+        assert!(export_raw(&[7], &mono, &mono_layout, &mono_request).is_err());
+
+        let color = RawDescriptor {
+            width: 2,
+            height: 2,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Rggb,
+            ..RawDescriptor::default()
+        };
+        let source = [9u8];
+        let layout = calculate_layout(&color, source.len() as u64).0;
+        let output = sibling_path(
+            &std::env::temp_dir().join("eraw-export-partial-rgb.raw"),
+            "test",
+        );
+        let mut request = test_export_request(&color, &output, ExportTarget::Demosaic);
+        request.missing_pixel_fill = MissingPixelFill {
+            mono: 0,
+            red: 11,
+            green_blue: 22,
+            green_red: 32,
+            blue: 44,
+        };
+        let result = export_raw(&source, &color, &layout, &request).unwrap();
+        let exported = fs::read(&output).unwrap();
+        fs::remove_file(&output).unwrap();
+
+        assert_eq!(exported.len(), 24);
+        assert!(result.filled_pixels.rgb > 0);
     }
 
     #[test]
