@@ -36,7 +36,7 @@ Tauri capability 采用最小授权：主窗口除默认只读窗口能力外，
 | `src/viewport.ts` | WebGL2、LOD、瓦片队列、纹理缓存、缩放和平移 |
 | `src/viewport-transform.ts` | 屏幕、图像和像素坐标的唯一变换来源；画布尺寸变化时的中心锚定；选区模型 |
 | `src/viewport-overlay.ts` | 图像边界与矩形选区 SVG 叠加 |
-| `src/pixel-overlay.ts` | 高倍率像素网格与 DN/RGB 数字叠加 |
+| `src/pixel-overlay.ts` / `src/pixel-value-display.ts` | 高倍率像素网格，以及与当前显示模式一致的原始、单通道或 RGB 数值叠加 |
 | `src/api.ts` / `src/types.ts` | Tauri 调用封装及前后端共享数据契约 |
 | `src-tauri/src/commands.rs` | 当前文档会话、内存映射、缓存、任务快照和命令边界 |
 | `src-tauri/src/raw/mod.rs` | 布局、packing、CFA、预览、Remosaic、Demosaic、检查与导出 |

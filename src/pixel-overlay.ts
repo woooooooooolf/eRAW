@@ -1,6 +1,12 @@
 import { inspectPixels } from "./api";
 import { backendErrorCode } from "./backend-error";
 import { t, type MessageKey } from "./i18n";
+import {
+  pixelValueLines,
+  resolvePixelValueDisplay,
+  widestPixelValueText,
+  type PixelValueDisplay,
+} from "./pixel-value-display";
 import type {
   DemosaicPixelValueMode,
   DisplayMode,
@@ -20,6 +26,13 @@ interface InspectionCache {
   width: number;
   height: number;
   bytes: Uint8Array;
+}
+
+interface PixelOverlayLayout {
+  active: boolean;
+  fontSize: number;
+  lineHeight: number;
+  valueDisplay: PixelValueDisplay;
 }
 
 export interface PixelOverlayView {
@@ -120,21 +133,22 @@ export class PixelValueOverlay {
     return `${view.document.generation}:${view.frame}:${view.displayMode}:${view.processing.demosaicAlgorithm}:${view.processing.remosaic.sameColorReconstruction}`;
   }
 
-  private layout(view: PixelOverlayView): { active: boolean; fontSize: number; lineHeight: number; rgbRows: boolean } {
-    if (!this.enabled) return { active: false, fontSize: 10, lineHeight: 13, rgbRows: false };
-    const rgbRows = view.displayMode === "demosaic" && this.demosaicValues === "rgb";
+  private layout(view: PixelOverlayView): PixelOverlayLayout {
+    const valueDisplay = resolvePixelValueDisplay(view.displayMode, this.demosaicValues);
+    if (!this.enabled) return { active: false, fontSize: 10, lineHeight: 13, valueDisplay };
+    const rgbRows = valueDisplay === "rgb";
     const fontSize = Math.min(12, Math.max(10, view.transform.zoom * 0.19));
     const lineHeight = fontSize + 2;
     const maxValue = this.maxValue(view);
     this.context.font = `600 ${fontSize}px "Cascadia Mono", Consolas, monospace`;
-    const widestText = rgbRows ? `G ${maxValue}` : String(maxValue);
+    const widestText = widestPixelValueText(valueDisplay, maxValue);
     const requiredWidth = this.context.measureText(widestText).width + 10;
     const requiredHeight = (rgbRows ? lineHeight * 3 : lineHeight) + 10;
     const requiredSize = Math.max(requiredWidth, requiredHeight);
     const active = this.visible
       ? view.transform.zoom >= requiredSize - 4
       : view.transform.zoom >= requiredSize;
-    return { active, fontSize, lineHeight, rgbRows };
+    return { active, fontSize, lineHeight, valueDisplay };
   }
 
   private visibleRect(view: PixelOverlayView): { x: number; y: number; width: number; height: number } | null {
@@ -167,7 +181,7 @@ export class PixelValueOverlay {
   private drawValues(
     view: PixelOverlayView,
     rect: { x: number; y: number; width: number; height: number },
-    layout: { fontSize: number; lineHeight: number; rgbRows: boolean },
+    layout: PixelOverlayLayout,
   ): void {
     const cache = this.cache!;
     const dpr = this.canvas.width / view.width;
@@ -212,9 +226,14 @@ export class PixelValueOverlay {
         this.context.strokeStyle = lightBackground ? "rgba(255,255,255,.58)" : "rgba(0,0,0,.72)";
         this.context.fillStyle = lightBackground ? "rgba(7,10,14,.94)" : "rgba(244,250,253,.96)";
         this.context.lineWidth = Math.max(1.5, layout.fontSize * 0.18);
-        const lines = layout.rgbRows
-          ? rgbValid ? [`R ${red}`, `G ${green}`, `B ${blue}`] : ["R —", "G —", "B —"]
-          : [(flags & 0b1) !== 0 ? String(raw) : "—"];
+        const lines = pixelValueLines(layout.valueDisplay, {
+          raw,
+          red,
+          green,
+          blue,
+          rawValid: (flags & 0b1) !== 0,
+          rgbValid,
+        });
         const centerX = screenX + view.transform.zoom / 2;
         const centerY = screenY + view.transform.zoom / 2;
         const firstY = centerY - (lines.length - 1) * layout.lineHeight / 2;
