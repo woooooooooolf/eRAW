@@ -819,9 +819,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 .fatal-error p { color: #e17d8c; font-size: 11px; }
 .fatal-error small { color: #66798a; }
 
-.ui-fullscreen .topbar, .ui-fullscreen .statusbar, .ui-fullscreen .diagnostics-drawer { display: none; }
-.ui-fullscreen { grid-template-rows: minmax(0, 1fr); }
-
 @media (max-width: 1120px) {
   .tool-button kbd { display: none; }
   .display-modes > button { padding: 0 7px; }

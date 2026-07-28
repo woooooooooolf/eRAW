@@ -39,7 +39,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.2.1";
+const VERSION = "0.2.2";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -226,7 +226,6 @@ export class ErawApp {
   private displayMode: DisplayMode = "bayer";
   private committing = false;
   private commitRevision = 0;
-  private fullscreen = false;
   private toastTimer = 0;
   private sidebarWidth = this.settings.sidebarWidth;
   private sidebarResizeStartX = 0;
@@ -1412,8 +1411,12 @@ export class ErawApp {
   }
 
   private async toggleFullscreen(): Promise<void> {
-    this.fullscreen = !this.fullscreen;
-    try { await getCurrentWindow().setFullscreen(this.fullscreen); } catch { this.root.querySelector(".app-shell")!.classList.toggle("ui-fullscreen", this.fullscreen); }
+    const appWindow = getCurrentWindow();
+    try {
+      await appWindow.setFullscreen(!(await appWindow.isFullscreen()));
+    } catch (error) {
+      this.reportRuntimeError(error, "runtime.fullscreenFailed");
+    }
   }
 
   private openSettingsDialog(): void {
