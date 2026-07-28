@@ -4,9 +4,10 @@ import test from "node:test";
 import ts from "typescript";
 
 const source = await readFile(new URL("../src/channel-rendering.ts", import.meta.url), "utf8");
-const [appSource, viewportSource] = await Promise.all([
+const [appSource, viewportSource, styleSource] = await Promise.all([
   readFile(new URL("../src/app.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/viewport.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
 ]);
 const { outputText } = ts.transpileModule(source, {
   compilerOptions: {
@@ -47,4 +48,17 @@ test("the persisted preference is applied as a presentation-only viewport settin
 test("the shader preserves non-grayscale diagnostic pixels", () => {
   assert.match(viewportSource, /float spread =/);
   assert.match(viewportSource, /mix\(color\.rgb \* u_channel_tint, color\.rgb/);
+});
+
+test("RGB channel buttons are explicit children of the Demosaic control", () => {
+  assert.match(
+    appSource,
+    /id="demosaic-group"[\s\S]*?data-mode="demosaic"[\s\S]*?data-mode="red"[\s\S]*?data-mode="green"[\s\S]*?data-mode="blue"/,
+  );
+  assert.doesNotMatch(appSource, /id="channel-mode"/);
+  assert.doesNotMatch(appSource, /全部通道/);
+  assert.match(appSource, /this\.get\("demosaic-group"\)\.toggleAttribute\("hidden", !color\)/);
+  for (const mode of ["red", "green", "blue"]) {
+    assert.ok(styleSource.includes(`.channel-modes button[data-mode="${mode}"].active`));
+  }
 });

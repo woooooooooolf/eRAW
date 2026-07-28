@@ -40,7 +40,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.2.3";
+const VERSION = "0.2.4";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -293,11 +293,13 @@ export class ErawApp {
             <button data-mode="raw">RAW 强度</button>
             <button id="cfa-mode" class="active" data-mode="bayer">CFA 点阵</button>
             <button id="remosaic-mode" data-mode="remosaic" hidden>Remosaic</button>
-            <button id="demosaic-mode" data-mode="demosaic">Demosaic</button>
-            <div id="channel-menu" class="channel-menu">
-              <select id="channel-mode" aria-label="通道显示">
-                <option value="bayer">全部通道</option><option value="red">R 平面</option><option value="green">G 平面</option><option value="blue">B 平面</option>
-              </select>
+            <div id="demosaic-group" class="demosaic-group" role="group" aria-label="Demosaic RGB 通道">
+              <button id="demosaic-mode" data-mode="demosaic">Demosaic</button>
+              <div class="channel-modes">
+                <button type="button" data-mode="red" title="R 平面" aria-label="R 平面">R</button>
+                <button type="button" data-mode="green" title="G 平面" aria-label="G 平面">G</button>
+                <button type="button" data-mode="blue" title="B 平面" aria-label="B 平面">B</button>
+              </div>
             </div>
           </div>
           <div class="toolbar view-actions">
@@ -679,7 +681,6 @@ export class ErawApp {
       this.get<HTMLDialogElement>("about-dialog").showModal();
     });
     this.root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => button.addEventListener("click", () => this.setDisplayMode(button.dataset.mode as DisplayMode)));
-    this.get<HTMLSelectElement>("channel-mode").addEventListener("change", (event) => this.setDisplayMode((event.currentTarget as HTMLSelectElement).value as DisplayMode));
     this.root.querySelectorAll<HTMLElement>("[data-field]").forEach((element) => {
       if (element instanceof HTMLSelectElement) element.addEventListener("change", () => {
         this.synchronizePackingAndDepth(element.dataset.field ?? "");
@@ -1235,10 +1236,8 @@ export class ErawApp {
     this.get("cfa-mode").toggleAttribute("hidden", !color);
     this.get("remosaic-processing-row").toggleAttribute("hidden", !quad);
     this.get("remosaic-mode").toggleAttribute("hidden", !quad);
-    this.get("demosaic-mode").toggleAttribute("hidden", !color);
-    this.get("channel-menu").toggleAttribute("hidden", !color);
+    this.get("demosaic-group").toggleAttribute("hidden", !color);
     this.get<HTMLButtonElement>("demosaic-mode").disabled = !color;
-    this.get<HTMLSelectElement>("channel-mode").disabled = !color;
     this.updateExportAvailability();
     this.get("remosaic-mode").setAttribute(
       "title",
@@ -1270,8 +1269,6 @@ export class ErawApp {
     if (["demosaic", "red", "green", "blue"].includes(mode) && !isColorCfa(cfa)) return;
     this.displayMode = mode;
     this.root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => button.classList.toggle("active", button.dataset.mode === mode));
-    if (["red", "green", "blue"].includes(mode)) this.get<HTMLSelectElement>("channel-mode").value = mode;
-    else this.get<HTMLSelectElement>("channel-mode").value = "bayer";
     this.updateDisplay();
   }
 
