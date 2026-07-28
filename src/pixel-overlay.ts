@@ -1,4 +1,6 @@
 import { inspectPixels } from "./api";
+import { backendErrorCode } from "./backend-error";
+import { t, type MessageKey } from "./i18n";
 import type {
   DemosaicPixelValueMode,
   DisplayMode,
@@ -33,7 +35,7 @@ export interface PixelOverlayView {
 export class PixelValueOverlay {
   private readonly canvas: HTMLCanvasElement;
   private readonly context: CanvasRenderingContext2D;
-  private readonly onError: (message: string) => void;
+  private readonly onError: (error: unknown, messageKey: MessageKey) => void;
   private readonly requestDraw: () => void;
   private enabled = true;
   private demosaicValues: DemosaicPixelValueMode = "rgb";
@@ -46,11 +48,11 @@ export class PixelValueOverlay {
 
   constructor(
     canvas: HTMLCanvasElement,
-    callbacks: { onError(message: string): void; requestDraw(): void },
+    callbacks: { onError(error: unknown, messageKey: MessageKey): void; requestDraw(): void },
   ) {
     this.canvas = canvas;
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("无法创建像素值叠加画布");
+    if (!context) throw new Error(t("error.pixelCanvas"));
     this.context = context;
     this.onError = callbacks.onError;
     this.requestDraw = callbacks.requestDraw;
@@ -262,14 +264,16 @@ export class PixelValueOverlay {
     void inspectPixels(request).then((bytes) => {
       if (revision !== this.revision || !this.currentView || baseKey !== this.key(this.currentView)) return;
       const expectedLength = requestRect.width * requestRect.height * BYTES_PER_PIXEL;
-      if (bytes.length !== expectedLength) throw new Error(`像素检查数据长度异常：预期 ${expectedLength} B，实际 ${bytes.length} B`);
+      if (bytes.length !== expectedLength) {
+        throw new Error(t("error.pixelDataLength", { expected: expectedLength, actual: bytes.length }));
+      }
       this.cache = { key: baseKey, ...requestRect, bytes };
       this.failedKey = "";
     }).catch((error: unknown) => {
-      const message = String(error);
-      if (!message.includes("stale_generation") && revision === this.revision) {
+      const code = backendErrorCode(error);
+      if (code !== "stale_generation" && revision === this.revision) {
         this.failedKey = baseKey;
-        this.onError(`高倍率像素值读取失败，已停止自动重试；修改参数、帧或显示模式后可重新尝试。\n${message}`);
+        this.onError(error, "runtime.pixelReadFailed");
       }
     }).finally(() => {
       if (this.inFlight === requestKey) this.inFlight = "";

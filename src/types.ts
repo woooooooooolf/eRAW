@@ -56,6 +56,7 @@ export interface RawWarning {
   severity: WarningSeverity;
   code: string;
   message: string;
+  arguments?: Record<string, string | number | boolean>;
 }
 
 export interface DocumentInfo {

@@ -1,7 +1,23 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import erawIconUrl from "./assets/eraw-icon.svg";
 import { chooseRawFile, openDocument, updateDescriptor } from "./api";
+import { localizeBackendError } from "./backend-error";
 import { ExportDialog, exportDialogTemplate } from "./export-dialog";
+import {
+  formatDateTime,
+  formatTime,
+  getLanguageOptions,
+  getLanguagePreference,
+  getLocaleName,
+  getResolvedLocale,
+  isLanguagePreference,
+  localizeTree,
+  refreshLocalizedTree,
+  setLanguagePreference,
+  t,
+  type LanguagePreference,
+  type MessageKey,
+} from "./i18n";
 import { RawViewport, type ImagePoint, type TileTimingStats } from "./viewport";
 import type {
   BitAlignment,
@@ -22,8 +38,8 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.1.2";
-const BUILD_TIME = formatBuildTime(__ERAW_BUILD_TIME__);
+const VERSION = "0.2.0";
+const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
 const PROCESSING_KEY = "eraw.processingSettings.v1";
@@ -32,7 +48,6 @@ type UiFontSize = "standard" | "large" | "extraLarge";
 type OpenView = "fit" | "actual";
 type WheelSpeed = "gentle" | "standard" | "fast";
 type TileCache = "compact" | "balanced" | "large";
-type AppLanguage = "system" | "zh-CN";
 type SidebarPosition = "left" | "right";
 type AppTheme = "dark-ocean" | "dark-violet" | "dark-amber" | "light-frost" | "light-mint" | "light-sand";
 
@@ -44,7 +59,7 @@ interface AppSettings {
   rememberDescriptor: boolean;
   wheelSpeed: WheelSpeed;
   tileCache: TileCache;
-  language: AppLanguage;
+  language: LanguagePreference;
   sidebarWidth: number;
   sidebarPosition: SidebarPosition;
   pixelValuesEnabled: boolean;
@@ -52,7 +67,9 @@ interface AppSettings {
 }
 
 interface RuntimeDiagnostic {
-  message: string;
+  source: unknown;
+  messageKey?: MessageKey;
+  fingerprint: string;
   count: number;
   timestamp: Date;
 }
@@ -61,6 +78,20 @@ const DEFAULT_SIDEBAR_WIDTH = 324;
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 560;
 const MAX_IMAGE_DIMENSION = 100_000;
+
+const WARNING_MESSAGES: Record<string, MessageKey> = {
+  empty_dimensions: "warning.emptyDimensions",
+  invalid_bit_depth: "warning.invalidBitDepth",
+  container_too_small: "warning.containerTooSmall",
+  packing_depth_mismatch: "warning.packingDepthMismatch",
+  short_row_stride: "warning.shortRowStride",
+  short_frame_stride: "warning.shortFrameStride",
+  header_outside_file: "warning.headerOutside",
+  no_decodable_frame: "warning.noFrame",
+  partial_first_frame: "warning.partialFirst",
+  partial_last_frame: "warning.partialLast",
+  multiple_frames: "warning.multipleFrames",
+};
 
 const THEMES: ReadonlyArray<{
   id: AppTheme;
@@ -104,6 +135,7 @@ const icons = {
   actual: icon("M4 4h16v16H4V4Zm2 2v12h12V6H6Zm2 2h2v2H8V8Zm6 6h2v2h-2v-2Z"),
   settings: icon("M19.4 13a7.9 7.9 0 0 0 .1-1 7.9 7.9 0 0 0-.1-1l2.1-1.6-2-3.4-2.5 1a7.3 7.3 0 0 0-1.7-1L15 3.3h-4L10.7 6A7.3 7.3 0 0 0 9 7L6.5 6l-2 3.4L6.6 11a7.9 7.9 0 0 0-.1 1 7.9 7.9 0 0 0 .1 1l-2.1 1.6 2 3.4L9 17a7.3 7.3 0 0 0 1.7 1l.3 2.7h4l.3-2.7a7.3 7.3 0 0 0 1.7-1l2.5 1 2-3.4L19.4 13ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"),
   theme: icon("M12 3a9 9 0 0 0 0 18h1.2a2.3 2.3 0 0 0 1.6-4l-.4-.4a1.2 1.2 0 0 1 .9-2h1.8A3.9 3.9 0 0 0 21 10.7C21 6.5 17 3 12 3Zm-4 9.2a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Zm1.5-4.4a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Zm4.3-.7a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Zm3 3a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Z"),
+  language: icon("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 9h-3.1a15.7 15.7 0 0 0-1.4-5A8.1 8.1 0 0 1 18.9 11ZM12 4c1 1.2 1.7 3.7 1.8 7H10.2C10.3 7.7 11 5.2 12 4ZM9.6 6a15.7 15.7 0 0 0-1.4 5H5.1A8.1 8.1 0 0 1 9.6 6ZM5.1 13h3.1a15.7 15.7 0 0 0 1.4 5A8.1 8.1 0 0 1 5.1 13Zm6.9 7c-1-1.2-1.7-3.7-1.8-7h3.6c-.1 3.3-.8 5.8-1.8 7Zm2.4-2a15.7 15.7 0 0 0 1.4-5h3.1a8.1 8.1 0 0 1-4.5 5Z"),
   about: icon("M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm-1 7h2v6h-2v-6Zm0-4h2v2h-2V7Z"),
   panel: icon("M3 4h18v16H3V4Zm2 2v12h4V6H5Zm6 0v12h8V6h-8Z"),
   warning: icon("M12 3 2 21h20L12 3Zm0 4 6.6 12H5.4L12 7Zm-1 3v5h2v-5h-2Zm0 6.5v2h2v-2h-2Z"),
@@ -111,20 +143,6 @@ const icons = {
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]!);
-}
-
-function formatBuildTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(date);
 }
 
 function descriptorsEqual(left: RawDescriptor, right: RawDescriptor): boolean {
@@ -148,7 +166,7 @@ function loadSettings(): AppSettings {
         rememberDescriptor: typeof value.rememberDescriptor === "boolean" ? value.rememberDescriptor : DEFAULT_SETTINGS.rememberDescriptor,
         wheelSpeed: ["gentle", "standard", "fast"].includes(value.wheelSpeed ?? "") ? value.wheelSpeed as WheelSpeed : DEFAULT_SETTINGS.wheelSpeed,
         tileCache: ["compact", "balanced", "large"].includes(value.tileCache ?? "") ? value.tileCache as TileCache : DEFAULT_SETTINGS.tileCache,
-        language: ["system", "zh-CN"].includes(value.language ?? "") ? value.language as AppLanguage : DEFAULT_SETTINGS.language,
+        language: isLanguagePreference(value.language) ? value.language : DEFAULT_SETTINGS.language,
         sidebarWidth: Number.isFinite(value.sidebarWidth) ? Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, Math.trunc(value.sidebarWidth!))) : DEFAULT_SETTINGS.sidebarWidth,
         sidebarPosition: ["left", "right"].includes(value.sidebarPosition ?? "") ? value.sidebarPosition as SidebarPosition : DEFAULT_SETTINGS.sidebarPosition,
         pixelValuesEnabled: typeof value.pixelValuesEnabled === "boolean" ? value.pixelValuesEnabled : DEFAULT_SETTINGS.pixelValuesEnabled,
@@ -218,7 +236,9 @@ export class ErawApp {
 
   constructor(root: HTMLElement) {
     this.root = root;
+    setLanguagePreference(this.settings.language);
     root.innerHTML = this.template();
+    localizeTree(root);
     this.writeDescriptor(this.descriptor);
     this.exportDialog = new ExportDialog(root, {
       onSuccess: (message) => this.showToast(message, "success", 6000),
@@ -229,11 +249,12 @@ export class ErawApp {
       onRenderStats: (levelLabel, loaded, pending, timing) => {
         this.updateRenderStatus(levelLabel, loaded, pending, timing);
       },
-      onError: (message) => this.reportRuntimeError(message),
+      onError: (error, messageKey) => this.reportRuntimeError(error, messageKey),
     });
     this.get<HTMLInputElement>("processing-same-color-reconstruction").checked =
       this.processing.remosaic.sameColorReconstruction;
     this.applySettings();
+    this.setLanguage(this.settings.language);
     this.bindEvents();
     this.updateCfaDependentUi(false);
     this.updateDisplay();
@@ -242,7 +263,7 @@ export class ErawApp {
 
   private get<T extends HTMLElement = HTMLElement>(id: string): T {
     const element = this.root.querySelector<T>(`#${id}`);
-    if (!element) throw new Error(`缺少界面元素 #${id}`);
+    if (!element) throw new Error(t("error.elementMissing", { id }));
     return element;
   }
 
@@ -277,6 +298,17 @@ export class ErawApp {
             <button id="fit-button" class="icon-button" title="适应窗口 (Ctrl+0)">${icons.fit}</button>
             <button id="actual-button" class="icon-button" title="实际像素 (Ctrl+1)">${icons.actual}</button>
             <button id="panel-button" class="icon-button active" title="显示或隐藏参数面板">${icons.panel}</button>
+            <div id="language-control" class="language-control">
+              <button id="language-button" class="icon-button" title="${t("language.button")}" aria-label="${t("language.button")}" aria-haspopup="menu" aria-expanded="false">${icons.language}</button>
+              <div id="language-popover" class="language-popover" role="menu" aria-label="${t("language.menuTitle")}" hidden>
+                <header><strong>${t("language.menuTitle")}</strong><span>${t("language.menuHint")}</span></header>
+                <div class="language-options">${getLanguageOptions().map((option) => `
+                  <button type="button" role="menuitemradio" data-language-value="${option.value}" aria-checked="${option.value === getLanguagePreference()}">
+                    <span>${option.label}</span><em aria-hidden="true">✓</em>
+                  </button>`).join("")}
+                </div>
+              </div>
+            </div>
             <div id="theme-control" class="theme-control">
               <button id="theme-button" class="icon-button" title="切换界面主题" aria-label="切换界面主题" aria-haspopup="menu" aria-expanded="false">${icons.theme}</button>
               <div id="theme-popover" class="theme-popover" role="menu" aria-label="选择界面主题" hidden>
@@ -412,9 +444,9 @@ export class ErawApp {
 
   private cfaPhaseField(): string {
     const phaseControl = (axis: "X" | "Y", field: "cfaPhaseX" | "cfaPhaseY") => `
-      <div class="phase-axis"><i>${axis}</i><button type="button" data-step-target="${field}" data-step="-1" aria-label="减小 CFA Phase ${axis}">−</button>
+      <div class="phase-axis"><i>${axis}</i><button type="button" data-step-target="${field}" data-step="-1" aria-label="${t("help.decrease", { label: `CFA Phase ${axis}` })}">−</button>
         <input id="descriptor-${field}" data-field="${field}" type="number" min="0" max="3" step="1" aria-label="CFA Phase ${axis}"/>
-        <button type="button" data-step-target="${field}" data-step="1" aria-label="增大 CFA Phase ${axis}">+</button>
+        <button type="button" data-step-target="${field}" data-step="1" aria-label="${t("help.increase", { label: `CFA Phase ${axis}` })}">+</button>
       </div>`;
     return `<div class="parameter-row cfa-phase-row" id="cfa-phase-row" hidden>
       <span class="field-label" data-help="${this.parameterHelp("cfaPhase")}">CFA Phase X/Y</span>
@@ -434,26 +466,27 @@ export class ErawApp {
   private numberField(field: string, label: string, unit: string, min: number, max?: number, hint?: string, descriptorField = true, adjustable = false): string {
     const inputId = descriptorField ? `descriptor-${field}` : field;
     const input = `<div class="number-input"><input id="${inputId}" type="number" ${descriptorField ? `data-field="${field}"` : ""} min="${min}" ${max === undefined ? "" : `max="${max}"`} step="1" ${hint ? `placeholder="${hint}"` : ""}/><b>${unit}</b></div>`;
-    const control = adjustable ? `<div class="stepper-control"><button type="button" data-step-target="${field}" data-step="-1" aria-label="减小${label}">−</button>${input}<button type="button" data-step-target="${field}" data-step="1" aria-label="增大${label}">+</button></div>` : input;
+    const control = adjustable ? `<div class="stepper-control"><button type="button" data-step-target="${field}" data-step="-1" aria-label="${t("help.decrease", { label })}">−</button>${input}<button type="button" data-step-target="${field}" data-step="1" aria-label="${t("help.increase", { label })}">+</button></div>` : input;
     return `<div class="parameter-row"><span class="field-label" data-help="${this.parameterHelp(field)}">${label}</span>${control}</div>`;
   }
 
   private parameterHelp(field: string): string {
-    const descriptions: Record<string, string> = {
-      dimensions: `图像中可见的有效像素宽度和高度，不包含每行或每帧末尾的填充数据。当前前端允许范围为 1×1 至 ${MAX_IMAGE_DIMENSION}×${MAX_IMAGE_DIMENSION}。`,
-      bitDepth: "每个像素实际使用的有效位数。9/11/13/15 bit 数据通常存放在 16-bit 容器中。",
-      packing: "RAW 像素在文件中的字节排列方式；MIPI 格式会将多个像素紧凑打包。",
-      endianness: "Unpacked 多字节像素在文件中的字节顺序；MIPI packed 格式不使用此设置。",
-      bitAlignment: "有效像素位在 Unpacked 容器中靠低位或靠高位存放。",
-      cfa: "传感器彩色滤光阵列；Quad CFA 使用 4×4 周期，每种颜色以 2×2 同色块排列。",
-      cfaPhase: "文件坐标 (0,0) 相对于所选 Quad CFA 基准 4×4 阵列的 X/Y 偏移，范围均为 0–3。",
-      headerOffset: "第一帧 RAW 像素数据相对于文件开头的字节偏移。",
-      rowAlignment: "自动行步长使用的字节对齐值；仅在显式行步长为 0 时生效。",
-      rowStride: "相邻两行起点之间的字节距离；0 表示根据有效行大小和行对齐自动计算。",
-      frameAlignment: "自动帧步长使用的字节对齐值；仅在显式帧步长为 0 时生效。",
-      frameStride: "相邻两帧起点之间的字节距离；0 表示根据帧数据大小和帧对齐自动计算。",
+    const descriptions: Partial<Record<string, MessageKey>> = {
+      dimensions: "help.dimensions",
+      bitDepth: "help.bitDepth",
+      packing: "help.packing",
+      endianness: "help.endianness",
+      bitAlignment: "help.bitAlignment",
+      cfa: "help.cfa",
+      cfaPhase: "help.cfaPhase",
+      headerOffset: "help.headerOffset",
+      rowAlignment: "help.rowAlignment",
+      rowStride: "help.rowStride",
+      frameAlignment: "help.frameAlignment",
+      frameStride: "help.frameStride",
     };
-    return escapeHtml(descriptions[field] ?? "");
+    const key = descriptions[field];
+    return key ? escapeHtml(t(key, { max: MAX_IMAGE_DIMENSION })) : "";
   }
 
   private pixelLocatorDialogTemplate(): string {
@@ -515,11 +548,11 @@ export class ErawApp {
   private aboutDialogTemplate(): string {
     return `<dialog id="about-dialog" class="modal about-modal"><form method="dialog">
       <button value="cancel" class="dialog-close floating">×</button>
-      <div class="about-hero"><img src="${erawIconUrl}" alt="eRAW"/><div><small>RAW SENSOR LAB</small><h2>eRAW</h2><p>V${VERSION}</p><time datetime="${__ERAW_BUILD_TIME__}">构建于 ${BUILD_TIME}</time></div></div>
+      <div class="about-hero"><img src="${erawIconUrl}" alt="eRAW"/><div><small>RAW SENSOR LAB</small><h2>eRAW</h2><p>V${VERSION}</p><time id="about-build-time" datetime="${BUILD_TIME_SOURCE}">${t("about.builtAt", { time: formatDateTime(BUILD_TIME_SOURCE) })}</time></div></div>
       <div class="about-copy">
         <div class="about-credits">
           <div><span>产品设计</span><strong>凌净清河</strong></div>
-          <div><span>工程实现</span><strong>Codex（GPT-5.6 Sol）</strong></div>
+          <div><span>工程实现</span><strong>Codex (GPT-5.6 Sol)</strong></div>
         </div>
         <button id="open-source-components" type="button" class="about-link"><span><strong>开源组件</strong><small>查看主要第三方组件与许可证信息</small></span><b>›</b></button>
       </div>
@@ -564,9 +597,6 @@ export class ErawApp {
         <section class="settings-group"><div class="settings-heading"><h3>性能</h3><p>更大的 GPU 缓存可减少超大图像来回拖动时的瓦片重载。</p></div>
           <label class="settings-row"><div><strong>GPU 瓦片缓存</strong><span>只缓存预览纹理，不复制完整 RAW 文件</span></div><select id="setting-tile-cache"><option value="compact">32 MiB</option><option value="balanced">64 MiB（推荐）</option><option value="large">128 MiB</option></select></label>
         </section>
-        <section class="settings-group"><div class="settings-heading"><h3>语言</h3><p>当前版本内置简体中文；此入口将用于后续语言包与区域格式。</p></div>
-          <label class="settings-row"><div><strong>界面语言</strong><span>“跟随系统”在当前版本回退为简体中文</span></div><select id="setting-language"><option value="system">跟随系统</option><option value="zh-CN">简体中文</option></select></label>
-        </section>
       </div>
       <footer><button id="reset-settings" type="button" class="text-button">恢复默认设置</button><span class="footer-spacer"></span><button value="cancel" class="secondary-button">取消</button><button id="confirm-settings" type="button" class="primary-button">应用</button></footer>
     </form></dialog>`;
@@ -591,6 +621,16 @@ export class ErawApp {
       this.root.querySelector(".app-shell")!.classList.toggle("panel-hidden");
       this.get("panel-button").classList.toggle("active");
     });
+    this.get("language-button").addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.setLanguageMenuOpen(this.get("language-popover").hidden);
+    });
+    this.root.querySelectorAll<HTMLButtonElement>("[data-language-value]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const value = button.dataset.languageValue;
+        if (isLanguagePreference(value)) this.setLanguage(value);
+      });
+    });
     this.get("theme-button").addEventListener("click", (event) => {
       event.stopPropagation();
       this.setThemeMenuOpen(this.get("theme-popover").hidden);
@@ -599,11 +639,13 @@ export class ErawApp {
       this.setTheme(button.dataset.themeValue as AppTheme);
     }));
     document.addEventListener("pointerdown", (event) => {
+      if (!(event.target instanceof Element) || !event.target.closest("#language-control")) this.setLanguageMenuOpen(false);
       if (!(event.target instanceof Element) || !event.target.closest("#theme-control")) this.setThemeMenuOpen(false);
       if (!(event.target instanceof Element) || !event.target.closest("#utility-control")) this.setUtilityMenuOpen(false);
       if (!(event.target instanceof Element) || !event.target.closest("#export-control")) this.setExportMenuOpen(false);
     });
     this.get("settings-button").addEventListener("click", () => {
+      this.setLanguageMenuOpen(false);
       this.setThemeMenuOpen(false);
       this.setUtilityMenuOpen(false);
       this.openSettingsDialog();
@@ -695,6 +737,9 @@ export class ErawApp {
     this.get("cancel-zoom-dialog").addEventListener("click", () => this.get<HTMLDialogElement>("zoom-dialog").close());
     window.addEventListener("keydown", (event) => this.onKeyDown(event));
     window.addEventListener("resize", () => this.setSidebarWidth(this.settings.sidebarWidth, false));
+    window.addEventListener("languagechange", () => {
+      if (this.settings.language === "system") this.setLanguage("system");
+    });
   }
 
   private synchronizePackingAndDepth(changedField: string): void {
@@ -755,7 +800,7 @@ export class ErawApp {
     try {
       const path = await chooseRawFile();
       if (!path) return;
-      this.showToast("正在映射并分析 RAW 文件…", "busy");
+      this.showToast(t("runtime.opening"), "busy");
       const info = await openDocument(path, this.readDescriptor());
       this.document = info;
       this.descriptor = info.descriptor;
@@ -763,9 +808,9 @@ export class ErawApp {
       this.viewport.setDocument(info);
       if (this.settings.openView === "actual") this.viewport.actualSize();
       this.updateDocumentUi();
-      this.showToast(`已打开 ${info.name}`, "success");
+      this.showToast(t("runtime.opened", { name: info.name }), "success");
     } catch (error) {
-      this.reportRuntimeError(String(error));
+      this.reportRuntimeError(error);
     }
   }
 
@@ -832,7 +877,7 @@ export class ErawApp {
             this.updateCfaDependentUi();
             this.updateDocumentUi();
           } catch (error) {
-            this.reportRuntimeError(String(error));
+            this.reportRuntimeError(error);
           }
         }
         if (revision === this.commitRevision) break;
@@ -853,7 +898,7 @@ export class ErawApp {
     this.get<HTMLButtonElement>("pixel-status").disabled = !info;
     this.get<HTMLButtonElement>("zoom-status").disabled = !info;
     const fileStatus = this.get("file-status");
-    fileStatus.textContent = info?.path ?? "未打开文件";
+    fileStatus.textContent = info?.path ?? t("diagnostics.noFile");
     fileStatus.title = info?.path ?? "";
     document.title = info ? `${info.name} — eRAW V${VERSION}` : `eRAW V${VERSION}`;
     const layout = info?.layout;
@@ -867,35 +912,56 @@ export class ErawApp {
 
   private renderDiagnostics(): void {
     const warnings = this.document?.warnings ?? [];
-    const warningMarkup = warnings.map((warning) => `<div class="warning-item ${warning.severity}"><span></span><div><strong>${warning.severity === "error" ? "错误" : warning.severity === "warning" ? "警告" : "信息"}<small>布局诊断</small></strong><p>${escapeHtml(warning.message)}</p></div></div>`);
-    const runtimeMarkup = this.runtimeDiagnostics.map((diagnostic) => `<div class="warning-item error runtime"><span></span><div><strong>运行时错误<small>${diagnostic.timestamp.toLocaleTimeString("zh-CN", { hour12: false })}${diagnostic.count > 1 ? ` · 重复 ${diagnostic.count} 次` : ""}</small></strong><p>${escapeHtml(diagnostic.message)}</p></div></div>`);
+    const warningMarkup = warnings.map((warning) => {
+      const key = WARNING_MESSAGES[warning.code];
+      const message = key ? t(key, warning.arguments ?? {}) : warning.message;
+      return `<div class="warning-item ${warning.severity}"><span></span><div><strong>${warning.severity === "error" ? t("common.error") : warning.severity === "warning" ? t("common.warning") : t("common.info")}<small>${t("diagnostics.layout")}</small></strong><p>${escapeHtml(message)}</p></div></div>`;
+    });
+    const runtimeMarkup = this.runtimeDiagnostics.map((diagnostic) => `<div class="warning-item error runtime"><span></span><div><strong>${t("diagnostics.runtime")}<small>${formatTime(diagnostic.timestamp)}${diagnostic.count > 1 ? ` · ${t("diagnostics.repeated", { count: diagnostic.count })}` : ""}</small></strong><p>${escapeHtml(this.runtimeDiagnosticMessage(diagnostic))}</p></div></div>`);
     const list = this.get("diagnostics-list");
     const entries = [...runtimeMarkup, ...warningMarkup];
-    list.innerHTML = entries.length ? entries.join("") : `<div class="no-warning">${this.document ? "参数与文件布局匹配，未发现异常" : "打开文件后显示布局诊断与运行时错误"}</div>`;
+    list.innerHTML = entries.length ? entries.join("") : `<div class="no-warning">${this.document ? t("diagnostics.normal") : t("diagnostics.openHint")}</div>`;
     const relevant = warnings.filter((warning) => warning.severity !== "info");
     const issueCount = relevant.length + this.runtimeDiagnostics.length;
     const errorPresent = this.runtimeDiagnostics.length > 0 || relevant.some((warning) => warning.severity === "error");
     const count = this.get("diagnostics-count");
     count.textContent = String(issueCount);
     count.toggleAttribute("hidden", issueCount === 0);
-    this.get("diagnostics-summary").textContent = issueCount ? `${issueCount} 项需要注意` : this.document ? "当前数据布局正常" : "等待文件";
+    this.get("diagnostics-summary").textContent = issueCount
+      ? t("diagnostics.issues", { count: issueCount })
+      : this.document ? t("diagnostics.currentNormal") : t("diagnostics.waiting");
     const status = this.get("status-warning");
     status.className = `status-warning ${errorPresent ? "error" : relevant.length ? "warning" : "ok"}`;
   }
 
-  private reportRuntimeError(message: string, duration = 5000): void {
-    const normalized = message.replace(/^Error:\s*/, "").trim();
-    const existing = this.runtimeDiagnostics.find((diagnostic) => diagnostic.message === normalized);
+  private runtimeDiagnosticMessage(diagnostic: Pick<RuntimeDiagnostic, "source" | "messageKey">): string {
+    const detail = localizeBackendError(diagnostic.source).message;
+    return diagnostic.messageKey ? t(diagnostic.messageKey, { detail }) : detail;
+  }
+
+  private runtimeDiagnosticFingerprint(source: unknown, messageKey?: MessageKey): string {
+    let serialized = "";
+    try {
+      serialized = typeof source === "string" ? source : JSON.stringify(source) ?? String(source);
+    } catch {
+      serialized = String(source);
+    }
+    return `${messageKey ?? "backend"}:${serialized.replace(/^Error:\s*/, "").trim()}`;
+  }
+
+  private reportRuntimeError(source: unknown, messageKey?: MessageKey, duration = 5000): void {
+    const fingerprint = this.runtimeDiagnosticFingerprint(source, messageKey);
+    const existing = this.runtimeDiagnostics.find((diagnostic) => diagnostic.fingerprint === fingerprint);
     if (existing) {
       existing.count += 1;
       existing.timestamp = new Date();
       this.runtimeDiagnostics = [existing, ...this.runtimeDiagnostics.filter((diagnostic) => diagnostic !== existing)];
     } else {
-      this.runtimeDiagnostics.unshift({ message: normalized, count: 1, timestamp: new Date() });
+      this.runtimeDiagnostics.unshift({ source, messageKey, fingerprint, count: 1, timestamp: new Date() });
       this.runtimeDiagnostics = this.runtimeDiagnostics.slice(0, 50);
     }
     this.renderDiagnostics();
-    this.showToast(normalized, "error", duration);
+    this.showToast(this.runtimeDiagnosticMessage({ source, messageKey }), "error", duration);
   }
 
   private toggleDiagnostics(): void {
@@ -968,6 +1034,62 @@ export class ErawApp {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
   }
 
+  private setLanguage(language: LanguagePreference): void {
+    this.settings.language = language;
+    this.persistSettings();
+    setLanguagePreference(language);
+    refreshLocalizedTree();
+    const dimensionsHelp = this.root.querySelector<HTMLElement>(".dimension-row .field-label");
+    if (dimensionsHelp) {
+      dimensionsHelp.dataset.help = t("help.dimensions", { max: MAX_IMAGE_DIMENSION });
+    }
+    this.root.querySelectorAll<HTMLButtonElement>("[data-step-target]").forEach((stepButton) => {
+      const target = stepButton.dataset.stepTarget ?? "";
+      const axis = target === "cfaPhaseX" ? "X" : target === "cfaPhaseY" ? "Y" : "";
+      const label = axis
+        ? `CFA Phase ${axis}`
+        : stepButton.closest(".parameter-row")?.querySelector(".field-label")?.textContent?.trim() ?? target;
+      const key = Number(stepButton.dataset.step) < 0 ? "help.decrease" : "help.increase";
+      stepButton.setAttribute("aria-label", t(key, { label }));
+    });
+    this.root.querySelectorAll<HTMLButtonElement>("[data-language-value]").forEach((option) => {
+      const active = option.dataset.languageValue === language;
+      option.classList.toggle("active", active);
+      option.setAttribute("aria-checked", String(active));
+    });
+    const options = getLanguageOptions();
+    this.root.querySelectorAll<HTMLButtonElement>("[data-language-value]").forEach((option) => {
+      const definition = options.find((candidate) => candidate.value === option.dataset.languageValue);
+      const label = option.querySelector("span");
+      if (definition && label) label.textContent = definition.label;
+    });
+    const currentName = language === "system"
+      ? `${t("language.system")} · ${getLocaleName(getResolvedLocale())}`
+      : getLocaleName(getResolvedLocale());
+    const button = this.get("language-button");
+    const buttonLabel = t("language.current", { language: currentName });
+    button.setAttribute("title", buttonLabel);
+    button.setAttribute("aria-label", buttonLabel);
+    this.get("about-build-time").textContent = t("about.builtAt", {
+      time: formatDateTime(BUILD_TIME_SOURCE),
+    });
+    this.applyTheme();
+    this.updateCfaDependentUi(false);
+    this.updateDocumentUi();
+    this.updateZoomStatus(this.viewport.getZoom());
+    this.setLanguageMenuOpen(false);
+  }
+
+  private setLanguageMenuOpen(open: boolean): void {
+    if (open) {
+      this.setThemeMenuOpen(false);
+      this.setUtilityMenuOpen(false);
+      this.setExportMenuOpen(false);
+    }
+    this.get("language-popover").hidden = !open;
+    this.get("language-button").setAttribute("aria-expanded", String(open));
+  }
+
   private setTheme(theme: AppTheme): void {
     if (!THEMES.some((candidate) => candidate.id === theme)) return;
     this.settings.theme = theme;
@@ -979,10 +1101,19 @@ export class ErawApp {
   private applyTheme(): void {
     document.documentElement.dataset.theme = this.settings.theme;
     const selected = THEMES.find((theme) => theme.id === this.settings.theme)!;
+    const themeKey = {
+      "dark-ocean": "theme.darkOcean",
+      "dark-violet": "theme.darkViolet",
+      "dark-amber": "theme.darkAmber",
+      "light-frost": "theme.lightFrost",
+      "light-mint": "theme.lightMint",
+      "light-sand": "theme.lightSand",
+    } as const;
+    const selectedName = t(themeKey[selected.id]);
     const button = this.get("theme-button");
     button.classList.remove("active");
-    button.setAttribute("title", `切换界面主题（当前：${selected.name}）`);
-    button.setAttribute("aria-label", `切换界面主题，当前为${selected.name}`);
+    button.setAttribute("title", `${t("toolbar.theme")} (${selectedName})`);
+    button.setAttribute("aria-label", `${t("toolbar.theme")}: ${selectedName}`);
     this.root.querySelectorAll<HTMLButtonElement>("[data-theme-value]").forEach((option) => {
       const active = option.dataset.themeValue === this.settings.theme;
       option.classList.toggle("active", active);
@@ -992,6 +1123,7 @@ export class ErawApp {
 
   private setThemeMenuOpen(open: boolean): void {
     if (open) {
+      this.setLanguageMenuOpen(false);
       this.setUtilityMenuOpen(false);
       this.setExportMenuOpen(false);
     }
@@ -1002,6 +1134,7 @@ export class ErawApp {
 
   private setUtilityMenuOpen(open: boolean): void {
     if (open) {
+      this.setLanguageMenuOpen(false);
       const themePopover = this.get("theme-popover");
       themePopover.hidden = true;
       this.get("theme-button").setAttribute("aria-expanded", "false");
@@ -1013,6 +1146,7 @@ export class ErawApp {
 
   private setExportMenuOpen(open: boolean): void {
     if (open) {
+      this.setLanguageMenuOpen(false);
       this.setThemeMenuOpen(false);
       this.setUtilityMenuOpen(false);
     }
@@ -1044,16 +1178,16 @@ export class ErawApp {
     this.get("remosaic-mode").setAttribute(
       "title",
       this.processing.remosaic.sameColorReconstruction
-        ? "查看同色双线性重建后的标准 Bayer 点阵"
-        : "查看 4×4 块内重排后的标准 Bayer 点阵",
+        ? t("runtime.remosaicReconstructTitle")
+        : t("runtime.remosaicReorderTitle"),
     );
     this.get("demosaic-mode").setAttribute(
       "title",
       quad
-        ? "先应用当前 Remosaic 设置，再执行双线性 Demosaic"
+        ? t("runtime.quadDemosaicTitle")
         : color
-          ? "对标准 Bayer 执行双线性 Demosaic"
-          : "Mono 图像不使用 Demosaic",
+          ? t("runtime.bayerDemosaicTitle")
+          : t("runtime.monoDemosaicTitle"),
     );
     if (!color && this.displayMode !== "raw") {
       this.setDisplayMode("raw");
@@ -1114,10 +1248,14 @@ export class ErawApp {
       ? `${(milliseconds / 1000).toFixed(2)} s`
       : `${milliseconds.toFixed(milliseconds >= 100 ? 0 : 1)} ms`;
     const timingHelp = timing.samples
-      ? `当前视图已完成 ${timing.samples} 个瓦片；最近 ${duration(timing.lastMs)}，平均 ${duration(timing.averageMs)}，最慢 ${duration(timing.maxMs)}。`
-      : "当前视图尚无已完成瓦片。";
-    status.dataset.help =
-      `L 表示当前预览层级；Lx↔Ly 表示正在混合相邻层级。tiles 是当前视野中已完成的瓦片数；loading 是当前视野仍在解码、传输或上传纹理的请求数。${timingHelp}`;
+      ? t("runtime.tileTiming", {
+          samples: timing.samples,
+          last: duration(timing.lastMs),
+          average: duration(timing.averageMs),
+          max: duration(timing.maxMs),
+        })
+      : t("runtime.noTileTiming");
+    status.dataset.help = t("runtime.renderHelp", { timing: timingHelp });
   }
 
   private formatZoom(zoom: number): string {
@@ -1150,21 +1288,21 @@ export class ErawApp {
     const preview = this.get("zoom-effective");
     const resolved = this.resolveZoomPercent(this.get<HTMLInputElement>("zoom-input").value);
     if (resolved.value === null) {
-      preview.textContent = "请输入有效的缩放值";
+      preview.textContent = t("runtime.invalidZoom");
       preview.dataset.state = "invalid";
       return;
     }
     if (resolved.adjustment === null) {
-      preview.textContent = "支持连续缩放，将按输入比例应用";
+      preview.textContent = t("dialog.zoomContinuous");
       preview.dataset.state = "valid";
       return;
     }
     const adjustment = resolved.adjustment === "min"
-      ? "已调整至下限"
+      ? t("runtime.adjustMin")
       : resolved.adjustment === "max"
-        ? "已调整至上限"
-        : "已保留两位小数";
-    preview.textContent = `实际应用：${resolved.value.toFixed(2)}%（${adjustment}）`;
+        ? t("runtime.adjustMax")
+        : t("runtime.rounded");
+    preview.textContent = t("runtime.effectiveZoom", { value: resolved.value.toFixed(2), adjustment });
     preview.dataset.state = "adjusted";
   }
 
@@ -1174,7 +1312,10 @@ export class ErawApp {
     const range = this.getZoomPercentRange();
     const input = this.get<HTMLInputElement>("zoom-input");
     input.value = (zoom * 100).toFixed(2);
-    this.get("zoom-range").textContent = `可设置范围：${range.min.toFixed(2)}%–${range.max.toFixed(2)}%`;
+    this.get("zoom-range").textContent = t("runtime.zoomRange", {
+      min: range.min.toFixed(2),
+      max: range.max.toFixed(2),
+    });
     this.updateZoomInputPreview();
     this.get<HTMLDialogElement>("zoom-dialog").showModal();
     requestAnimationFrame(() => { input.focus(); input.select(); });
@@ -1208,7 +1349,10 @@ export class ErawApp {
     yInput.max = String(height - 1);
     xInput.value = String(sample.x);
     yInput.value = String(sample.y);
-    this.get("pixel-locator-range").textContent = `有效范围：X 0–${width - 1} · Y 0–${height - 1}`;
+    this.get("pixel-locator-range").textContent = t("runtime.coordinateRange", {
+      x: width - 1,
+      y: height - 1,
+    });
     this.get<HTMLDialogElement>("pixel-locator-dialog").showModal();
     requestAnimationFrame(() => { xInput.focus(); xInput.select(); });
   }
@@ -1221,13 +1365,13 @@ export class ErawApp {
     const y = Number(yInput.value);
     const { width, height } = this.document.descriptor;
     if (!Number.isInteger(x) || x < 0 || x >= width) {
-      this.showToast(`X 坐标必须是 0–${width - 1} 之间的整数`, "error");
+      this.showToast(t("runtime.coordinateError", { axis: "X", max: width - 1 }), "error");
       xInput.focus();
       xInput.select();
       return;
     }
     if (!Number.isInteger(y) || y < 0 || y >= height) {
-      this.showToast(`Y 坐标必须是 0–${height - 1} 之间的整数`, "error");
+      this.showToast(t("runtime.coordinateError", { axis: "Y", max: height - 1 }), "error");
       yInput.focus();
       yInput.select();
       return;
@@ -1240,8 +1384,9 @@ export class ErawApp {
   }
 
   private onKeyDown(event: KeyboardEvent): void {
-    if (event.key === "Escape" && (!this.get("theme-popover").hidden || !this.get("utility-popover").hidden || !this.get("export-popover").hidden)) {
+    if (event.key === "Escape" && (!this.get("language-popover").hidden || !this.get("theme-popover").hidden || !this.get("utility-popover").hidden || !this.get("export-popover").hidden)) {
       event.preventDefault();
+      this.setLanguageMenuOpen(false);
       this.setThemeMenuOpen(false);
       this.setUtilityMenuOpen(false);
       this.setExportMenuOpen(false);
@@ -1290,7 +1435,6 @@ export class ErawApp {
     this.get<HTMLInputElement>("setting-pixel-values").checked = settings.pixelValuesEnabled;
     this.get<HTMLSelectElement>("setting-demosaic-pixel-values").value = settings.demosaicPixelValues;
     this.get<HTMLSelectElement>("setting-tile-cache").value = settings.tileCache;
-    this.get<HTMLSelectElement>("setting-language").value = settings.language;
     this.updatePixelSettingsAvailability();
   }
 
@@ -1303,7 +1447,7 @@ export class ErawApp {
       rememberDescriptor: this.get<HTMLInputElement>("setting-remember-descriptor").checked,
       wheelSpeed: this.get<HTMLSelectElement>("setting-wheel-speed").value as WheelSpeed,
       tileCache: this.get<HTMLSelectElement>("setting-tile-cache").value as TileCache,
-      language: this.get<HTMLSelectElement>("setting-language").value as AppLanguage,
+      language: this.settings.language,
       sidebarWidth: this.settingsFormSidebarWidth,
       sidebarPosition: this.get<HTMLSelectElement>("setting-sidebar-position").value as SidebarPosition,
       pixelValuesEnabled: this.get<HTMLInputElement>("setting-pixel-values").checked,
@@ -1314,7 +1458,7 @@ export class ErawApp {
     else localStorage.removeItem(STORAGE_KEY);
     this.applySettings();
     this.get<HTMLDialogElement>("settings-dialog").close();
-    this.showToast("设置已保存", "success");
+    this.showToast(t("settings.saved"), "success");
   }
 
   private applySettings(): void {
@@ -1325,7 +1469,7 @@ export class ErawApp {
     shell.classList.toggle("sidebar-right", this.settings.sidebarPosition === "right");
     this.get("sidebar-resizer").setAttribute(
       "aria-label",
-      `调整${this.settings.sidebarPosition === "right" ? "右侧" : "左侧"}参数面板宽度`,
+      `${t("sidebar.resize")} (${this.settings.sidebarPosition === "right" ? t("common.right") : t("common.left")})`,
     );
     const wheelSensitivity: Record<WheelSpeed, number> = { gentle: 0.001, standard: 0.0015, fast: 0.0022 };
     const maxTextures: Record<TileCache, number> = { compact: 128, balanced: 256, large: 512 };

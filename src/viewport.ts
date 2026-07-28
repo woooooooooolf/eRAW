@@ -1,4 +1,6 @@
 import { renderTile } from "./api";
+import { backendErrorCode } from "./backend-error";
+import { t, type MessageKey } from "./i18n";
 import { PixelValueOverlay } from "./pixel-overlay";
 import {
   DEFAULT_PROCESSING_SETTINGS,
@@ -51,7 +53,7 @@ export interface ViewportCallbacks {
   onZoomChange(zoom: number): void;
   onSampleChange(sample: ImagePoint | null): void;
   onRenderStats(levelLabel: string, loaded: number, pending: number, timing: TileTimingStats): void;
-  onError(message: string): void;
+  onError(error: unknown, messageKey: MessageKey): void;
 }
 
 const vertexShaderSource = `#version 300 es
@@ -86,20 +88,20 @@ void main() {
 
 function createShader(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
   const shader = gl.createShader(type);
-  if (!shader) throw new Error("无法创建 WebGL 着色器");
+  if (!shader) throw new Error(t("error.shaderCreate"));
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
     const log = gl.getShaderInfoLog(shader);
     gl.deleteShader(shader);
-    throw new Error(`WebGL 着色器编译失败：${log ?? "未知错误"}`);
+    throw new Error(t("error.shaderCompile", { detail: log ?? t("common.unknownError") }));
   }
   return shader;
 }
 
 function createProgram(gl: WebGL2RenderingContext): WebGLProgram {
   const program = gl.createProgram();
-  if (!program) throw new Error("无法创建 WebGL 程序");
+  if (!program) throw new Error(t("error.programCreate"));
   const vertex = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
   const fragment = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
   gl.attachShader(program, vertex);
@@ -108,7 +110,7 @@ function createProgram(gl: WebGL2RenderingContext): WebGLProgram {
   gl.deleteShader(vertex);
   gl.deleteShader(fragment);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    throw new Error(`WebGL 程序链接失败：${gl.getProgramInfoLog(program) ?? "未知错误"}`);
+    throw new Error(t("error.programLink", { detail: gl.getProgramInfoLog(program) ?? t("common.unknownError") }));
   }
   return program;
 }
@@ -182,12 +184,12 @@ export class RawViewport {
     this.pixelValueOverlay = new PixelValueOverlay(
       container.querySelector<HTMLCanvasElement>(".pixel-value-overlay")!,
       {
-        onError: (message) => this.callbacks.onError(message),
+        onError: (error, messageKey) => this.callbacks.onError(error, messageKey),
         requestDraw: () => this.requestDraw(),
       },
     );
     const gl = this.canvas.getContext("webgl2", { alpha: true, antialias: false, premultipliedAlpha: false });
-    if (!gl) throw new Error("当前 WebView2 不支持 eRAW 所需的 WebGL2 画布");
+    if (!gl) throw new Error(t("error.webglUnsupported"));
     this.gl = gl;
     this.program = createProgram(gl);
     this.rectLocation = this.requireUniform("u_rect");
@@ -212,7 +214,7 @@ export class RawViewport {
 
   private requireUniform(name: string): WebGLUniformLocation {
     const location = this.gl.getUniformLocation(this.program, name);
-    if (!location) throw new Error(`WebGL uniform ${name} 不可用`);
+    if (!location) throw new Error(t("error.uniformUnavailable", { name }));
     return location;
   }
 
@@ -746,7 +748,7 @@ export class RawViewport {
     void renderTile(request).then((bytes) => {
       if (!this.document || revision !== this.renderRevision || key !== this.tileKey(level, tileX, tileY)) return;
       const texture = this.gl.createTexture();
-      if (!texture) throw new Error("GPU 纹理分配失败");
+      if (!texture) throw new Error(t("error.textureAllocation"));
       this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
       this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1);
       this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
@@ -758,13 +760,13 @@ export class RawViewport {
       this.recordTileTiming(performance.now() - startedAt);
       this.evictTextures();
     }).catch((error: unknown) => {
-      const message = String(error);
+      const code = backendErrorCode(error);
       const belongsToCurrentView = this.document && key === this.tileKey(level, tileX, tileY);
-      if (!message.includes("stale_generation") && !message.includes("stale_render") && belongsToCurrentView) {
+      if (code !== "stale_generation" && code !== "stale_render" && belongsToCurrentView) {
         this.failedTiles.add(key);
         if (!this.failureReported) {
           this.failureReported = true;
-          this.callbacks.onError(`部分瓦片渲染失败，已停止自动重试；修改参数、帧或显示模式后可重新尝试。\n${message}`);
+          this.callbacks.onError(error, "runtime.renderFailed");
         }
       }
     }).finally(() => {

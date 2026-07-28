@@ -1,4 +1,6 @@
 import { chooseExportFile, exportDocument } from "./api";
+import { localizeBackendError } from "./backend-error";
+import { t } from "./i18n";
 import type {
   BitAlignment,
   CfaPattern,
@@ -186,8 +188,15 @@ export class ExportDialog {
     const targetName = this.targetName(target);
     this.get("export-title").textContent = targetName;
     this.get("export-source-name").textContent = document.name;
-    this.get("export-source-summary").textContent =
-      `帧 ${frame + 1}/${document.layout.frameCount} · ${document.descriptor.width} × ${document.descriptor.height} · ${document.descriptor.bitDepth} bit · ${document.descriptor.packing} · ${this.sourceCfaLabel(document.descriptor)}`;
+    this.get("export-source-summary").textContent = t("export.snapshotSummary", {
+      frame: frame + 1,
+      count: document.layout.frameCount,
+      width: document.descriptor.width,
+      height: document.descriptor.height,
+      depth: document.descriptor.bitDepth,
+      packing: document.descriptor.packing,
+      cfa: this.sourceCfaLabel(document.descriptor),
+    });
 
     this.setValue("crop-x", 0);
     this.setValue("crop-y", 0);
@@ -218,7 +227,7 @@ export class ExportDialog {
 
   private get<T extends HTMLElement = HTMLElement>(id: string): T {
     const element = this.root.querySelector<T>(`#${id}`);
-    if (!element) throw new Error(`缺少导出界面元素 #${id}`);
+    if (!element) throw new Error(t("error.elementMissing", { id }));
     return element;
   }
 
@@ -291,7 +300,7 @@ export class ExportDialog {
     this.get<HTMLButtonElement>("confirm-export").disabled = busy;
     this.get<HTMLButtonElement>("cancel-export").disabled = busy;
     this.get<HTMLButtonElement>("close-export").disabled = busy;
-    this.get<HTMLButtonElement>("confirm-export").textContent = busy ? "正在导出…" : "选择位置并导出";
+    this.get<HTMLButtonElement>("confirm-export").textContent = busy ? t("export.exporting") : t("export.choose");
   }
 
   private setRangeMode(mode: RangeMode): void {
@@ -322,14 +331,14 @@ export class ExportDialog {
     const endId = axis === "x" ? "crop-end-x" : "crop-end-y";
     let start = this.integerValue(startId);
     if (start === null) {
-      this.setFieldError(startId, "请输入整数坐标");
+      this.setFieldError(startId, t("export.integerCoordinate"));
       return;
     }
 
     if (this.rangeMode === "size") {
       let size = this.integerValue(sizeId);
       if (size === null) {
-        this.setFieldError(sizeId, "请输入大于 0 的整数");
+        this.setFieldError(sizeId, t("export.positiveInteger"));
         return;
       }
       if (changedId === sizeId) {
@@ -345,7 +354,7 @@ export class ExportDialog {
     } else {
       let end = this.integerValue(endId);
       if (end === null) {
-        this.setFieldError(endId, "请输入整数坐标");
+        this.setFieldError(endId, t("export.integerCoordinate"));
         return;
       }
       if (changedId === endId) {
@@ -394,7 +403,7 @@ export class ExportDialog {
     const width = this.integerValue("crop-width");
     const height = this.integerValue("crop-height");
     if ([x, y, width, height].some((value) => value === null)) {
-      this.get("export-range-summary").textContent = "范围尚未完成";
+      this.get("export-range-summary").textContent = t("export.rangeIncomplete");
       return;
     }
     this.get("export-cfa").textContent = this.outputFormatLabel(x!, y!);
@@ -432,10 +441,10 @@ export class ExportDialog {
     this.toggleField("export-bit-alignment", !rgb);
     this.toggleField("export-mapping", !rgb);
     this.get("export-target-note").textContent = rgb
-      ? `固定 RGB48 Interleaved · R16 G16 B16 · DN 保持 ${this.snapshot.descriptor.bitDepth} bit 范围`
+      ? t("export.rgb48Fixed", { depth: this.snapshot.descriptor.bitDepth })
       : this.snapshot.target === "remosaic"
-        ? `输出标准 Bayer · ${this.remosaicMethodLabel()}`
-        : "转换原始 CFA 数据，不执行图像处理";
+        ? t("export.standardBayer", { method: this.remosaicMethodLabel() })
+        : t("export.originalOnly");
   }
 
   private updateFillMode(): void {
@@ -444,10 +453,10 @@ export class ExportDialog {
     this.get("export-mono-fill").toggleAttribute("hidden", !mono);
     this.get("export-bayer-fill").toggleAttribute("hidden", mono);
     this.get("export-fill-format").textContent = mono
-      ? "输出格式：MONO"
+      ? t("export.formatMono")
       : this.snapshot.target === "demosaic"
-        ? "缺失 RGB 像素使用 R、(Gr+Gb)/2、B"
-        : `按输出 CFA 站点分别填充`;
+        ? t("export.rgbFill")
+        : t("export.cfaFill");
     this.clampFillValues();
   }
 
@@ -466,7 +475,7 @@ export class ExportDialog {
   private clampIntegerField(id: string, minimum: number, maximum: number): boolean {
     const value = this.integerValue(id);
     if (value === null) {
-      this.setFieldError(id, "请输入整数");
+      this.setFieldError(id, t("export.integer"));
       return false;
     }
     this.setValue(id, this.clamp(value, minimum, maximum));
@@ -493,14 +502,14 @@ export class ExportDialog {
       : ["crop-x", "crop-y", "crop-end-x", "crop-end-y"];
     activeRange.forEach((id) => {
       if (this.integerValue(id) === null) {
-        this.setFieldError(id, "请输入整数");
+        this.setFieldError(id, t("export.integer"));
         valid = false;
       }
     });
     ["export-row-alignment", "export-frame-alignment"].forEach((id) => {
       const value = this.integerValue(id);
       if (value === null || value < 1 || !Number.isSafeInteger(value)) {
-        this.setFieldError(id, "必须是大于 0 的安全整数");
+        this.setFieldError(id, t("export.safePositive"));
         valid = false;
       }
     });
@@ -510,12 +519,12 @@ export class ExportDialog {
     fillIds.forEach((id) => {
       const value = this.integerValue(id);
       if (value === null || value < 0 || value > this.outputMaximum()) {
-        this.setFieldError(id, `请输入 0–${this.outputMaximum()} 之间的整数`);
+        this.setFieldError(id, t("export.integerRange", { max: this.outputMaximum() }));
         valid = false;
       }
     });
     if (!valid) {
-      this.showMessage("请修正标红的导出参数后重试。", "error");
+      this.showMessage(t("export.fixFields"), "error");
       this.root.querySelector<HTMLInputElement | HTMLSelectElement>(".export-field.invalid input, .export-field.invalid select")?.focus();
     }
     return valid;
@@ -567,7 +576,7 @@ export class ExportDialog {
       const path = await chooseExportFile(defaultPath);
       if (!path) return;
       this.setBusy(true);
-      this.showMessage("正在转换并安全写入 RAW 数据…", "info");
+      this.showMessage(t("export.writing"), "info");
       const result = await exportDocument(this.buildRequest(path));
       this.get<HTMLDialogElement>("export-dialog").close();
       this.callbacks.onSuccess(this.successMessage(result));
@@ -582,12 +591,17 @@ export class ExportDialog {
 
   private successMessage(result: ExportResult): string {
     const filled = this.totalFilled(result.filledPixels);
-    const clipped = result.clippedValues ? ` · 裁剪 ${result.clippedValues} 像素` : "";
-    const missing = filled ? ` · 填充 ${filled} 像素` : "";
+    const clipped = result.clippedValues ? ` · ${t("export.clipped", { count: result.clippedValues })}` : "";
+    const missing = filled ? ` · ${t("export.filled", { count: filled })}` : "";
     const format = result.outputCfa
       ? `${result.outputCfa}${result.outputCfa.startsWith("Q") ? ` · Phase ${result.outputCfaPhaseX},${result.outputCfaPhaseY}` : ""} · ${result.outputBitDepth} bit`
-      : `RGB48 Interleaved · ${result.outputBitDepth} bit 有效 DN`;
-    return `已导出当前帧 · ${formatBytes(result.bytesWritten)} · ${format}${missing}${clipped}`;
+      : t("export.rgb48Format", { depth: result.outputBitDepth });
+    return t("export.success", {
+      bytes: formatBytes(result.bytesWritten),
+      format,
+      missing,
+      clipped,
+    });
   }
 
   private totalFilled(counts: MissingPixelCounts): number {
@@ -595,16 +609,11 @@ export class ExportDialog {
   }
 
   private normalizeError(error: unknown): { field?: string; message: string } {
-    if (typeof error === "object" && error !== null) {
-      const value = error as { field?: unknown; message?: unknown };
-      if (typeof value.message === "string") {
-        return {
-          field: typeof value.field === "string" ? value.field : undefined,
-          message: value.message,
-        };
-      }
-    }
-    return { message: String(error).replace(/^Error:\s*/, "").trim() || "导出失败" };
+    const localized = localizeBackendError(error);
+    return {
+      field: localized.field,
+      message: localized.message || t("export.failed"),
+    };
   }
 
   private fieldId(field: string): string {
@@ -630,7 +639,7 @@ export class ExportDialog {
 
   private restoreSnapshotMessage(): void {
     if (this.snapshot?.partial) {
-      this.showMessage("当前来源帧不完整；读取不到的像素将使用下方按通道设置的输出 DN。", "warning");
+      this.showMessage(t("export.partialFrame"), "warning");
     } else {
       this.showMessage("", "info");
     }
@@ -642,7 +651,7 @@ export class ExportDialog {
     const rowAlignment = this.integerValue("export-row-alignment");
     const frameAlignment = this.integerValue("export-frame-alignment");
     if (width === null || height === null || rowAlignment === null || frameAlignment === null || rowAlignment < 1 || frameAlignment < 1) {
-      this.get("export-summary").textContent = "完成参数后显示预计输出大小。";
+      this.get("export-summary").textContent = t("export.summaryPending");
       return;
     }
     const packing = this.get<HTMLSelectElement>("export-packing").value as Packing;
@@ -661,8 +670,8 @@ export class ExportDialog {
     const bytes = this.alignUp(rowStride * height, frameAlignment);
     this.get("export-summary").textContent =
       Number.isSafeInteger(bytes)
-        ? `仅导出当前帧 · 行步长 ${formatBytes(rowStride)} · 预计 ${formatBytes(bytes)}`
-        : "输出大小超过安全计算范围，请减小尺寸或对齐值。";
+        ? t("export.sizeEstimate", { row: formatBytes(rowStride), bytes: formatBytes(bytes) })
+        : t("export.sizeOverflow");
   }
 
   private alignUp(value: number, alignment: number): number {
@@ -670,9 +679,9 @@ export class ExportDialog {
   }
 
   private targetName(target: ExportTarget): string {
-    if (target === "remosaic") return "导出 Remosaic Bayer";
-    if (target === "demosaic") return "导出 Demosaic RGB";
-    return "导出原始 CFA";
+    if (target === "remosaic") return t("export.titleRemosaic");
+    if (target === "demosaic") return t("export.titleDemosaic");
+    return t("export.titleOriginal");
   }
 
   private sourceCfaLabel(descriptor: RawDescriptor): string {
@@ -683,8 +692,8 @@ export class ExportDialog {
 
   private remosaicMethodLabel(): string {
     return this.snapshot?.processing.remosaic.sameColorReconstruction
-      ? "同色双线性重建"
-      : "仅 4×4 块内重排";
+      ? t("export.sameColor")
+      : t("export.reorder");
   }
 
   private outputFormatLabel(x: number, y: number): string {

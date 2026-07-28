@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { t } from "./i18n";
 import type {
   DocumentInfo,
   ExportRequest,
@@ -12,19 +13,19 @@ import type {
 
 export async function chooseRawFile(): Promise<string | null> {
   const result = await open({
-    title: "打开 RAW 图像",
+    title: t("empty.open"),
     multiple: false,
     directory: false,
-    filters: [{ name: "RAW 图像", extensions: ["raw", "bin"] }],
+    filters: [{ name: t("empty.open"), extensions: ["raw", "bin"] }],
   });
   return typeof result === "string" ? result : null;
 }
 
 export async function chooseExportFile(defaultPath: string): Promise<string | null> {
   const result = await save({
-    title: "导出 RAW 数据",
+    title: t("toolbar.export"),
     defaultPath,
-    filters: [{ name: "RAW 图像", extensions: ["raw"] }],
+    filters: [{ name: "RAW", extensions: ["raw"] }],
   });
   return result ?? null;
 }

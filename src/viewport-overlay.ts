@@ -1,5 +1,6 @@
 import type { ImagePoint } from "./viewport-transform";
 import { SelectionModel, ViewportTransform } from "./viewport-transform";
+import { t } from "./i18n";
 
 export class ViewportOverlayLayer {
   readonly selection = new SelectionModel();
@@ -11,7 +12,7 @@ export class ViewportOverlayLayer {
     this.svg = svg;
     this.boundaryRects = svg.querySelectorAll<SVGRectElement>(".image-boundary-rect");
     const selectionRect = svg.querySelector<SVGRectElement>(".image-selection");
-    if (!selectionRect) throw new Error("缺少图像选区叠加层");
+    if (!selectionRect) throw new Error(t("error.selectionOverlayMissing"));
     this.selectionRect = selectionRect;
   }
 

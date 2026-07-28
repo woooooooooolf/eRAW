@@ -56,6 +56,7 @@ flowchart LR
 ```powershell
 git status --short
 npm.cmd run check
+npm.cmd run test:i18n
 npm.cmd run build
 cargo test --manifest-path src-tauri/Cargo.toml
 npm.cmd run release
@@ -68,10 +69,18 @@ npm.cmd run release
 发布前至少确认：
 
 - `git diff --check` 无格式错误。
-- TypeScript 检查、前端构建和全部 Rust 测试通过。
+- TypeScript 检查、国际化测试、前端构建和全部 Rust 测试通过。
 - Release EXE 能作为独立程序启动，不依赖 Vite 开发服务器。
 - 关于页版本与构建时间正确。
 - 没有把测试 RAW、`target/`、`dist/` 或用户临时文件纳入提交。
 - 人工回归范围与本次风险相匹配。
 
 推送后比较 `HEAD` 与 `origin/master`；提交差异必须为 `0 / 0`。网络异常时停止强行绕过，由用户恢复网络或手动推送后再核对。
+
+## 翻译目录维护
+
+- 新增或修改用户可见文字时，同步补齐 `src/i18n.ts` 的七种语言，不提交空白占位。
+- 产品名、RAW/CFA/Packing/Remosaic/Demosaic、格式名、单位和按键保持行业惯用写法；普通说明文字应完整翻译。
+- 带变量的消息只通过命名占位符传入数值，不拼接后端自然语言。
+- 后端新增用户可见错误或警告时，先定义稳定代码和结构化参数，再在前端目录中映射；不要以任一语言的句子作为控制流条件。
+- 变更目录或系统语言解析后运行 `npm.cmd run test:i18n`，并至少在最小窗口尺寸检查英文和一种长文本语言。

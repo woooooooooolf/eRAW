@@ -6,9 +6,9 @@ eRAW 是一个面向 SoC 与图像传感器适配工作的 RAW 图像查看、�
 
 ## 当前版本
 
-`V0.1.2`（开发中）
+`V0.2.0`（开发中）
 
-V0.1.2 为 RAW 强度、CFA 点阵和 Remosaic 引入结构保持型 LOD，在大图 L2 及以上缩放层级继续保留 CFA 阵列观感；Demosaic 与 MONO 保持平滑区域聚合。
+V0.2.0 增加完整界面国际化。主窗口主题按钮左侧的语言菜单支持跟随系统，以及 English、简体中文、繁體中文、日本語、Español、Français 和 Deutsch；切换立即生效并自动保存。
 
 ## 规划中的首版能力
 
@@ -22,6 +22,7 @@ V0.1.2 为 RAW 强度、CFA 点阵和 Remosaic 引入结构保持型 LOD，在�
 - 原始 CFA 的裁剪、去 padding、packed/unpacked 与字节序转换
 - Remosaic Bayer 与 RGB48 Interleaved 单帧快照导出
 - 对异常和不完整数据尽可能显示并报告明确警告
+- 七种界面语言、系统语言匹配和运行时即时切换
 
 ## 开发
 

@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-    UI["应用编排与界面<br/>app.ts / export-dialog.ts"]
+    UI["应用编排与界面<br/>app.ts / export-dialog.ts / i18n.ts"]
     VP["视口与叠加层<br/>viewport*.ts / pixel-overlay.ts"]
     API["类型化 IPC 适配<br/>api.ts / types.ts"]
     CMD["Tauri 命令与会话<br/>commands.rs"]
@@ -28,6 +28,8 @@ flowchart LR
 | --- | --- |
 | `src/app.ts` | 应用状态、参数提交、菜单、状态栏、诊断、设置与对话框编排 |
 | `src/export-dialog.ts` | 冻结导出快照、范围联动、字段校验和导出反馈 |
+| `src/i18n.ts` | 语言偏好、系统语言解析、七语文案目录、日期时间格式化和静态 DOM 翻译 |
+| `src/backend-error.ts` | 解析后端结构化错误码，并在当前语言下生成用户消息 |
 | `src/viewport.ts` | WebGL2、LOD、瓦片队列、纹理缓存、缩放和平移 |
 | `src/viewport-transform.ts` | 屏幕、图像和像素坐标的唯一变换来源；选区模型 |
 | `src/viewport-overlay.ts` | 图像边界与矩形选区 SVG 叠加 |
@@ -37,6 +39,14 @@ flowchart LR
 | `src-tauri/src/raw/mod.rs` | 布局、packing、CFA、预览、Remosaic、Demosaic、检查与导出 |
 
 `raw/mod.rs` 是无 UI 的领域核心。新格式和算法应优先在这里形成可测试的纯逻辑；`app.ts` 不应承担像素语义。
+
+## 国际化与错误契约
+
+- 设置只保存语言偏好；`system` 会按 BCP 47 语言族解析系统首选语言，不支持的语言回退英文。
+- `i18n.ts` 的目录以英文、简体中文、繁体中文、日语、西班牙语、法语和德语形成完整类型约束。模板中的既有文字在创建 DOM 后登记语义键，动态状态直接通过 `t()` 生成。
+- 专业格式名、算法名、按键和单位（如 RAW、CFA、Packing、Demosaic、DN、MiB）保持行业惯用写法。
+- Rust 命令返回稳定 `code`、插值参数、可选原因和字段名；RAW 布局警告也携带结构化参数。前端不依赖中文后端字符串判断错误类型。
+- 运行时诊断保留原始结构化错误，绘制诊断列表和提示时再按当前语言翻译，因此切换语言后已有诊断也会同步更新。
 
 ## 文档会话与一致性
 

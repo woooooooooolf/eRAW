@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeMap,
     fs::{self, File, OpenOptions},
     io::{BufWriter, Write},
     path::{Path, PathBuf},
@@ -98,6 +99,7 @@ pub struct RawWarning {
     pub severity: WarningSeverity,
     pub code: &'static str,
     pub message: String,
+    pub arguments: BTreeMap<String, serde_json::Value>,
 }
 
 impl RawWarning {
@@ -106,7 +108,15 @@ impl RawWarning {
             severity,
             code,
             message: message.into(),
+            arguments: BTreeMap::new(),
         }
+    }
+
+    fn with_argument(mut self, name: &str, value: impl Serialize) -> Self {
+        if let Ok(value) = serde_json::to_value(value) {
+            self.arguments.insert(name.to_owned(), value);
+        }
+        self
     }
 }
 
@@ -168,21 +178,33 @@ pub fn calculate_layout(
             "container_too_small",
             "8-bit 容器无法保存超过 8 bit 的像素，显示时只读取低 8 bit",
         )),
-        Packing::MipiRaw10 if descriptor.bit_depth != 10 => warnings.push(RawWarning::new(
-            WarningSeverity::Warning,
-            "packing_depth_mismatch",
-            "MIPI RAW10 固定按 10 bit 解码；当前位深设置与打包格式不一致",
-        )),
-        Packing::MipiRaw12 if descriptor.bit_depth != 12 => warnings.push(RawWarning::new(
-            WarningSeverity::Warning,
-            "packing_depth_mismatch",
-            "MIPI RAW12 固定按 12 bit 解码；当前位深设置与打包格式不一致",
-        )),
-        Packing::MipiRaw14 if descriptor.bit_depth != 14 => warnings.push(RawWarning::new(
-            WarningSeverity::Warning,
-            "packing_depth_mismatch",
-            "MIPI RAW14 固定按 14 bit 解码；当前位深设置与打包格式不一致",
-        )),
+        Packing::MipiRaw10 if descriptor.bit_depth != 10 => warnings.push(
+            RawWarning::new(
+                WarningSeverity::Warning,
+                "packing_depth_mismatch",
+                "MIPI RAW10 固定按 10 bit 解码；当前位深设置与打包格式不一致",
+            )
+            .with_argument("packing", "MIPI RAW10")
+            .with_argument("bitDepth", descriptor.bit_depth),
+        ),
+        Packing::MipiRaw12 if descriptor.bit_depth != 12 => warnings.push(
+            RawWarning::new(
+                WarningSeverity::Warning,
+                "packing_depth_mismatch",
+                "MIPI RAW12 固定按 12 bit 解码；当前位深设置与打包格式不一致",
+            )
+            .with_argument("packing", "MIPI RAW12")
+            .with_argument("bitDepth", descriptor.bit_depth),
+        ),
+        Packing::MipiRaw14 if descriptor.bit_depth != 14 => warnings.push(
+            RawWarning::new(
+                WarningSeverity::Warning,
+                "packing_depth_mismatch",
+                "MIPI RAW14 固定按 14 bit 解码；当前位深设置与打包格式不一致",
+            )
+            .with_argument("packing", "MIPI RAW14")
+            .with_argument("bitDepth", descriptor.bit_depth),
+        ),
         _ => {}
     }
 
@@ -197,7 +219,7 @@ pub fn calculate_layout(
             WarningSeverity::Warning,
             "short_row_stride",
             format!("行步长 {row_stride} B 小于有效行最小大小 {row_bytes} B；相邻行可能重叠，仍将尝试显示"),
-        ));
+        ).with_argument("rowStride", row_stride).with_argument("rowBytes", row_bytes));
     }
     let frame_bytes = row_stride.saturating_mul(u64::from(descriptor.height));
     let frame_stride = if descriptor.frame_stride == 0 {
@@ -206,11 +228,15 @@ pub fn calculate_layout(
         descriptor.frame_stride
     };
     if frame_stride < frame_bytes {
-        warnings.push(RawWarning::new(
-            WarningSeverity::Warning,
-            "short_frame_stride",
-            format!("帧步长 {frame_stride} B 小于帧数据大小 {frame_bytes} B；相邻帧可能重叠"),
-        ));
+        warnings.push(
+            RawWarning::new(
+                WarningSeverity::Warning,
+                "short_frame_stride",
+                format!("帧步长 {frame_stride} B 小于帧数据大小 {frame_bytes} B；相邻帧可能重叠"),
+            )
+            .with_argument("frameStride", frame_stride)
+            .with_argument("frameBytes", frame_bytes),
+        );
     }
 
     let available = file_size.saturating_sub(descriptor.header_offset);
@@ -243,18 +269,24 @@ pub fn calculate_layout(
             "文件不足一帧，将显示第一帧中可读取的部分",
         ));
     } else if trailing_bytes > 0 {
-        warnings.push(RawWarning::new(
-            WarningSeverity::Warning,
-            "partial_last_frame",
-            format!("完整帧后还剩 {trailing_bytes} B，将其作为不完整的末帧显示"),
-        ));
+        warnings.push(
+            RawWarning::new(
+                WarningSeverity::Warning,
+                "partial_last_frame",
+                format!("完整帧后还剩 {trailing_bytes} B，将其作为不完整的末帧显示"),
+            )
+            .with_argument("trailingBytes", trailing_bytes),
+        );
     }
     if frame_count > 1 {
-        warnings.push(RawWarning::new(
-            WarningSeverity::Info,
-            "multiple_frames",
-            format!("按当前参数识别到 {frame_count} 帧"),
-        ));
+        warnings.push(
+            RawWarning::new(
+                WarningSeverity::Info,
+                "multiple_frames",
+                format!("按当前参数识别到 {frame_count} 帧"),
+            )
+            .with_argument("frameCount", frame_count),
+        );
     }
 
     (
