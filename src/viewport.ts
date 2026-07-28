@@ -292,6 +292,32 @@ export class RawViewport {
     if (!preserveView || dimensionsChanged) this.fit(); else this.requestDraw();
   }
 
+  clearDocument(): void {
+    this.document = null;
+    this.frame = 0;
+    this.zoom = 1;
+    this.cameraX = 0;
+    this.cameraY = 0;
+    this.fitScale = 1;
+    this.dragging = false;
+    this.selecting = false;
+    this.canvas.classList.remove("dragging");
+    this.hideCrosshair();
+    this.overlayLayer.clearSelection();
+    this.overlayLayer.hide();
+    this.lastSampleKey = "";
+    this.clearTextures();
+    this.callbacks.onSampleChange(null);
+    this.callbacks.onZoomChange(this.zoom);
+    this.callbacks.onRenderStats("L0", 0, 0, {
+      samples: 0,
+      lastMs: 0,
+      averageMs: 0,
+      maxMs: 0,
+    });
+    this.requestDraw();
+  }
+
   setFrame(frame: number): void {
     if (!this.document) return;
     this.frame = Math.max(0, Math.min(frame, Math.max(0, this.document.layout.frameCount - 1)));
@@ -384,9 +410,19 @@ export class RawViewport {
   }
 
   private resize(): void {
+    const previousWidth = this.width;
+    const previousHeight = this.height;
     const rect = this.container.getBoundingClientRect();
     this.width = Math.max(1, rect.width);
     this.height = Math.max(1, rect.height);
+    if (this.document) {
+      this.transform.preserveViewportCenter(
+        previousWidth,
+        previousHeight,
+        this.width,
+        this.height,
+      );
+    }
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const pixelWidth = Math.round(this.width * dpr);
     const pixelHeight = Math.round(this.height * dpr);

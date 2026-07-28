@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "check": "tsc --noEmit",
     "test:i18n": "node --test tests/i18n.test.mjs",
-    "test:frontend": "node --test tests/i18n.test.mjs tests/descriptor-input.test.mjs tests/fullscreen.test.mjs",
+    "test:frontend": "node --test tests/i18n.test.mjs tests/descriptor-input.test.mjs tests/document-close.test.mjs tests/fullscreen.test.mjs tests/viewport-transform.test.mjs",
     "release": "tauri build --no-bundle",
     "tauri": "tauri"
   },

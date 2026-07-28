@@ -34,7 +34,7 @@ Tauri capability 采用最小授权：主窗口除默认只读窗口能力外，
 | `src/i18n.ts` | 语言偏好、系统语言解析、七语文案目录、日期时间格式化和静态 DOM 翻译 |
 | `src/backend-error.ts` | 解析后端结构化错误码，并在当前语言下生成用户消息 |
 | `src/viewport.ts` | WebGL2、LOD、瓦片队列、纹理缓存、缩放和平移 |
-| `src/viewport-transform.ts` | 屏幕、图像和像素坐标的唯一变换来源；选区模型 |
+| `src/viewport-transform.ts` | 屏幕、图像和像素坐标的唯一变换来源；画布尺寸变化时的中心锚定；选区模型 |
 | `src/viewport-overlay.ts` | 图像边界与矩形选区 SVG 叠加 |
 | `src/pixel-overlay.ts` | 高倍率像素网格与 DN/RGB 数字叠加 |
 | `src/api.ts` / `src/types.ts` | Tauri 调用封装及前后端共享数据契约 |
@@ -64,7 +64,7 @@ RawDocument
 └─ generation               文档世代号
 ```
 
-- 打开文件或提交新描述符会增加 `generation`，并清空预览缓存。
+- 打开文件、关闭文件或提交新描述符会增加 `generation`，并清空预览缓存；关闭文件同时释放只读内存映射。
 - 耗时任务先复制不可变快照，再释放文档互斥锁。
 - 前端请求携带 `generation`；旧文档结果返回 `stale_generation`。
 - 预览另有 `renderRevision`；帧、模式、参数或 LOD 计划变化时，旧任务协作取消并返回 `stale_render`。

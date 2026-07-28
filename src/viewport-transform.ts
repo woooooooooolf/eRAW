@@ -15,6 +15,16 @@ export class ViewportTransform {
   cameraY = 0;
   zoom = 1;
 
+  preserveViewportCenter(
+    previousWidth: number,
+    previousHeight: number,
+    nextWidth: number,
+    nextHeight: number,
+  ): void {
+    this.cameraX += (nextWidth - previousWidth) / 2;
+    this.cameraY += (nextHeight - previousHeight) / 2;
+  }
+
   imageToScreen(point: ImagePoint): ImagePoint {
     return {
       x: this.cameraX + point.x * this.zoom,

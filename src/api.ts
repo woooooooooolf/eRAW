@@ -34,6 +34,10 @@ export function openDocument(path: string, descriptor: RawDescriptor): Promise<D
   return invoke("open_document", { path, descriptor });
 }
 
+export function closeDocument(): Promise<void> {
+  return invoke("close_document");
+}
+
 export function updateDescriptor(descriptor: RawDescriptor): Promise<DocumentInfo> {
   return invoke("update_descriptor", { descriptor });
 }

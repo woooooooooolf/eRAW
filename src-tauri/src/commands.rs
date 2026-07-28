@@ -247,8 +247,15 @@ pub fn update_descriptor(
 
 #[tauri::command]
 pub fn close_document(state: State<'_, AppState>) -> Result<(), CommandError> {
+    close_document_state(state.inner())
+}
+
+fn close_document_state(state: &AppState) -> Result<(), CommandError> {
     state.next_generation();
-    *lock_document(&state)? = None;
+    *state
+        .document
+        .lock()
+        .map_err(|_| CommandError::new("document_session_poisoned"))? = None;
     state.clear_preview_cache()?;
     Ok(())
 }
@@ -431,4 +438,71 @@ pub async fn export_document(
     })
     .await
     .map_err(|error| CommandError::new("export_task_failed").with_cause(error))?
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use std::{
+        fs::{OpenOptions, remove_file, rename, write},
+        os::windows::fs::OpenOptionsExt,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    #[test]
+    fn closing_document_releases_the_source_mapping() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should follow the Unix epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "eraw-close-document-{}-{unique}.raw",
+            std::process::id()
+        ));
+        let renamed = path.with_extension("closed");
+        write(&path, vec![0u8; 4096]).expect("temporary RAW should be created");
+
+        let file = File::open(&path).expect("temporary RAW should open");
+        let map = unsafe { MmapOptions::new().map(&file) }.expect("temporary RAW should map");
+        drop(file);
+        let descriptor = RawDescriptor::default();
+        let (layout, warnings) = calculate_layout(&descriptor, 4096);
+        let state = AppState::default();
+        *state.document.lock().expect("document session should lock") = Some(RawDocument {
+            path: path.to_string_lossy().into_owned(),
+            name: path
+                .file_name()
+                .expect("temporary RAW should have a name")
+                .to_string_lossy()
+                .into_owned(),
+            file_size: 4096,
+            map: Some(Arc::new(map)),
+            descriptor,
+            layout,
+            warnings,
+            generation: state.next_generation(),
+        });
+
+        let exclusive_while_open = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .share_mode(0)
+            .open(&path);
+        assert!(
+            exclusive_while_open.is_err(),
+            "the mapped source should reject exclusive access while open"
+        );
+
+        close_document_state(&state).expect("closing the document should succeed");
+
+        let exclusive_after_close = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .share_mode(0)
+            .open(&path)
+            .expect("the source should allow exclusive access after close");
+        drop(exclusive_after_close);
+        rename(&path, &renamed).expect("the source should be renameable after close");
+        remove_file(&renamed).expect("temporary RAW should be removed");
+    }
 }

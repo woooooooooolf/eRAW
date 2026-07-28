@@ -1,6 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import erawIconUrl from "./assets/eraw-icon.svg";
-import { chooseRawFile, openDocument, updateDescriptor } from "./api";
+import { chooseRawFile, closeDocument, openDocument, updateDescriptor } from "./api";
 import { localizeBackendError } from "./backend-error";
 import { normalizeIntegerInput } from "./descriptor-input";
 import { ExportDialog, exportDialogTemplate } from "./export-dialog";
@@ -131,6 +131,7 @@ function icon(path: string): string {
 
 const icons = {
   open: icon("M4 5h6l2 2h8a2 2 0 0 1 2 2v1H7.2L4 17.4V5Zm18 7-4 8H2l4-8h16Z"),
+  closeFile: icon("M5 3h9l5 5v4h-2V9h-4V5H7v14h5v2H5V3Zm10.4 10 2.1 2.1 2.1-2.1 1.4 1.4-2.1 2.1 2.1 2.1-1.4 1.4-2.1-2.1-2.1 2.1-1.4-1.4 2.1-2.1-2.1-2.1 1.4-1.4Z"),
   export: icon("M13 3v8.2l2.6-2.6L17 10l-5 5-5-5 1.4-1.4 2.6 2.6V3h2Zm-9 14h2v2h12v-2h2v4H4v-4Z"),
   fit: icon("M4 9V4h5v2H6v3H4Zm11-5h5v5h-2V6h-3V4ZM4 15h2v3h3v2H4v-5Zm14 0h2v5h-5v-2h3v-3Z"),
   actual: icon("M4 4h16v16H4V4Zm2 2v12h12V6H6Zm2 2h2v2H8V8Zm6 6h2v2h-2v-2Z"),
@@ -226,6 +227,7 @@ export class ErawApp {
   private displayMode: DisplayMode = "bayer";
   private committing = false;
   private commitRevision = 0;
+  private fileOperationInProgress = false;
   private toastTimer = 0;
   private sidebarWidth = this.settings.sidebarWidth;
   private sidebarResizeStartX = 0;
@@ -272,7 +274,7 @@ export class ErawApp {
       <div class="app-shell">
         <header class="topbar">
           <div class="toolbar primary-actions">
-            <button id="open-button" class="tool-button accent">${icons.open}<span>打开</span><kbd>Ctrl O</kbd></button>
+            <button id="open-button" class="tool-button accent"><i class="file-action-icon file-action-open">${icons.open}</i><i class="file-action-icon file-action-close">${icons.closeFile}</i><span>打开</span><kbd>Ctrl O</kbd></button>
             <div id="export-control" class="export-control">
               <button id="export-button" class="tool-button" disabled aria-haspopup="menu" aria-expanded="false">${icons.export}<span>导出</span><kbd>Ctrl E</kbd></button>
               <div id="export-popover" class="export-popover" role="menu" aria-label="选择导出内容" hidden>
@@ -525,6 +527,7 @@ export class ErawApp {
       <div class="shortcuts-body">
         <section><h3>文件与视图</h3>
           <div><span>打开 RAW 文件</span><kbd>Ctrl</kbd><kbd>O</kbd></div>
+          <div><span>关闭当前 RAW 文件</span><kbd>Ctrl</kbd><kbd>W</kbd></div>
           <div><span>导出当前帧</span><kbd>Ctrl</kbd><kbd>E</kbd></div>
           <div><span>适应窗口</span><kbd>Ctrl</kbd><kbd>0</kbd></div>
           <div><span>100% 实际像素</span><kbd>Ctrl</kbd><kbd>1</kbd></div>
@@ -603,7 +606,7 @@ export class ErawApp {
   }
 
   private bindEvents(): void {
-    this.get("open-button").addEventListener("click", () => void this.openFile());
+    this.get("open-button").addEventListener("click", () => void this.toggleFile());
     this.get("empty-open-button").addEventListener("click", () => void this.openFile());
     this.get<HTMLButtonElement>("export-button").addEventListener("click", (event) => {
       event.stopPropagation();
@@ -796,8 +799,17 @@ export class ErawApp {
     });
   }
 
+  private async toggleFile(): Promise<void> {
+    if (this.document) await this.closeFile();
+    else await this.openFile();
+  }
+
   private async openFile(): Promise<void> {
+    if (this.fileOperationInProgress) return;
+    this.fileOperationInProgress = true;
+    this.updateDocumentUi();
     try {
+      await this.flushDescriptor();
       const path = await chooseRawFile();
       if (!path) return;
       this.showToast(t("runtime.opening"), "busy");
@@ -811,6 +823,42 @@ export class ErawApp {
       this.showToast(t("runtime.opened", { name: info.name }), "success");
     } catch (error) {
       this.reportRuntimeError(error);
+    } finally {
+      this.fileOperationInProgress = false;
+      this.updateDocumentUi();
+    }
+  }
+
+  private async closeFile(): Promise<void> {
+    if (!this.document || this.fileOperationInProgress) return;
+    if (this.exportDialog.isOpen) {
+      this.showToast(t("runtime.closeBlockedByExport"), "error");
+      return;
+    }
+    this.fileOperationInProgress = true;
+    this.updateDocumentUi();
+    try {
+      await this.flushDescriptor();
+      const name = this.document?.name;
+      if (!name) return;
+      this.showToast(t("runtime.closing", { name }), "busy");
+      await closeDocument();
+      this.document = null;
+      this.frame = 0;
+      this.lastSample = null;
+      this.runtimeDiagnostics = [];
+      this.viewport.clearDocument();
+      this.setExportMenuOpen(false);
+      this.setDiagnosticsOpen(false);
+      this.get<HTMLDialogElement>("pixel-locator-dialog").close();
+      this.get<HTMLDialogElement>("zoom-dialog").close();
+      this.updateDocumentUi();
+      this.showToast(t("runtime.closed", { name }), "success");
+    } catch (error) {
+      this.reportRuntimeError(error);
+    } finally {
+      this.fileOperationInProgress = false;
+      this.updateDocumentUi();
     }
   }
 
@@ -883,12 +931,28 @@ export class ErawApp {
     }
   }
 
+  private async flushDescriptor(): Promise<void> {
+    await this.commitDescriptor();
+    while (this.committing) {
+      await new Promise((resolve) => window.setTimeout(resolve, 16));
+    }
+  }
+
   private updateDocumentUi(): void {
     const info = this.document;
     const emptyState = this.get("empty-state");
     emptyState.classList.toggle("hidden", Boolean(info));
     emptyState.setAttribute("aria-hidden", String(Boolean(info)));
-    this.get<HTMLButtonElement>("empty-open-button").disabled = Boolean(info);
+    const fileButton = this.get<HTMLButtonElement>("open-button");
+    fileButton.classList.toggle("accent", !info);
+    fileButton.classList.toggle("close-file", Boolean(info));
+    fileButton.disabled = this.fileOperationInProgress;
+    fileButton.querySelector("span")!.textContent = info ? t("toolbar.closeFile") : t("toolbar.open");
+    fileButton.querySelector("kbd")!.textContent = info ? "Ctrl W" : "Ctrl O";
+    const fileActionLabel = info ? t("toolbar.closeFile") : t("toolbar.open");
+    fileButton.setAttribute("title", fileActionLabel);
+    fileButton.setAttribute("aria-label", fileActionLabel);
+    this.get<HTMLButtonElement>("empty-open-button").disabled = Boolean(info) || this.fileOperationInProgress;
     this.get<HTMLButtonElement>("export-button").disabled = !info || info.layout.frameCount === 0;
     this.updateExportAvailability();
     this.get<HTMLButtonElement>("pixel-status").disabled = !info;
@@ -1389,6 +1453,11 @@ export class ErawApp {
     }
     else if (event.key === "Escape" && this.root.querySelector(".app-shell")!.classList.contains("diagnostics-open")) { event.preventDefault(); this.setDiagnosticsOpen(false); }
     else if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); void this.openFile(); }
+    else if (event.ctrlKey && event.key.toLowerCase() === "w" && this.document) {
+      event.preventDefault();
+      if (this.exportDialog.isOpen) this.showToast(t("runtime.closeBlockedByExport"), "error");
+      else if (!this.root.querySelector("dialog[open]")) void this.closeFile();
+    }
     else if (event.ctrlKey && event.key.toLowerCase() === "e" && this.document?.layout.frameCount && !this.exportDialog.isOpen) {
       event.preventDefault();
       void this.openExport("originalCfa");
@@ -1399,10 +1468,7 @@ export class ErawApp {
   }
 
   private async openExport(target: ExportTarget): Promise<void> {
-    await this.commitDescriptor();
-    while (this.committing) {
-      await new Promise((resolve) => window.setTimeout(resolve, 16));
-    }
+    await this.flushDescriptor();
     if (!this.document?.layout.frameCount) return;
     const cfa = this.document.descriptor.cfa;
     if (target === "remosaic" && !isQuadCfa(cfa)) return;

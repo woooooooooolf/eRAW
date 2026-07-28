@@ -39,6 +39,7 @@ const CATALOG = {
   "language.current": message("Interface language: {language}", "界面语言：{language}", "介面語言：{language}", "表示言語：{language}", "Idioma de la interfaz: {language}", "Langue de l’interface : {language}", "Oberflächensprache: {language}"),
 
   "toolbar.open": message("Open", "打开", "開啟", "開く", "Abrir", "Ouvrir", "Öffnen"),
+  "toolbar.closeFile": message("Close file", "关闭文件", "關閉檔案", "ファイルを閉じる", "Cerrar archivo", "Fermer le fichier", "Datei schließen"),
   "toolbar.export": message("Export", "导出", "匯出", "エクスポート", "Exportar", "Exporter", "Exportieren"),
   "toolbar.exportSelect": message("Select export content", "选择导出内容", "選擇匯出內容", "エクスポート内容を選択", "Seleccionar contenido de exportación", "Choisir le contenu à exporter", "Exportinhalt auswählen"),
   "toolbar.exportCurrent": message("Export current frame", "导出当前帧", "匯出目前影格", "現在のフレームをエクスポート", "Exportar fotograma actual", "Exporter l’image actuelle", "Aktuellen Frame exportieren"),
@@ -196,6 +197,7 @@ const CATALOG = {
   "shortcuts.eyebrow": message("KEYBOARD & CANVAS REFERENCE", "键盘与画布速查", "鍵盤與畫布速查", "キーボードとキャンバス操作", "REFERENCIA DE TECLADO Y LIENZO", "RÉFÉRENCE CLAVIER ET CANEVAS", "TASTATUR- UND ARBEITSFLÄCHENREFERENZ"),
   "shortcuts.fileView": message("File and view", "文件与视图", "檔案與檢視", "ファイルと表示", "Archivo y vista", "Fichier et affichage", "Datei und Ansicht"),
   "shortcuts.openRaw": message("Open RAW file", "打开 RAW 文件", "開啟 RAW 檔案", "RAW ファイルを開く", "Abrir archivo RAW", "Ouvrir un fichier RAW", "RAW-Datei öffnen"),
+  "shortcuts.closeRaw": message("Close current RAW file", "关闭当前 RAW 文件", "關閉目前的 RAW 檔案", "現在の RAW ファイルを閉じる", "Cerrar el archivo RAW actual", "Fermer le fichier RAW actuel", "Aktuelle RAW-Datei schließen"),
   "shortcuts.exportFrame": message("Export current frame", "导出当前帧", "匯出目前影格", "現在のフレームをエクスポート", "Exportar fotograma actual", "Exporter l’image actuelle", "Aktuellen Frame exportieren"),
   "shortcuts.fit": message("Fit to window", "适应窗口", "符合視窗", "ウィンドウに合わせる", "Ajustar a la ventana", "Adapter à la fenêtre", "An Fenster anpassen"),
   "shortcuts.actual": message("100% actual pixels", "100% 实际像素", "100% 實際像素", "100% 等倍表示", "100% píxeles reales", "100 % pixels réels", "100 % tatsächliche Pixel"),
@@ -291,6 +293,9 @@ const CATALOG = {
 
   "runtime.opening": message("Mapping and analyzing RAW file…", "正在映射并分析 RAW 文件…", "正在映射並分析 RAW 檔案…", "RAW ファイルをマッピングして解析中…", "Mapeando y analizando el archivo RAW…", "Mappage et analyse du fichier RAW…", "RAW-Datei wird abgebildet und analysiert…"),
   "runtime.opened": message("Opened {name}", "已打开 {name}", "已開啟 {name}", "{name} を開きました", "Se abrió {name}", "{name} ouvert", "{name} geöffnet"),
+  "runtime.closing": message("Releasing {name}…", "正在释放 {name}…", "正在釋放 {name}…", "{name} を解放しています…", "Liberando {name}…", "Libération de {name}…", "{name} wird freigegeben…"),
+  "runtime.closed": message("Closed {name}", "已关闭 {name}", "已關閉 {name}", "{name} を閉じました", "Se cerró {name}", "{name} fermé", "{name} geschlossen"),
+  "runtime.closeBlockedByExport": message("Finish or close the export dialog before closing the RAW file.", "请先完成或关闭导出窗口，再关闭 RAW 文件。", "請先完成或關閉匯出視窗，再關閉 RAW 檔案。", "RAW ファイルを閉じる前に、エクスポート画面を完了または閉じてください。", "Finalice o cierre el diálogo de exportación antes de cerrar el archivo RAW.", "Terminez ou fermez la fenêtre d’exportation avant de fermer le fichier RAW.", "Schließen oder beenden Sie den Exportdialog, bevor Sie die RAW-Datei schließen."),
   "runtime.invalidZoom": message("Enter a valid zoom value", "请输入有效的缩放值", "請輸入有效的縮放值", "有効なズーム値を入力してください", "Introduzca un valor de zoom válido", "Saisissez une valeur de zoom valide", "Gültigen Zoomwert eingeben"),
   "runtime.adjustMin": message("Adjusted to the minimum", "已调整至下限", "已調整至下限", "最小値に調整しました", "Ajustado al mínimo", "Ajusté au minimum", "Auf das Minimum angepasst"),
   "runtime.adjustMax": message("Adjusted to the maximum", "已调整至上限", "已調整至上限", "最大値に調整しました", "Ajustado al máximo", "Ajusté au maximum", "Auf das Maximum angepasst"),
