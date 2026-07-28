@@ -2,6 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import erawIconUrl from "./assets/eraw-icon.svg";
 import { chooseRawFile, closeDocument, openDocument, updateDescriptor } from "./api";
 import { localizeBackendError } from "./backend-error";
+import type { ChannelRenderingMode } from "./channel-rendering";
 import { normalizeIntegerInput } from "./descriptor-input";
 import { ExportDialog, exportDialogTemplate } from "./export-dialog";
 import {
@@ -39,7 +40,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.2.2";
+const VERSION = "0.2.3";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -65,6 +66,7 @@ interface AppSettings {
   sidebarPosition: SidebarPosition;
   pixelValuesEnabled: boolean;
   demosaicPixelValues: DemosaicPixelValueMode;
+  channelRendering: ChannelRenderingMode;
 }
 
 interface RuntimeDiagnostic {
@@ -123,6 +125,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   sidebarPosition: "left",
   pixelValuesEnabled: true,
   demosaicPixelValues: "rgb",
+  channelRendering: "color",
 };
 
 function icon(path: string): string {
@@ -173,6 +176,7 @@ function loadSettings(): AppSettings {
         sidebarPosition: ["left", "right"].includes(value.sidebarPosition ?? "") ? value.sidebarPosition as SidebarPosition : DEFAULT_SETTINGS.sidebarPosition,
         pixelValuesEnabled: typeof value.pixelValuesEnabled === "boolean" ? value.pixelValuesEnabled : DEFAULT_SETTINGS.pixelValuesEnabled,
         demosaicPixelValues: ["rawDn", "rgb"].includes(value.demosaicPixelValues ?? "") ? value.demosaicPixelValues as DemosaicPixelValueMode : DEFAULT_SETTINGS.demosaicPixelValues,
+        channelRendering: ["color", "grayscale"].includes(value.channelRendering ?? "") ? value.channelRendering as ChannelRenderingMode : DEFAULT_SETTINGS.channelRendering,
       };
     }
   } catch { /* 使用安全默认值 */ }
@@ -593,7 +597,8 @@ export class ErawApp {
           <label class="settings-row"><div><strong>滚轮缩放速度</strong><span>缩放始终以鼠标指向的图像位置为中心</span></div><select id="setting-wheel-speed"><option value="gentle">柔和</option><option value="standard">标准</option><option value="fast">快速</option></select></label>
           <label class="settings-row toggle-row"><div><strong>记住 RAW 参数</strong><span>下次启动时恢复尺寸、packing、CFA 和对齐配置</span></div><input id="setting-remember-descriptor" type="checkbox"/></label>
         </section>
-        <section class="settings-group"><div class="settings-heading"><h3>像素检查</h3><p>仅在像素格能够完整容纳数值时显示，不会截断或缩写。</p></div>
+        <section class="settings-group"><div class="settings-heading"><h3>像素检查</h3><p>控制通道着色；数值仅在像素格能够完整容纳时显示。</p></div>
+          <label class="settings-row"><div><strong>RGB 通道渲染</strong><span>仅改变 R/G/B 通道视图的着色，不改变重建 DN 或导出数据</span></div><select id="setting-channel-rendering"><option value="color">通道颜色</option><option value="grayscale">灰度（仅强度）</option></select></label>
           <label class="settings-row toggle-row"><div><strong>高倍率显示像素值</strong><span>RAW 强度与 Bayer 点阵始终显示原始 DN</span></div><input id="setting-pixel-values" type="checkbox"/></label>
           <label class="settings-row" id="demosaic-pixel-values-row"><div><strong>Demosaic 数值内容</strong><span>RGB 为原始位深范围内的插值分量，不是 8-bit 显示值</span></div><select id="setting-demosaic-pixel-values"><option value="rawDn">原始 DN</option><option value="rgb">三行插值 RGB</option></select></label>
         </section>
@@ -1500,6 +1505,7 @@ export class ErawApp {
     this.get<HTMLInputElement>("setting-remember-descriptor").checked = settings.rememberDescriptor;
     this.get<HTMLInputElement>("setting-pixel-values").checked = settings.pixelValuesEnabled;
     this.get<HTMLSelectElement>("setting-demosaic-pixel-values").value = settings.demosaicPixelValues;
+    this.get<HTMLSelectElement>("setting-channel-rendering").value = settings.channelRendering;
     this.get<HTMLSelectElement>("setting-tile-cache").value = settings.tileCache;
     this.updatePixelSettingsAvailability();
   }
@@ -1518,6 +1524,7 @@ export class ErawApp {
       sidebarPosition: this.get<HTMLSelectElement>("setting-sidebar-position").value as SidebarPosition,
       pixelValuesEnabled: this.get<HTMLInputElement>("setting-pixel-values").checked,
       demosaicPixelValues: this.get<HTMLSelectElement>("setting-demosaic-pixel-values").value as DemosaicPixelValueMode,
+      channelRendering: this.get<HTMLSelectElement>("setting-channel-rendering").value as ChannelRenderingMode,
     };
     this.persistSettings();
     if (this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(this.descriptor));
@@ -1540,6 +1547,7 @@ export class ErawApp {
     const wheelSensitivity: Record<WheelSpeed, number> = { gentle: 0.001, standard: 0.0015, fast: 0.0022 };
     const maxTextures: Record<TileCache, number> = { compact: 128, balanced: 256, large: 512 };
     this.viewport.setPreferences({ wheelSensitivity: wheelSensitivity[this.settings.wheelSpeed], maxTextures: maxTextures[this.settings.tileCache] });
+    this.viewport.setChannelRendering(this.settings.channelRendering);
     this.viewport.setPixelInspectionPreferences({
       enabled: this.settings.pixelValuesEnabled,
       demosaicValues: this.settings.demosaicPixelValues,

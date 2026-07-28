@@ -33,6 +33,7 @@ Tauri capability 采用最小授权：主窗口除默认只读窗口能力外，
 | `src/export-dialog.ts` | 冻结导出快照、范围联动、字段校验和导出反馈 |
 | `src/i18n.ts` | 语言偏好、系统语言解析、七语文案目录、日期时间格式化和静态 DOM 翻译 |
 | `src/backend-error.ts` | 解析后端结构化错误码，并在当前语言下生成用户消息 |
+| `src/channel-rendering.ts` | 将显示模式与通道渲染偏好映射为纯 GPU 着色参数 |
 | `src/viewport.ts` | WebGL2、LOD、瓦片队列、纹理缓存、缩放和平移 |
 | `src/viewport-transform.ts` | 屏幕、图像和像素坐标的唯一变换来源；画布尺寸变化时的中心锚定；选区模型 |
 | `src/viewport-overlay.ts` | 图像边界与矩形选区 SVG 叠加 |
@@ -78,6 +79,7 @@ RawDocument
 - 前端纹理缓存按设置提供约 32/64/128 MiB 三档，并按最近使用顺序淘汰。
 - 每次最多并发 8 个前端瓦片请求。
 - RGBA 瓦片和像素检查结果通过二进制 IPC 返回，避免大型 JSON 数组开销。
+- R/G/B 通道瓦片保持后端生成的灰度重建强度；通道颜色由 WebGL 最终合成阶段施加，因此切换偏好不使后端缓存或前端纹理失效。
 
 ## 故障边界
 

@@ -1,5 +1,9 @@
 import { renderTile } from "./api";
 import { backendErrorCode } from "./backend-error";
+import {
+  channelTint,
+  type ChannelRenderingMode,
+} from "./channel-rendering";
 import { t, type MessageKey } from "./i18n";
 import { PixelValueOverlay } from "./pixel-overlay";
 import {
@@ -76,6 +80,7 @@ precision highp float;
 uniform sampler2D u_texture;
 uniform vec4 u_rect;
 uniform float u_opacity;
+uniform vec3 u_channel_tint;
 in vec2 v_image_point;
 out vec4 outColor;
 void main() {
@@ -83,7 +88,9 @@ void main() {
   vec2 local = (v_image_point - u_rect.xy) / u_rect.zw;
   ivec2 texel = clamp(ivec2(floor(local * vec2(texture_size))), ivec2(0), texture_size - 1);
   vec4 color = texelFetch(u_texture, texel, 0);
-  outColor = vec4(color.rgb, color.a * u_opacity);
+  float spread = max(max(abs(color.r - color.g), abs(color.g - color.b)), abs(color.r - color.b));
+  vec3 tinted = mix(color.rgb * u_channel_tint, color.rgb, step(0.5 / 255.0, spread));
+  outColor = vec4(tinted, color.a * u_opacity);
 }`;
 
 function createShader(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
@@ -127,6 +134,7 @@ export class RawViewport {
   private readonly cameraLocation: WebGLUniformLocation;
   private readonly zoomLocation: WebGLUniformLocation;
   private readonly opacityLocation: WebGLUniformLocation;
+  private readonly channelTintLocation: WebGLUniformLocation;
   private readonly horizontalScrollbar: HTMLElement;
   private readonly horizontalThumb: HTMLElement;
   private readonly verticalScrollbar: HTMLElement;
@@ -159,6 +167,7 @@ export class RawViewport {
   private dragCameraY = 0;
   private maxTextures = DEFAULT_MAX_TEXTURES;
   private wheelSensitivity = 0.0015;
+  private channelRendering: ChannelRenderingMode = "color";
   private animationFrame = 0;
   private lastSampleKey = "";
   private renderCounter = 0;
@@ -197,6 +206,7 @@ export class RawViewport {
     this.cameraLocation = this.requireUniform("u_camera");
     this.zoomLocation = this.requireUniform("u_zoom");
     this.opacityLocation = this.requireUniform("u_opacity");
+    this.channelTintLocation = this.requireUniform("u_channel_tint");
     this.horizontalScrollbar = container.querySelector<HTMLElement>(".image-scrollbar.horizontal")!;
     this.horizontalThumb = this.horizontalScrollbar.querySelector<HTMLElement>(".scroll-thumb")!;
     this.verticalScrollbar = container.querySelector<HTMLElement>(".image-scrollbar.vertical")!;
@@ -344,6 +354,12 @@ export class RawViewport {
     this.wheelSensitivity = Math.max(0.0005, Math.min(0.004, preferences.wheelSensitivity));
     this.maxTextures = Math.max(64, Math.min(512, Math.trunc(preferences.maxTextures)));
     this.evictTextures();
+  }
+
+  setChannelRendering(mode: ChannelRenderingMode): void {
+    if (mode === this.channelRendering) return;
+    this.channelRendering = mode;
+    this.requestDraw();
   }
 
   setPixelInspectionPreferences(preferences: { enabled: boolean; demosaicValues: DemosaicPixelValueMode }): void {
@@ -697,6 +713,8 @@ export class RawViewport {
     gl.uniform2f(this.viewportLocation, this.width, this.height);
     gl.uniform2f(this.cameraLocation, this.cameraX, this.cameraY);
     gl.uniform1f(this.zoomLocation, this.zoom);
+    const tint = channelTint(this.settings.mode, this.channelRendering);
+    gl.uniform3f(this.channelTintLocation, tint[0], tint[1], tint[2]);
     const fineLoaded = this.drawLayer(plan.fineLevel, fineVisible, 1);
     const coarseLoaded = plan.coarseLevel === null
       ? 0
