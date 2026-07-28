@@ -66,27 +66,37 @@ uniform vec4 u_rect;
 uniform vec2 u_viewport;
 uniform vec2 u_camera;
 uniform float u_zoom;
-out vec2 v_image_point;
 void main() {
   vec2 imagePoint = u_rect.xy + a_position * u_rect.zw;
   vec2 screenPoint = u_camera + imagePoint * u_zoom;
   vec2 clip = vec2(screenPoint.x / u_viewport.x * 2.0 - 1.0, 1.0 - screenPoint.y / u_viewport.y * 2.0);
   gl_Position = vec4(clip, 0.0, 1.0);
-  v_image_point = imagePoint;
 }`;
 
 const fragmentShaderSource = `#version 300 es
 precision highp float;
 uniform sampler2D u_texture;
 uniform vec4 u_rect;
+uniform vec2 u_viewport;
+uniform vec2 u_framebuffer;
+uniform vec2 u_camera;
+uniform float u_zoom;
 uniform float u_opacity;
 uniform vec3 u_channel_tint;
-in vec2 v_image_point;
 out vec4 outColor;
 void main() {
   ivec2 texture_size = textureSize(u_texture, 0);
-  vec2 local = (v_image_point - u_rect.xy) / u_rect.zw;
-  ivec2 texel = clamp(ivec2(floor(local * vec2(texture_size))), ivec2(0), texture_size - 1);
+  vec2 screen_point = vec2(
+    gl_FragCoord.x * u_viewport.x / u_framebuffer.x,
+    (u_framebuffer.y - gl_FragCoord.y) * u_viewport.y / u_framebuffer.y
+  );
+  vec2 image_point = (screen_point - u_camera) / u_zoom;
+  vec2 sample_span = u_rect.zw / vec2(texture_size);
+  ivec2 texel = clamp(
+    ivec2(floor((image_point - u_rect.xy) / sample_span)),
+    ivec2(0),
+    texture_size - 1
+  );
   vec4 color = texelFetch(u_texture, texel, 0);
   float spread = max(max(abs(color.r - color.g), abs(color.g - color.b)), abs(color.r - color.b));
   vec3 tinted = mix(color.rgb * u_channel_tint, color.rgb, step(0.5 / 255.0, spread));
@@ -131,6 +141,7 @@ export class RawViewport {
   private readonly program: WebGLProgram;
   private readonly rectLocation: WebGLUniformLocation;
   private readonly viewportLocation: WebGLUniformLocation;
+  private readonly framebufferLocation: WebGLUniformLocation;
   private readonly cameraLocation: WebGLUniformLocation;
   private readonly zoomLocation: WebGLUniformLocation;
   private readonly opacityLocation: WebGLUniformLocation;
@@ -203,6 +214,7 @@ export class RawViewport {
     this.program = createProgram(gl);
     this.rectLocation = this.requireUniform("u_rect");
     this.viewportLocation = this.requireUniform("u_viewport");
+    this.framebufferLocation = this.requireUniform("u_framebuffer");
     this.cameraLocation = this.requireUniform("u_camera");
     this.zoomLocation = this.requireUniform("u_zoom");
     this.opacityLocation = this.requireUniform("u_opacity");
@@ -711,6 +723,7 @@ export class RawViewport {
     const coarseVisible = plan.coarseLevel === null ? [] : this.visibleTiles(plan.coarseLevel);
     gl.useProgram(this.program);
     gl.uniform2f(this.viewportLocation, this.width, this.height);
+    gl.uniform2f(this.framebufferLocation, this.canvas.width, this.canvas.height);
     gl.uniform2f(this.cameraLocation, this.cameraX, this.cameraY);
     gl.uniform1f(this.zoomLocation, this.zoom);
     const tint = channelTint(this.settings.mode, this.channelRendering);
