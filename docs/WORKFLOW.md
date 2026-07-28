@@ -56,7 +56,7 @@ flowchart LR
 ```powershell
 git status --short
 npm.cmd run check
-npm.cmd run test:i18n
+npm.cmd run test:frontend
 npm.cmd run build
 cargo test --manifest-path src-tauri/Cargo.toml
 npm.cmd run release

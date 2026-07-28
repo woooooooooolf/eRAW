@@ -2,6 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import erawIconUrl from "./assets/eraw-icon.svg";
 import { chooseRawFile, openDocument, updateDescriptor } from "./api";
 import { localizeBackendError } from "./backend-error";
+import { normalizeIntegerInput } from "./descriptor-input";
 import { ExportDialog, exportDialogTemplate } from "./export-dialog";
 import {
   formatDateTime,
@@ -38,7 +39,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.2.0";
+const VERSION = "0.2.1";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -815,22 +816,18 @@ export class ErawApp {
   }
 
   private readDescriptor(): RawDescriptor {
-    const number = (field: string) => {
-      const value = Number(this.descriptorFieldValue(field));
-      return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
-    };
-    const dimension = (field: "width" | "height") => {
-      const clamped = clampImageDimension(number(field));
+    const number = (field: string, minimum = 0, maximum = Number.POSITIVE_INFINITY) => {
+      const normalized = normalizeIntegerInput(this.descriptorFieldValue(field), minimum, maximum);
       const input = this.root.querySelector<HTMLInputElement>(`input[data-field="${field}"]`);
-      if (input) input.value = String(clamped);
-      return clamped;
+      if (input) input.value = String(normalized);
+      return normalized;
     };
     const value = <T extends string>(field: string) => this.descriptorFieldValue(field) as T;
     return {
-      width: dimension("width"), height: dimension("height"), bitDepth: Number(value("bitDepth")),
+      width: number("width", 1, MAX_IMAGE_DIMENSION), height: number("height", 1, MAX_IMAGE_DIMENSION), bitDepth: Number(value("bitDepth")),
       packing: value<Packing>("packing"), endianness: value<Endianness>("endianness"), bitAlignment: value<BitAlignment>("bitAlignment"), cfa: value<CfaPattern>("cfa"),
-      cfaPhaseX: Math.min(3, number("cfaPhaseX")), cfaPhaseY: Math.min(3, number("cfaPhaseY")),
-      rowAlignment: Math.max(1, number("rowAlignment")), rowStride: number("rowStride"), frameAlignment: Math.max(1, number("frameAlignment")), frameStride: number("frameStride"), headerOffset: number("headerOffset"),
+      cfaPhaseX: number("cfaPhaseX", 0, 3), cfaPhaseY: number("cfaPhaseY", 0, 3),
+      rowAlignment: number("rowAlignment", 1), rowStride: number("rowStride"), frameAlignment: number("frameAlignment", 1), frameStride: number("frameStride"), headerOffset: number("headerOffset"),
     };
   }
 
