@@ -37,6 +37,7 @@ test("presentation controls live in the sidebar and persist immediately", () => 
   assert.match(appSource, /id="presentation-section"[\s\S]*?>画面呈现</);
   assert.match(appSource, /id="presentation-channel-rendering"/);
   assert.match(appSource, /id="presentation-pixel-values"/);
+  assert.match(appSource, /id="presentation-pixel-grid-color"/);
   assert.match(appSource, /id="presentation-demosaic-pixel-values"/);
   assert.match(appSource, /id="presentation-missing-pixel-pattern"/);
   assert.match(appSource, /id="presentation-missing-pixel-color"/);

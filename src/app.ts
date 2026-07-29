@@ -37,6 +37,7 @@ import {
   normalizeMissingPixelColor,
   type MissingPixelPattern,
 } from "./missing-pixel-rendering";
+import { normalizePixelGridColor } from "./pixel-grid-rendering";
 import {
   THEMES,
   isAppTheme,
@@ -63,7 +64,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.2.9";
+const VERSION = "0.2.10";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -330,6 +331,10 @@ export class ErawApp {
                   <label class="parameter-row processing-toggle-row">
                     <span class="field-label" data-help="RAW 强度与 Bayer 点阵始终显示原始 DN">高倍率显示像素值</span>
                     <input id="presentation-pixel-values" type="checkbox" role="switch"/>
+                  </label>
+                  <label class="parameter-row presentation-color-row">
+                    <span class="field-label" data-help="只改变高倍率像素网格，不改变图像或像素值">像素网格颜色</span>
+                    <input id="presentation-pixel-grid-color" type="color" value="#8ecde4"/>
                   </label>
                   <label class="parameter-row" id="presentation-demosaic-values-row">
                     <span class="field-label" data-help="RGB 为原始位深范围内的插值分量，不是 8-bit 显示值">Demosaic 数值内容</span>
@@ -707,6 +712,7 @@ export class ErawApp {
     this.get("reset-settings").addEventListener("click", () => this.writeSettingsForm(DEFAULT_SETTINGS));
     this.get<HTMLSelectElement>("presentation-channel-rendering").addEventListener("change", () => this.savePresentationSettings());
     this.get<HTMLInputElement>("presentation-pixel-values").addEventListener("change", () => this.savePresentationSettings());
+    this.get<HTMLInputElement>("presentation-pixel-grid-color").addEventListener("input", () => this.savePresentationSettings());
     this.get<HTMLSelectElement>("presentation-demosaic-pixel-values").addEventListener("change", () => this.savePresentationSettings());
     this.get<HTMLSelectElement>("presentation-missing-pixel-pattern").addEventListener("change", () => this.savePresentationSettings());
     this.get<HTMLInputElement>("presentation-missing-pixel-color").addEventListener("input", () => this.savePresentationSettings());
@@ -1481,6 +1487,7 @@ export class ErawApp {
       sidebarWidth: this.settingsFormSidebarWidth,
       sidebarPosition: this.get<HTMLSelectElement>("setting-sidebar-position").value as SidebarPosition,
       pixelValuesEnabled: this.settings.pixelValuesEnabled,
+      pixelGridColor: this.settings.pixelGridColor,
       demosaicPixelValues: this.settings.demosaicPixelValues,
       channelRendering: this.settings.channelRendering,
       missingPixelPattern: this.settings.missingPixelPattern,
@@ -1510,6 +1517,7 @@ export class ErawApp {
     this.viewport.setChannelRendering(this.settings.channelRendering);
     this.viewport.setPixelInspectionPreferences({
       enabled: this.settings.pixelValuesEnabled,
+      gridColor: this.settings.pixelGridColor,
       demosaicValues: this.settings.demosaicPixelValues,
     });
     this.viewport.setMissingPixelAppearance({
@@ -1523,6 +1531,7 @@ export class ErawApp {
   private writePresentationControls(): void {
     this.get<HTMLSelectElement>("presentation-channel-rendering").value = this.settings.channelRendering;
     this.get<HTMLInputElement>("presentation-pixel-values").checked = this.settings.pixelValuesEnabled;
+    this.get<HTMLInputElement>("presentation-pixel-grid-color").value = this.settings.pixelGridColor;
     this.get<HTMLSelectElement>("presentation-demosaic-pixel-values").value = this.settings.demosaicPixelValues;
     this.get<HTMLSelectElement>("presentation-missing-pixel-pattern").value = this.settings.missingPixelPattern;
     this.get<HTMLInputElement>("presentation-missing-pixel-color").value = this.settings.missingPixelColor;
@@ -1534,6 +1543,9 @@ export class ErawApp {
       this.get<HTMLSelectElement>("presentation-channel-rendering").value as ChannelRenderingMode;
     this.settings.pixelValuesEnabled =
       this.get<HTMLInputElement>("presentation-pixel-values").checked;
+    this.settings.pixelGridColor = normalizePixelGridColor(
+      this.get<HTMLInputElement>("presentation-pixel-grid-color").value,
+    );
     this.settings.demosaicPixelValues =
       this.get<HTMLSelectElement>("presentation-demosaic-pixel-values").value as DemosaicPixelValueMode;
     this.settings.missingPixelPattern =
@@ -1545,6 +1557,7 @@ export class ErawApp {
     this.viewport.setChannelRendering(this.settings.channelRendering);
     this.viewport.setPixelInspectionPreferences({
       enabled: this.settings.pixelValuesEnabled,
+      gridColor: this.settings.pixelGridColor,
       demosaicValues: this.settings.demosaicPixelValues,
     });
     this.viewport.setMissingPixelAppearance({

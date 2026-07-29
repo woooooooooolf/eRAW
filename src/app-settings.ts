@@ -6,6 +6,10 @@ import {
   normalizeMissingPixelColor,
   type MissingPixelPattern,
 } from "./missing-pixel-rendering";
+import {
+  DEFAULT_PIXEL_GRID_COLOR,
+  normalizePixelGridColor,
+} from "./pixel-grid-rendering";
 import { isAppTheme, type AppTheme } from "./theme-catalog";
 import type { DemosaicPixelValueMode } from "./types";
 
@@ -27,6 +31,7 @@ export interface AppSettings {
   sidebarWidth: number;
   sidebarPosition: SidebarPosition;
   pixelValuesEnabled: boolean;
+  pixelGridColor: string;
   demosaicPixelValues: DemosaicPixelValueMode;
   channelRendering: ChannelRenderingMode;
   missingPixelPattern: MissingPixelPattern;
@@ -49,6 +54,7 @@ export const DEFAULT_SETTINGS: Readonly<AppSettings> = {
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   sidebarPosition: "left",
   pixelValuesEnabled: true,
+  pixelGridColor: DEFAULT_PIXEL_GRID_COLOR,
   demosaicPixelValues: "rgb",
   channelRendering: "color",
   missingPixelPattern: DEFAULT_MISSING_PIXEL_APPEARANCE.pattern,
@@ -107,6 +113,7 @@ export function parseAppSettings(value: unknown): AppSettings {
     pixelValuesEnabled: typeof candidate.pixelValuesEnabled === "boolean"
       ? candidate.pixelValuesEnabled
       : DEFAULT_SETTINGS.pixelValuesEnabled,
+    pixelGridColor: normalizePixelGridColor(candidate.pixelGridColor),
     demosaicPixelValues: oneOf(
       candidate.demosaicPixelValues,
       ["rawDn", "rgb"],

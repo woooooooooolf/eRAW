@@ -409,7 +409,11 @@ export class RawViewport {
     this.requestDraw();
   }
 
-  setPixelInspectionPreferences(preferences: { enabled: boolean; demosaicValues: DemosaicPixelValueMode }): void {
+  setPixelInspectionPreferences(preferences: {
+    enabled: boolean;
+    gridColor: string;
+    demosaicValues: DemosaicPixelValueMode;
+  }): void {
     this.pixelValueOverlay.setPreferences(preferences);
   }
 

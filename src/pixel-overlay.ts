@@ -2,6 +2,11 @@ import { inspectPixels } from "./api";
 import { backendErrorCode } from "./backend-error";
 import { t, type MessageKey } from "./i18n";
 import {
+  DEFAULT_PIXEL_GRID_COLOR,
+  normalizePixelGridColor,
+  pixelGridStrokeStyle,
+} from "./pixel-grid-rendering";
+import {
   pixelValueLines,
   resolvePixelValueDisplay,
   widestPixelValueText,
@@ -52,6 +57,7 @@ export class PixelValueOverlay {
   private readonly onError: (error: unknown, messageKey: MessageKey) => void;
   private readonly requestDraw: () => void;
   private enabled = true;
+  private gridColor = DEFAULT_PIXEL_GRID_COLOR;
   private demosaicValues: DemosaicPixelValueMode = "rgb";
   private cache: InspectionCache | null = null;
   private inFlight = "";
@@ -72,13 +78,24 @@ export class PixelValueOverlay {
     this.requestDraw = callbacks.requestDraw;
   }
 
-  setPreferences(preferences: { enabled: boolean; demosaicValues: DemosaicPixelValueMode }): void {
-    const changed = this.enabled !== preferences.enabled || this.demosaicValues !== preferences.demosaicValues;
+  setPreferences(preferences: {
+    enabled: boolean;
+    gridColor: string;
+    demosaicValues: DemosaicPixelValueMode;
+  }): void {
+    const gridColor = normalizePixelGridColor(preferences.gridColor);
+    const valuesChanged =
+      this.enabled !== preferences.enabled
+      || this.demosaicValues !== preferences.demosaicValues;
+    const gridColorChanged = this.gridColor !== gridColor;
     this.enabled = preferences.enabled;
+    this.gridColor = gridColor;
     this.demosaicValues = preferences.demosaicValues;
-    if (changed) {
+    if (valuesChanged) {
       this.visible = false;
       this.invalidate(false);
+      this.requestDraw();
+    } else if (gridColorChanged) {
       this.requestDraw();
     }
   }
@@ -196,7 +213,7 @@ export class PixelValueOverlay {
     this.context.setTransform(1, 0, 0, 1, 0, 0);
     this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.context.strokeStyle = "rgba(142,205,228,.22)";
+    this.context.strokeStyle = pixelGridStrokeStyle(this.gridColor);
     this.context.lineWidth = 1;
     for (let y = rect.y; y < rect.y + rect.height; y += 1) {
       for (let x = rect.x; x < rect.x + rect.width; x += 1) {

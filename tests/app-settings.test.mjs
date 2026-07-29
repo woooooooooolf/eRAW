@@ -23,9 +23,11 @@ const [i18nSource, missingSource, themeSource, settingsSource] = await Promise.a
   transpile("../src/theme-catalog.ts"),
   transpile("../src/app-settings.ts"),
 ]);
+const pixelGridSource = await transpile("../src/pixel-grid-rendering.ts");
 const settingsWithDependencies = settingsSource
   .replaceAll('"./i18n"', JSON.stringify(dataUrl(i18nSource)))
   .replaceAll('"./missing-pixel-rendering"', JSON.stringify(dataUrl(missingSource)))
+  .replaceAll('"./pixel-grid-rendering"', JSON.stringify(dataUrl(pixelGridSource)))
   .replaceAll('"./theme-catalog"', JSON.stringify(dataUrl(themeSource)));
 const settings = await import(dataUrl(settingsWithDependencies));
 
@@ -41,6 +43,7 @@ test("legacy settings gain new presentation defaults without losing valid values
   assert.equal(parsed.language, "fr");
   assert.equal(parsed.sidebarWidth, 412);
   assert.equal(parsed.openView, "actual");
+  assert.equal(parsed.pixelGridColor, "#8ecde4");
   assert.equal(parsed.missingPixelPattern, "darkCheckerboard");
   assert.equal(parsed.missingPixelColor, "#808080");
 });
@@ -49,12 +52,14 @@ test("new themes and presentation preferences survive settings parsing", () => {
   const parsed = settings.parseAppSettings({
     theme: "light-flat",
     channelRendering: "grayscale",
+    pixelGridColor: "#Ff00Aa",
     missingPixelPattern: "solid",
     missingPixelColor: "#A1b2C3",
   });
 
   assert.equal(parsed.theme, "light-flat");
   assert.equal(parsed.channelRendering, "grayscale");
+  assert.equal(parsed.pixelGridColor, "#ff00aa");
   assert.equal(parsed.missingPixelPattern, "solid");
   assert.equal(parsed.missingPixelColor, "#a1b2c3");
 });
@@ -64,6 +69,7 @@ test("invalid settings fall back and sidebar width stays bounded", () => {
     theme: "unknown",
     language: "ko",
     wheelSpeed: "instant",
+    pixelGridColor: "cyan",
     missingPixelColor: "red",
     sidebarWidth: Number.NaN,
   });
