@@ -62,6 +62,8 @@ cargo test --manifest-path src-tauri/Cargo.toml
 npm.cmd run release
 ```
 
+自动化测试流程不得加入 `npm.cmd run dev`、`npm.cmd run tauri dev` 或其他常驻服务启动命令。交互或视觉检查应使用已构建的 Release EXE，并为启动、探测和关闭设置明确的时间边界。
+
 不要用裸 `cargo build --release` 代替发布命令；它不会保证执行 Tauri 的前端构建和资源嵌入流程。
 
 ## 发布验收

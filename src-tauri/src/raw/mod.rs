@@ -1811,6 +1811,23 @@ pub fn export_raw(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{
+        sync::atomic::{AtomicU64, Ordering},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    fn test_output_path(label: &str) -> PathBuf {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should follow the Unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "eraw-{label}-{}-{timestamp}-{}.raw",
+            std::process::id(),
+            NEXT_ID.fetch_add(1, Ordering::Relaxed)
+        ))
+    }
 
     fn test_export_request(
         descriptor: &RawDescriptor,
@@ -2742,10 +2759,7 @@ mod tests {
         };
         let source = [9u8];
         let layout = calculate_layout(&descriptor, source.len() as u64).0;
-        let output = sibling_path(
-            &std::env::temp_dir().join("eraw-export-fill-test.raw"),
-            "test",
-        );
+        let output = test_output_path("export-fill");
         let request = ExportRequest {
             path: output.to_string_lossy().into_owned(),
             source_path: "source.raw".into(),
@@ -2800,10 +2814,7 @@ mod tests {
         };
         let source: Vec<u8> = (0..16).collect();
         let layout = calculate_layout(&descriptor, source.len() as u64).0;
-        let output = sibling_path(
-            &std::env::temp_dir().join("eraw-export-quad-phase.raw"),
-            "test",
-        );
+        let output = test_output_path("export-quad-phase");
         let mut request = test_export_request(&descriptor, &output, ExportTarget::OriginalCfa);
         request.crop_x = 1;
         request.crop_y = 1;
@@ -2833,10 +2844,7 @@ mod tests {
         };
         let source: Vec<u8> = (0..16).collect();
         let layout = calculate_layout(&descriptor, source.len() as u64).0;
-        let output = sibling_path(
-            &std::env::temp_dir().join("eraw-export-remosaic-reorder.raw"),
-            "test",
-        );
+        let output = test_output_path("export-remosaic-reorder");
         let request = test_export_request(&descriptor, &output, ExportTarget::Remosaic);
 
         let result = export_raw(&source, &descriptor, &layout, &request).unwrap();
@@ -2866,10 +2874,7 @@ mod tests {
         };
         let source = vec![0; 64];
         let layout = calculate_layout(&descriptor, source.len() as u64).0;
-        let output = sibling_path(
-            &std::env::temp_dir().join("eraw-export-remosaic-phase.raw"),
-            "test",
-        );
+        let output = test_output_path("export-remosaic-phase");
         let mut request = test_export_request(&descriptor, &output, ExportTarget::Remosaic);
         request.crop_x = 1;
         request.crop_y = 1;
@@ -2907,10 +2912,7 @@ mod tests {
             }
         }
         let layout = calculate_layout(&descriptor, source.len() as u64).0;
-        let output = sibling_path(
-            &std::env::temp_dir().join("eraw-export-remosaic-reconstruct.raw"),
-            "test",
-        );
+        let output = test_output_path("export-remosaic-reconstruct");
         let mut request = test_export_request(&descriptor, &output, ExportTarget::Remosaic);
         request.processing.remosaic.same_color_reconstruction = true;
 
@@ -2953,7 +2955,7 @@ mod tests {
         let pixels = [[10u16, 25, 40], [10, 20, 40], [10, 30, 40], [10, 25, 40]];
 
         for endianness in [Endianness::Little, Endianness::Big] {
-            let output = sibling_path(&std::env::temp_dir().join("eraw-export-rgb48.raw"), "test");
+            let output = test_output_path("export-rgb48");
             let mut request = test_export_request(&descriptor, &output, ExportTarget::Demosaic);
             request.endianness = endianness;
             let result = export_raw(&source, &descriptor, &layout, &request).unwrap();
@@ -2998,10 +3000,7 @@ mod tests {
             }
         }
         let layout = calculate_layout(&descriptor, source.len() as u64).0;
-        let output = sibling_path(
-            &std::env::temp_dir().join("eraw-export-quad-rgb48.raw"),
-            "test",
-        );
+        let output = test_output_path("export-quad-rgb48");
         let mut request = test_export_request(&descriptor, &output, ExportTarget::Demosaic);
         request.processing.remosaic.same_color_reconstruction = true;
 
@@ -3028,10 +3027,7 @@ mod tests {
             ..RawDescriptor::default()
         };
         let mono_layout = calculate_layout(&mono, 1).0;
-        let mono_output = sibling_path(
-            &std::env::temp_dir().join("eraw-export-mono-rgb.raw"),
-            "test",
-        );
+        let mono_output = test_output_path("export-mono-rgb");
         let mono_request = test_export_request(&mono, &mono_output, ExportTarget::Demosaic);
         assert!(export_raw(&[7], &mono, &mono_layout, &mono_request).is_err());
 
@@ -3045,10 +3041,7 @@ mod tests {
         };
         let source = [9u8];
         let layout = calculate_layout(&color, source.len() as u64).0;
-        let output = sibling_path(
-            &std::env::temp_dir().join("eraw-export-partial-rgb.raw"),
-            "test",
-        );
+        let output = test_output_path("export-partial-rgb");
         let mut request = test_export_request(&color, &output, ExportTarget::Demosaic);
         request.missing_pixel_fill = MissingPixelFill {
             mono: 0,

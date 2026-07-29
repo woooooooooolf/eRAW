@@ -1,6 +1,19 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import erawIconUrl from "./assets/eraw-icon.svg";
 import { chooseRawFile, closeDocument, openDocument, updateDescriptor } from "./api";
+import {
+  DEFAULT_SETTINGS,
+  DEFAULT_SIDEBAR_WIDTH,
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH,
+  parseAppSettings,
+  type AppSettings,
+  type OpenView,
+  type SidebarPosition,
+  type TileCache,
+  type UiFontSize,
+  type WheelSpeed,
+} from "./app-settings";
 import { localizeBackendError } from "./backend-error";
 import type { ChannelRenderingMode } from "./channel-rendering";
 import { normalizeIntegerInput } from "./descriptor-input";
@@ -21,11 +34,15 @@ import {
   type MessageKey,
 } from "./i18n";
 import {
-  DEFAULT_MISSING_PIXEL_APPEARANCE,
-  isMissingPixelPattern,
   normalizeMissingPixelColor,
   type MissingPixelPattern,
 } from "./missing-pixel-rendering";
+import {
+  THEMES,
+  isAppTheme,
+  themeMessageKey,
+  type AppTheme,
+} from "./theme-catalog";
 import { RawViewport, type ImagePoint, type TileTimingStats } from "./viewport";
 import type {
   BitAlignment,
@@ -46,36 +63,11 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.2.7";
+const VERSION = "0.2.8";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
 const PROCESSING_KEY = "eraw.processingSettings.v1";
-
-type UiFontSize = "standard" | "large" | "extraLarge";
-type OpenView = "fit" | "actual";
-type WheelSpeed = "gentle" | "standard" | "fast";
-type TileCache = "compact" | "balanced" | "large";
-type SidebarPosition = "left" | "right";
-type AppTheme = "dark-ocean" | "dark-violet" | "dark-amber" | "light-frost" | "light-mint" | "light-sand";
-
-interface AppSettings {
-  theme: AppTheme;
-  uiFontSize: UiFontSize;
-  reduceMotion: boolean;
-  openView: OpenView;
-  rememberDescriptor: boolean;
-  wheelSpeed: WheelSpeed;
-  tileCache: TileCache;
-  language: LanguagePreference;
-  sidebarWidth: number;
-  sidebarPosition: SidebarPosition;
-  pixelValuesEnabled: boolean;
-  demosaicPixelValues: DemosaicPixelValueMode;
-  channelRendering: ChannelRenderingMode;
-  missingPixelPattern: MissingPixelPattern;
-  missingPixelColor: string;
-}
 
 interface RuntimeDiagnostic {
   source: unknown;
@@ -85,9 +77,6 @@ interface RuntimeDiagnostic {
   timestamp: Date;
 }
 
-const DEFAULT_SIDEBAR_WIDTH = 324;
-const MIN_SIDEBAR_WIDTH = 280;
-const MAX_SIDEBAR_WIDTH = 560;
 const MAX_IMAGE_DIMENSION = 100_000;
 
 const WARNING_MESSAGES: Record<string, MessageKey> = {
@@ -102,40 +91,6 @@ const WARNING_MESSAGES: Record<string, MessageKey> = {
   partial_first_frame: "warning.partialFirst",
   partial_last_frame: "warning.partialLast",
   multiple_frames: "warning.multipleFrames",
-};
-
-const THEMES: ReadonlyArray<{
-  id: AppTheme;
-  name: string;
-  tone: "深色" | "浅色";
-  background: string;
-  surface: string;
-  accent: string;
-}> = [
-  { id: "dark-ocean", name: "深海蓝", tone: "深色", background: "#070a0f", surface: "#131b26", accent: "#52caf4" },
-  { id: "dark-violet", name: "曜石紫", tone: "深色", background: "#0a0810", surface: "#1b1726", accent: "#a890ff" },
-  { id: "dark-amber", name: "琥珀黑", tone: "深色", background: "#0d0b08", surface: "#221b12", accent: "#efb65b" },
-  { id: "light-frost", name: "极昼蓝", tone: "浅色", background: "#e9eff4", surface: "#ffffff", accent: "#087dab" },
-  { id: "light-mint", name: "薄荷白", tone: "浅色", background: "#e8f1ee", surface: "#fbfffd", accent: "#168b72" },
-  { id: "light-sand", name: "暖砂白", tone: "浅色", background: "#f2ede5", surface: "#fffdf9", accent: "#a46117" },
-];
-
-const DEFAULT_SETTINGS: AppSettings = {
-  theme: "dark-ocean",
-  uiFontSize: "standard",
-  reduceMotion: false,
-  openView: "fit",
-  rememberDescriptor: true,
-  wheelSpeed: "standard",
-  tileCache: "balanced",
-  language: "system",
-  sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
-  sidebarPosition: "left",
-  pixelValuesEnabled: true,
-  demosaicPixelValues: "rgb",
-  channelRendering: "color",
-  missingPixelPattern: DEFAULT_MISSING_PIXEL_APPEARANCE.pattern,
-  missingPixelColor: DEFAULT_MISSING_PIXEL_APPEARANCE.color,
 };
 
 function icon(path: string): string {
@@ -171,26 +126,7 @@ function clampImageDimension(value: number): number {
 function loadSettings(): AppSettings {
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
-    if (saved) {
-      const value = JSON.parse(saved) as Partial<AppSettings>;
-      return {
-        theme: THEMES.some((theme) => theme.id === value.theme) ? value.theme as AppTheme : DEFAULT_SETTINGS.theme,
-        uiFontSize: ["standard", "large", "extraLarge"].includes(value.uiFontSize ?? "") ? value.uiFontSize as UiFontSize : DEFAULT_SETTINGS.uiFontSize,
-        reduceMotion: typeof value.reduceMotion === "boolean" ? value.reduceMotion : DEFAULT_SETTINGS.reduceMotion,
-        openView: ["fit", "actual"].includes(value.openView ?? "") ? value.openView as OpenView : DEFAULT_SETTINGS.openView,
-        rememberDescriptor: typeof value.rememberDescriptor === "boolean" ? value.rememberDescriptor : DEFAULT_SETTINGS.rememberDescriptor,
-        wheelSpeed: ["gentle", "standard", "fast"].includes(value.wheelSpeed ?? "") ? value.wheelSpeed as WheelSpeed : DEFAULT_SETTINGS.wheelSpeed,
-        tileCache: ["compact", "balanced", "large"].includes(value.tileCache ?? "") ? value.tileCache as TileCache : DEFAULT_SETTINGS.tileCache,
-        language: isLanguagePreference(value.language) ? value.language : DEFAULT_SETTINGS.language,
-        sidebarWidth: Number.isFinite(value.sidebarWidth) ? Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, Math.trunc(value.sidebarWidth!))) : DEFAULT_SETTINGS.sidebarWidth,
-        sidebarPosition: ["left", "right"].includes(value.sidebarPosition ?? "") ? value.sidebarPosition as SidebarPosition : DEFAULT_SETTINGS.sidebarPosition,
-        pixelValuesEnabled: typeof value.pixelValuesEnabled === "boolean" ? value.pixelValuesEnabled : DEFAULT_SETTINGS.pixelValuesEnabled,
-        demosaicPixelValues: ["rawDn", "rgb"].includes(value.demosaicPixelValues ?? "") ? value.demosaicPixelValues as DemosaicPixelValueMode : DEFAULT_SETTINGS.demosaicPixelValues,
-        channelRendering: ["color", "grayscale"].includes(value.channelRendering ?? "") ? value.channelRendering as ChannelRenderingMode : DEFAULT_SETTINGS.channelRendering,
-        missingPixelPattern: isMissingPixelPattern(value.missingPixelPattern) ? value.missingPixelPattern : DEFAULT_SETTINGS.missingPixelPattern,
-        missingPixelColor: normalizeMissingPixelColor(value.missingPixelColor),
-      };
-    }
+    if (saved) return parseAppSettings(JSON.parse(saved));
   } catch { /* 使用安全默认值 */ }
   return { ...DEFAULT_SETTINGS };
 }
@@ -1194,7 +1130,7 @@ export class ErawApp {
   }
 
   private setTheme(theme: AppTheme): void {
-    if (!THEMES.some((candidate) => candidate.id === theme)) return;
+    if (!isAppTheme(theme)) return;
     this.settings.theme = theme;
     this.persistSettings();
     this.applyTheme();
@@ -1204,15 +1140,7 @@ export class ErawApp {
   private applyTheme(): void {
     document.documentElement.dataset.theme = this.settings.theme;
     const selected = THEMES.find((theme) => theme.id === this.settings.theme)!;
-    const themeKey = {
-      "dark-ocean": "theme.darkOcean",
-      "dark-violet": "theme.darkViolet",
-      "dark-amber": "theme.darkAmber",
-      "light-frost": "theme.lightFrost",
-      "light-mint": "theme.lightMint",
-      "light-sand": "theme.lightSand",
-    } as const;
-    const selectedName = t(themeKey[selected.id]);
+    const selectedName = t(themeMessageKey(selected.id));
     const button = this.get("theme-button");
     button.classList.remove("active");
     button.setAttribute("title", `${t("toolbar.theme")} (${selectedName})`);

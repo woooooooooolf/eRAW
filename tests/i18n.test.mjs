@@ -41,7 +41,7 @@ test("system locale mapping follows BCP 47 language families", () => {
   }
 });
 
-test("every message has a non-empty translation in every supported locale", () => {
+test("every message has a non-empty translation with matching placeholders", () => {
   assert.deepEqual(i18n.validateCatalog(), []);
   for (const locale of ["en", "zh-CN", "zh-TW", "ja", "es", "fr", "de"]) {
     assert.equal(i18n.setLanguagePreference(locale), locale);

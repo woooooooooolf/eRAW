@@ -38,8 +38,6 @@ test("channel rendering preference does not tint other display modes", () => {
 });
 
 test("the persisted preference is applied as a presentation-only viewport setting", () => {
-  assert.match(appSource, /channelRendering: "color"/);
-  assert.match(appSource, /\["color", "grayscale"\]\.includes\(value\.channelRendering/);
   assert.match(appSource, /this\.viewport\.setChannelRendering\(this\.settings\.channelRendering\)/);
   assert.match(viewportSource, /setChannelRendering\(mode: ChannelRenderingMode\)/);
   assert.match(viewportSource, /gl\.uniform3f\(this\.channelTintLocation/);

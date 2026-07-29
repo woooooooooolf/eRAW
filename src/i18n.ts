@@ -78,6 +78,9 @@ const CATALOG = {
   "theme.lightFrost": message("Polar Blue", "极昼蓝", "極晝藍", "ポーラーブルー", "Azul polar", "Bleu polaire", "Polarblau"),
   "theme.lightMint": message("Mint White", "薄荷白", "薄荷白", "ミントホワイト", "Blanco menta", "Blanc menthe", "Mintweiß"),
   "theme.lightSand": message("Warm Sand", "暖砂白", "暖砂白", "ウォームサンド", "Arena cálida", "Sable chaud", "Warmer Sand"),
+  "theme.darkContrast": message("High Contrast Black", "高对比黑", "高對比黑", "ハイコントラスト・ブラック", "Negro de alto contraste", "Noir à contraste élevé", "Schwarz mit hohem Kontrast"),
+  "theme.darkFlat": message("Graphite Flat", "石墨扁平", "石墨扁平", "グラファイト・フラット", "Grafito plano", "Graphite plat", "Graphit flach"),
+  "theme.lightFlat": message("Mist Flat", "雾白扁平", "霧白扁平", "ミスト・フラット", "Niebla plana", "Brume plate", "Nebel flach"),
   "theme.dark": message("Dark", "深色", "深色", "ダーク", "Oscuro", "Sombre", "Dunkel"),
   "theme.light": message("Light", "浅色", "淺色", "ライト", "Claro", "Clair", "Hell"),
 
@@ -465,8 +468,20 @@ export function hasMessage(key: string): key is MessageKey {
 export function validateCatalog(): string[] {
   const issues: string[] = [];
   for (const [key, entry] of Object.entries(CATALOG) as Array<[MessageKey, Entry]>) {
+    const expectedPlaceholders = [...entry.en.matchAll(/\{([A-Za-z0-9_]+)\}/g)]
+      .map((match) => match[1])
+      .sort();
     for (const language of Object.keys(LOCALE_NAMES) as ResolvedLocale[]) {
       if (!entry[language].trim()) issues.push(`${key}:${language}`);
+      const placeholders = [...entry[language].matchAll(/\{([A-Za-z0-9_]+)\}/g)]
+        .map((match) => match[1])
+        .sort();
+      if (
+        placeholders.length !== expectedPlaceholders.length
+        || placeholders.some((placeholder, index) => placeholder !== expectedPlaceholders[index])
+      ) {
+        issues.push(`${key}:${language}:placeholders`);
+      }
     }
   }
   return issues;
