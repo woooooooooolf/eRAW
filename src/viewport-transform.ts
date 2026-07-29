@@ -10,6 +10,22 @@ export interface ImageRect {
   height: number;
 }
 
+export function snapCoordinateToPhysicalPixels(
+  coordinate: number,
+  viewportSize: number,
+  framebufferSize: number,
+): number {
+  if (
+    !Number.isFinite(coordinate)
+    || !Number.isFinite(viewportSize)
+    || !Number.isFinite(framebufferSize)
+    || viewportSize <= 0
+    || framebufferSize <= 0
+  ) return coordinate;
+  const scale = framebufferSize / viewportSize;
+  return Math.round(coordinate * scale) / scale;
+}
+
 export class ViewportTransform {
   cameraX = 0;
   cameraY = 0;
