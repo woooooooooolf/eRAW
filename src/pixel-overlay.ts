@@ -30,6 +30,7 @@ interface InspectionCache {
 
 interface PixelOverlayLayout {
   active: boolean;
+  showValues: boolean;
   fontSize: number;
   lineHeight: number;
   valueDisplay: PixelValueDisplay;
@@ -121,6 +122,10 @@ export class PixelValueOverlay {
       this.clear();
       return;
     }
+    if (!layout.showValues) {
+      this.drawGrid(view, rect);
+      return;
+    }
     if (!this.cacheCovers(view, rect)) {
       this.clear();
       this.queue(view, rect);
@@ -135,7 +140,6 @@ export class PixelValueOverlay {
 
   private layout(view: PixelOverlayView): PixelOverlayLayout {
     const valueDisplay = resolvePixelValueDisplay(view.displayMode, this.demosaicValues);
-    if (!this.enabled) return { active: false, fontSize: 10, lineHeight: 13, valueDisplay };
     const rgbRows = valueDisplay === "rgb";
     const fontSize = Math.min(12, Math.max(10, view.transform.zoom * 0.19));
     const lineHeight = fontSize + 2;
@@ -148,7 +152,13 @@ export class PixelValueOverlay {
     const active = this.visible
       ? view.transform.zoom >= requiredSize - 4
       : view.transform.zoom >= requiredSize;
-    return { active, fontSize, lineHeight, valueDisplay };
+    return {
+      active,
+      showValues: this.enabled,
+      fontSize,
+      lineHeight,
+      valueDisplay,
+    };
   }
 
   private visibleRect(view: PixelOverlayView): { x: number; y: number; width: number; height: number } | null {
@@ -178,16 +188,36 @@ export class PixelValueOverlay {
       && rect.y + rect.height <= this.cache.y + this.cache.height);
   }
 
+  private drawGrid(
+    view: PixelOverlayView,
+    rect: { x: number; y: number; width: number; height: number },
+  ): void {
+    const dpr = this.canvas.width / view.width;
+    this.context.setTransform(1, 0, 0, 1, 0, 0);
+    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.context.strokeStyle = "rgba(142,205,228,.22)";
+    this.context.lineWidth = 1;
+    for (let y = rect.y; y < rect.y + rect.height; y += 1) {
+      for (let x = rect.x; x < rect.x + rect.width; x += 1) {
+        const screen = view.transform.imageToScreen({ x, y });
+        this.context.strokeRect(
+          screen.x + 0.5,
+          screen.y + 0.5,
+          view.transform.zoom - 1,
+          view.transform.zoom - 1,
+        );
+      }
+    }
+  }
+
   private drawValues(
     view: PixelOverlayView,
     rect: { x: number; y: number; width: number; height: number },
     layout: PixelOverlayLayout,
   ): void {
     const cache = this.cache!;
-    const dpr = this.canvas.width / view.width;
-    this.context.setTransform(1, 0, 0, 1, 0, 0);
-    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.drawGrid(view, rect);
     this.context.font = `600 ${layout.fontSize}px "Cascadia Mono", Consolas, monospace`;
     this.context.textAlign = "center";
     this.context.textBaseline = "middle";
@@ -215,14 +245,6 @@ export class PixelValueOverlay {
             + 0.0722 * linearize(normalize(blue))
           : linearize(normalize(raw));
         const lightBackground = luminance > 0.179;
-        this.context.strokeStyle = "rgba(142,205,228,.22)";
-        this.context.lineWidth = 1;
-        this.context.strokeRect(
-          screenX + 0.5,
-          screenY + 0.5,
-          view.transform.zoom - 1,
-          view.transform.zoom - 1,
-        );
         this.context.strokeStyle = lightBackground ? "rgba(255,255,255,.58)" : "rgba(0,0,0,.72)";
         this.context.fillStyle = lightBackground ? "rgba(7,10,14,.94)" : "rgba(244,250,253,.96)";
         this.context.lineWidth = Math.max(1.5, layout.fontSize * 0.18);
