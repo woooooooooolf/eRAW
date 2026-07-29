@@ -45,7 +45,7 @@ test("the persisted preference is applied as a presentation-only viewport settin
   assert.match(viewportSource, /gl\.uniform3f\(this\.channelTintLocation/);
 });
 
-test("the shader preserves non-grayscale diagnostic pixels", () => {
+test("the shader preserves pixels that are already colorized", () => {
   assert.match(viewportSource, /float spread =/);
   assert.match(viewportSource, /mix\(color\.rgb \* u_channel_tint, color\.rgb/);
 });

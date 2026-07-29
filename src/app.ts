@@ -20,6 +20,12 @@ import {
   type LanguagePreference,
   type MessageKey,
 } from "./i18n";
+import {
+  DEFAULT_MISSING_PIXEL_APPEARANCE,
+  isMissingPixelPattern,
+  normalizeMissingPixelColor,
+  type MissingPixelPattern,
+} from "./missing-pixel-rendering";
 import { RawViewport, type ImagePoint, type TileTimingStats } from "./viewport";
 import type {
   BitAlignment,
@@ -40,7 +46,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.2.6";
+const VERSION = "0.2.7";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -67,6 +73,8 @@ interface AppSettings {
   pixelValuesEnabled: boolean;
   demosaicPixelValues: DemosaicPixelValueMode;
   channelRendering: ChannelRenderingMode;
+  missingPixelPattern: MissingPixelPattern;
+  missingPixelColor: string;
 }
 
 interface RuntimeDiagnostic {
@@ -126,6 +134,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   pixelValuesEnabled: true,
   demosaicPixelValues: "rgb",
   channelRendering: "color",
+  missingPixelPattern: DEFAULT_MISSING_PIXEL_APPEARANCE.pattern,
+  missingPixelColor: DEFAULT_MISSING_PIXEL_APPEARANCE.color,
 };
 
 function icon(path: string): string {
@@ -177,6 +187,8 @@ function loadSettings(): AppSettings {
         pixelValuesEnabled: typeof value.pixelValuesEnabled === "boolean" ? value.pixelValuesEnabled : DEFAULT_SETTINGS.pixelValuesEnabled,
         demosaicPixelValues: ["rawDn", "rgb"].includes(value.demosaicPixelValues ?? "") ? value.demosaicPixelValues as DemosaicPixelValueMode : DEFAULT_SETTINGS.demosaicPixelValues,
         channelRendering: ["color", "grayscale"].includes(value.channelRendering ?? "") ? value.channelRendering as ChannelRenderingMode : DEFAULT_SETTINGS.channelRendering,
+        missingPixelPattern: isMissingPixelPattern(value.missingPixelPattern) ? value.missingPixelPattern : DEFAULT_SETTINGS.missingPixelPattern,
+        missingPixelColor: normalizeMissingPixelColor(value.missingPixelColor),
       };
     }
   } catch { /* 使用安全默认值 */ }
@@ -368,6 +380,32 @@ export class ErawApp {
                   <label class="parameter-row processing-toggle-row" id="remosaic-processing-row" hidden>
                     <span class="field-label" data-help="按目标 Bayer 站点从相同颜色的 QCFA 样本进行双线性重建。相比仅重排需要更多 CPU 计算，超大图像或频繁缩放时，瓦片完成时间可能明显增加。">同色双线性重建（高计算量）</span>
                     <input id="processing-same-color-reconstruction" type="checkbox" role="switch"/>
+                  </label>
+                </div>
+              </section>
+
+              <section class="parameter-section open" id="presentation-section">
+                <button class="section-title"><span>画面呈现</span><i>−</i></button>
+                <div class="section-content field-grid">
+                  <label class="parameter-row">
+                    <span class="field-label" data-help="仅改变 R/G/B 通道视图的着色，不改变重建 DN 或导出数据">RGB 通道渲染</span>
+                    <select id="presentation-channel-rendering"><option value="color">通道颜色</option><option value="grayscale">灰度（仅强度）</option></select>
+                  </label>
+                  <label class="parameter-row processing-toggle-row">
+                    <span class="field-label" data-help="RAW 强度与 Bayer 点阵始终显示原始 DN">高倍率显示像素值</span>
+                    <input id="presentation-pixel-values" type="checkbox" role="switch"/>
+                  </label>
+                  <label class="parameter-row" id="presentation-demosaic-values-row">
+                    <span class="field-label" data-help="RGB 为原始位深范围内的插值分量，不是 8-bit 显示值">Demosaic 数值内容</span>
+                    <select id="presentation-demosaic-pixel-values"><option value="rawDn">原始 DN</option><option value="rgb">三行插值 RGB</option></select>
+                  </label>
+                  <label class="parameter-row">
+                    <span class="field-label" data-help="只改变预览中无法从文件读取的像素，不改变导出填充值">缺失数据外观</span>
+                    <select id="presentation-missing-pixel-pattern"><option value="darkCheckerboard">深色棋盘格</option><option value="lightCheckerboard">浅色棋盘格</option><option value="solid">纯色</option></select>
+                  </label>
+                  <label class="parameter-row presentation-color-row" id="presentation-missing-pixel-color-row">
+                    <span class="field-label">纯色颜色</span>
+                    <input id="presentation-missing-pixel-color" type="color" value="#808080"/>
                   </label>
                 </div>
               </section>
@@ -599,11 +637,6 @@ export class ErawApp {
           <label class="settings-row"><div><strong>滚轮缩放速度</strong><span>缩放始终以鼠标指向的图像位置为中心</span></div><select id="setting-wheel-speed"><option value="gentle">柔和</option><option value="standard">标准</option><option value="fast">快速</option></select></label>
           <label class="settings-row toggle-row"><div><strong>记住 RAW 参数</strong><span>下次启动时恢复尺寸、packing、CFA 和对齐配置</span></div><input id="setting-remember-descriptor" type="checkbox"/></label>
         </section>
-        <section class="settings-group"><div class="settings-heading"><h3>像素检查</h3><p>控制通道着色；数值仅在像素格能够完整容纳时显示。</p></div>
-          <label class="settings-row"><div><strong>RGB 通道渲染</strong><span>仅改变 R/G/B 通道视图的着色，不改变重建 DN 或导出数据</span></div><select id="setting-channel-rendering"><option value="color">通道颜色</option><option value="grayscale">灰度（仅强度）</option></select></label>
-          <label class="settings-row toggle-row"><div><strong>高倍率显示像素值</strong><span>RAW 强度与 Bayer 点阵始终显示原始 DN</span></div><input id="setting-pixel-values" type="checkbox"/></label>
-          <label class="settings-row" id="demosaic-pixel-values-row"><div><strong>Demosaic 数值内容</strong><span>RGB 为原始位深范围内的插值分量，不是 8-bit 显示值</span></div><select id="setting-demosaic-pixel-values"><option value="rawDn">原始 DN</option><option value="rgb">三行插值 RGB</option></select></label>
-        </section>
         <section class="settings-group"><div class="settings-heading"><h3>性能</h3><p>更大的 GPU 缓存可减少超大图像来回拖动时的瓦片重载。</p></div>
           <label class="settings-row"><div><strong>GPU 瓦片缓存</strong><span>只缓存预览纹理，不复制完整 RAW 文件</span></div><select id="setting-tile-cache"><option value="compact">32 MiB</option><option value="balanced">64 MiB（推荐）</option><option value="large">128 MiB</option></select></label>
         </section>
@@ -736,7 +769,11 @@ export class ErawApp {
     this.get<HTMLInputElement>("frame-input").addEventListener("change", (event) => this.setFrame(Number((event.currentTarget as HTMLInputElement).value) - 1));
     this.get("confirm-settings").addEventListener("click", () => this.saveSettingsFromDialog());
     this.get("reset-settings").addEventListener("click", () => this.writeSettingsForm(DEFAULT_SETTINGS));
-    this.get<HTMLInputElement>("setting-pixel-values").addEventListener("change", () => this.updatePixelSettingsAvailability());
+    this.get<HTMLSelectElement>("presentation-channel-rendering").addEventListener("change", () => this.savePresentationSettings());
+    this.get<HTMLInputElement>("presentation-pixel-values").addEventListener("change", () => this.savePresentationSettings());
+    this.get<HTMLSelectElement>("presentation-demosaic-pixel-values").addEventListener("change", () => this.savePresentationSettings());
+    this.get<HTMLSelectElement>("presentation-missing-pixel-pattern").addEventListener("change", () => this.savePresentationSettings());
+    this.get<HTMLInputElement>("presentation-missing-pixel-color").addEventListener("input", () => this.savePresentationSettings());
     this.get("pixel-locator-form").addEventListener("submit", (event) => { event.preventDefault(); this.locatePixel(); });
     this.get("close-pixel-locator").addEventListener("click", () => this.get<HTMLDialogElement>("pixel-locator-dialog").close());
     this.get("cancel-pixel-locator").addEventListener("click", () => this.get<HTMLDialogElement>("pixel-locator-dialog").close());
@@ -1500,11 +1537,7 @@ export class ErawApp {
     this.get<HTMLSelectElement>("setting-open-view").value = settings.openView;
     this.get<HTMLSelectElement>("setting-wheel-speed").value = settings.wheelSpeed;
     this.get<HTMLInputElement>("setting-remember-descriptor").checked = settings.rememberDescriptor;
-    this.get<HTMLInputElement>("setting-pixel-values").checked = settings.pixelValuesEnabled;
-    this.get<HTMLSelectElement>("setting-demosaic-pixel-values").value = settings.demosaicPixelValues;
-    this.get<HTMLSelectElement>("setting-channel-rendering").value = settings.channelRendering;
     this.get<HTMLSelectElement>("setting-tile-cache").value = settings.tileCache;
-    this.updatePixelSettingsAvailability();
   }
 
   private saveSettingsFromDialog(): void {
@@ -1519,9 +1552,11 @@ export class ErawApp {
       language: this.settings.language,
       sidebarWidth: this.settingsFormSidebarWidth,
       sidebarPosition: this.get<HTMLSelectElement>("setting-sidebar-position").value as SidebarPosition,
-      pixelValuesEnabled: this.get<HTMLInputElement>("setting-pixel-values").checked,
-      demosaicPixelValues: this.get<HTMLSelectElement>("setting-demosaic-pixel-values").value as DemosaicPixelValueMode,
-      channelRendering: this.get<HTMLSelectElement>("setting-channel-rendering").value as ChannelRenderingMode,
+      pixelValuesEnabled: this.settings.pixelValuesEnabled,
+      demosaicPixelValues: this.settings.demosaicPixelValues,
+      channelRendering: this.settings.channelRendering,
+      missingPixelPattern: this.settings.missingPixelPattern,
+      missingPixelColor: this.settings.missingPixelColor,
     };
     this.persistSettings();
     if (this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(this.descriptor));
@@ -1549,13 +1584,55 @@ export class ErawApp {
       enabled: this.settings.pixelValuesEnabled,
       demosaicValues: this.settings.demosaicPixelValues,
     });
+    this.viewport.setMissingPixelAppearance({
+      pattern: this.settings.missingPixelPattern,
+      color: this.settings.missingPixelColor,
+    });
+    this.writePresentationControls();
     this.setSidebarWidth(this.settings.sidebarWidth, false);
   }
 
-  private updatePixelSettingsAvailability(): void {
-    const enabled = this.get<HTMLInputElement>("setting-pixel-values").checked;
-    this.get<HTMLSelectElement>("setting-demosaic-pixel-values").disabled = !enabled;
-    this.get("demosaic-pixel-values-row").classList.toggle("settings-disabled", !enabled);
+  private writePresentationControls(): void {
+    this.get<HTMLSelectElement>("presentation-channel-rendering").value = this.settings.channelRendering;
+    this.get<HTMLInputElement>("presentation-pixel-values").checked = this.settings.pixelValuesEnabled;
+    this.get<HTMLSelectElement>("presentation-demosaic-pixel-values").value = this.settings.demosaicPixelValues;
+    this.get<HTMLSelectElement>("presentation-missing-pixel-pattern").value = this.settings.missingPixelPattern;
+    this.get<HTMLInputElement>("presentation-missing-pixel-color").value = this.settings.missingPixelColor;
+    this.updatePresentationAvailability();
+  }
+
+  private savePresentationSettings(): void {
+    this.settings.channelRendering =
+      this.get<HTMLSelectElement>("presentation-channel-rendering").value as ChannelRenderingMode;
+    this.settings.pixelValuesEnabled =
+      this.get<HTMLInputElement>("presentation-pixel-values").checked;
+    this.settings.demosaicPixelValues =
+      this.get<HTMLSelectElement>("presentation-demosaic-pixel-values").value as DemosaicPixelValueMode;
+    this.settings.missingPixelPattern =
+      this.get<HTMLSelectElement>("presentation-missing-pixel-pattern").value as MissingPixelPattern;
+    this.settings.missingPixelColor = normalizeMissingPixelColor(
+      this.get<HTMLInputElement>("presentation-missing-pixel-color").value,
+    );
+    this.persistSettings();
+    this.viewport.setChannelRendering(this.settings.channelRendering);
+    this.viewport.setPixelInspectionPreferences({
+      enabled: this.settings.pixelValuesEnabled,
+      demosaicValues: this.settings.demosaicPixelValues,
+    });
+    this.viewport.setMissingPixelAppearance({
+      pattern: this.settings.missingPixelPattern,
+      color: this.settings.missingPixelColor,
+    });
+    this.updatePresentationAvailability();
+  }
+
+  private updatePresentationAvailability(): void {
+    const pixelValuesEnabled = this.get<HTMLInputElement>("presentation-pixel-values").checked;
+    this.get<HTMLSelectElement>("presentation-demosaic-pixel-values").disabled = !pixelValuesEnabled;
+    this.get("presentation-demosaic-values-row").classList.toggle("presentation-disabled", !pixelValuesEnabled);
+    const solid = this.get<HTMLSelectElement>("presentation-missing-pixel-pattern").value === "solid";
+    this.get<HTMLInputElement>("presentation-missing-pixel-color").disabled = !solid;
+    this.get("presentation-missing-pixel-color-row").classList.toggle("presentation-disabled", !solid);
   }
 
   private showToast(message: string, type: "success" | "error" | "busy", duration = 3200): void {

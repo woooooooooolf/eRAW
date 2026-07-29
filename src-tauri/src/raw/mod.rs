@@ -1188,12 +1188,10 @@ pub fn render_tile_cancellable(
                 output[index + 2] = normalize(rgb[2], request.display_min, max_value);
                 output[index + 3] = 255;
             } else {
-                let light = ((ox / 12 + oy / 12) & 1) == 0;
-                output[index..index + 4].copy_from_slice(if light {
-                    &[82, 29, 48, 255]
-                } else {
-                    &[48, 20, 33, 255]
-                });
+                // Alpha 254 is an internal preview marker. The WebGL shader
+                // replaces it with the user's missing-data appearance; alpha
+                // 0 remains reserved for pixels outside the image boundary.
+                output[index..index + 4].copy_from_slice(&[0, 0, 0, 254]);
             }
         }
     }
@@ -2019,8 +2017,25 @@ mod tests {
         let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
         assert_eq!(&tile[0..4], &[128, 128, 128, 255]);
         let missing = 40 * 4;
-        assert!(tile[missing] == 82 || tile[missing] == 48);
+        assert_eq!(&tile[missing..missing + 4], &[0, 0, 0, 254]);
+        let missing_later_row = (63 * 64 + 63) * 4;
+        assert_eq!(&tile[missing_later_row..missing_later_row + 4], &[0, 0, 0, 254]);
         assert_eq!(tile.len(), 64 * 64 * 4);
+
+        let smaller = RawDescriptor {
+            width: 32,
+            height: 32,
+            ..d
+        };
+        let complete_bytes = vec![128u8; 32 * 32];
+        let (smaller_layout, _) = calculate_layout(&smaller, complete_bytes.len() as u64);
+        let smaller_tile =
+            render_tile(&complete_bytes, &smaller, &smaller_layout, &request).unwrap();
+        let outside_image = 32 * 4;
+        assert_eq!(
+            &smaller_tile[outside_image..outside_image + 4],
+            &[0, 0, 0, 0]
+        );
     }
 
     #[test]

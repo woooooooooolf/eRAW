@@ -20,7 +20,7 @@ test("the frontend exposes and invokes the backend close command", () => {
 
 test("closing a document clears viewport-owned resources", () => {
   const clearMethod = viewportSource.match(
-    /clearDocument\(\): void \{(?<body>[\s\S]*?)\n  \}\n\n  setFrame/,
+    /clearDocument\(\): void \{(?<body>[\s\S]*?)\r?\n  \}\r?\n\r?\n  setFrame/,
   )?.groups?.body;
   assert.ok(clearMethod);
   assert.match(clearMethod, /this\.document = null/);

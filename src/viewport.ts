@@ -5,6 +5,11 @@ import {
   type ChannelRenderingMode,
 } from "./channel-rendering";
 import { t, type MessageKey } from "./i18n";
+import {
+  hexColorToUnitRgb,
+  missingPixelPatternIndex,
+  type MissingPixelAppearance,
+} from "./missing-pixel-rendering";
 import { PixelValueOverlay } from "./pixel-overlay";
 import {
   DEFAULT_PROCESSING_SETTINGS,
@@ -85,6 +90,8 @@ uniform sampler2D u_texture;
 uniform vec4 u_rect;
 uniform float u_opacity;
 uniform vec3 u_channel_tint;
+uniform int u_missing_pattern;
+uniform vec3 u_missing_color;
 in vec2 v_image_point;
 out vec4 outColor;
 void main() {
@@ -92,6 +99,24 @@ void main() {
   vec2 local = (v_image_point - u_rect.xy) / u_rect.zw;
   ivec2 texel = clamp(ivec2(floor(local * vec2(texture_size))), ivec2(0), texture_size - 1);
   vec4 color = texelFetch(u_texture, texel, 0);
+  bool missing = abs(color.a - 254.0 / 255.0) < 0.25 / 255.0;
+  if (missing) {
+    vec2 texel_span = u_rect.zw / vec2(texture_size);
+    ivec2 image_texel = ivec2(floor(v_image_point / texel_span));
+    ivec2 checker_cell = image_texel / 12;
+    bool light_square = ((checker_cell.x + checker_cell.y) % 2) == 0;
+    vec3 dark_checker = light_square
+      ? vec3(73.0, 81.0, 92.0) / 255.0
+      : vec3(41.0, 47.0, 55.0) / 255.0;
+    vec3 light_checker = light_square
+      ? vec3(232.0, 236.0, 241.0) / 255.0
+      : vec3(198.0, 204.0, 212.0) / 255.0;
+    vec3 missing_color = u_missing_pattern == 0
+      ? dark_checker
+      : (u_missing_pattern == 1 ? light_checker : u_missing_color);
+    outColor = vec4(missing_color, u_opacity);
+    return;
+  }
   float spread = max(max(abs(color.r - color.g), abs(color.g - color.b)), abs(color.r - color.b));
   vec3 tinted = mix(color.rgb * u_channel_tint, color.rgb, step(0.5 / 255.0, spread));
   outColor = vec4(tinted, color.a * u_opacity);
@@ -139,6 +164,8 @@ export class RawViewport {
   private readonly zoomLocation: WebGLUniformLocation;
   private readonly opacityLocation: WebGLUniformLocation;
   private readonly channelTintLocation: WebGLUniformLocation;
+  private readonly missingPatternLocation: WebGLUniformLocation;
+  private readonly missingColorLocation: WebGLUniformLocation;
   private readonly horizontalScrollbar: HTMLElement;
   private readonly horizontalThumb: HTMLElement;
   private readonly verticalScrollbar: HTMLElement;
@@ -172,6 +199,10 @@ export class RawViewport {
   private maxTextures = DEFAULT_MAX_TEXTURES;
   private wheelSensitivity = 0.0015;
   private channelRendering: ChannelRenderingMode = "color";
+  private missingPixelAppearance: MissingPixelAppearance = {
+    pattern: "darkCheckerboard",
+    color: "#808080",
+  };
   private animationFrame = 0;
   private lastSampleKey = "";
   private renderCounter = 0;
@@ -211,6 +242,8 @@ export class RawViewport {
     this.zoomLocation = this.requireUniform("u_zoom");
     this.opacityLocation = this.requireUniform("u_opacity");
     this.channelTintLocation = this.requireUniform("u_channel_tint");
+    this.missingPatternLocation = this.requireUniform("u_missing_pattern");
+    this.missingColorLocation = this.requireUniform("u_missing_color");
     this.horizontalScrollbar = container.querySelector<HTMLElement>(".image-scrollbar.horizontal")!;
     this.horizontalThumb = this.horizontalScrollbar.querySelector<HTMLElement>(".scroll-thumb")!;
     this.verticalScrollbar = container.querySelector<HTMLElement>(".image-scrollbar.vertical")!;
@@ -364,6 +397,15 @@ export class RawViewport {
   setChannelRendering(mode: ChannelRenderingMode): void {
     if (mode === this.channelRendering) return;
     this.channelRendering = mode;
+    this.requestDraw();
+  }
+
+  setMissingPixelAppearance(appearance: MissingPixelAppearance): void {
+    if (
+      appearance.pattern === this.missingPixelAppearance.pattern
+      && appearance.color === this.missingPixelAppearance.color
+    ) return;
+    this.missingPixelAppearance = { ...appearance };
     this.requestDraw();
   }
 
@@ -726,6 +768,17 @@ export class RawViewport {
     gl.uniform1f(this.zoomLocation, this.zoom);
     const tint = channelTint(this.settings.mode, this.channelRendering);
     gl.uniform3f(this.channelTintLocation, tint[0], tint[1], tint[2]);
+    gl.uniform1i(
+      this.missingPatternLocation,
+      missingPixelPatternIndex(this.missingPixelAppearance.pattern),
+    );
+    const missingColor = hexColorToUnitRgb(this.missingPixelAppearance.color);
+    gl.uniform3f(
+      this.missingColorLocation,
+      missingColor[0],
+      missingColor[1],
+      missingColor[2],
+    );
     const fineLoaded = this.drawLayer(plan.fineLevel, fineVisible, 1);
     const coarseLoaded = plan.coarseLevel === null
       ? 0
