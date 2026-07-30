@@ -18,6 +18,7 @@ import { localizeBackendError } from "./backend-error";
 import type { ChannelRenderingMode } from "./channel-rendering";
 import { normalizeIntegerInput } from "./descriptor-input";
 import { ExportDialog, exportDialogTemplate } from "./export-dialog";
+import { packingControlState } from "./packing-controls";
 import {
   formatDateTime,
   formatTime,
@@ -195,6 +196,14 @@ export class ErawApp {
     root.innerHTML = this.template();
     localizeTree(root);
     this.writeDescriptor(this.descriptor);
+    this.updatePackingDependentUi();
+    const normalizedBitDepth = Number(this.descriptorFieldValue("bitDepth"));
+    if (normalizedBitDepth !== this.descriptor.bitDepth) {
+      this.descriptor = { ...this.descriptor, bitDepth: normalizedBitDepth };
+      if (this.settings.rememberDescriptor) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.descriptor));
+      }
+    }
     this.exportDialog = new ExportDialog(root, {
       onSuccess: (message) => this.showToast(message, "success", 6000),
     });
@@ -298,8 +307,8 @@ export class ErawApp {
                 <button class="section-title"><span>图像格式</span><i>−</i></button>
                 <div class="section-content field-grid">
                   ${this.dimensionField()}
-                  ${this.selectField("bitDepth", "位深", `<option value="8">8 bit</option><option value="9">9 bit</option><option value="10">10 bit</option><option value="11">11 bit</option><option value="12">12 bit</option><option value="13">13 bit</option><option value="14">14 bit</option><option value="15">15 bit</option><option value="16">16 bit</option>`)}
                   ${this.selectField("packing", "存储方式", `<option value="unpacked8">Unpacked 8</option><option value="unpacked16">Unpacked 16</option><option value="mipiRaw10">MIPI RAW10</option><option value="mipiRaw12">MIPI RAW12</option><option value="mipiRaw14">MIPI RAW14</option>`)}
+                  ${this.selectField("bitDepth", "位深", `<option value="8">8 bit</option><option value="9">9 bit</option><option value="10">10 bit</option><option value="11">11 bit</option><option value="12">12 bit</option><option value="13">13 bit</option><option value="14">14 bit</option><option value="15">15 bit</option><option value="16">16 bit</option>`)}
                   ${this.segmentedField("endianness", "字节序", [["little", "Little"], ["big", "Big"]])}
                   ${this.segmentedField("bitAlignment", "有效位位置", [["lsb", "低位 LSB"], ["msb", "高位 MSB"]])}
                   ${this.selectField("cfa", "CFA 排列", `<option value="MONO">Mono</option><optgroup label="标准 Bayer"><option value="RGGB">RGGB</option><option value="BGGR">BGGR</option><option value="GBRG">GBRG</option><option value="GRBG">GRBG</option></optgroup><optgroup label="Quad CFA"><option value="QRGGB">Quad RGGB</option><option value="QBGGR">Quad BGGR</option><option value="QGBRG">Quad GBRG</option><option value="QGRBG">Quad GRBG</option></optgroup>`)}
@@ -442,12 +451,12 @@ export class ErawApp {
   }
 
   private selectField(field: string, label: string, options: string): string {
-    return `<div class="parameter-row"><span class="field-label" data-help="${this.parameterHelp(field)}">${label}</span><select id="descriptor-${field}" data-field="${field}" aria-label="${label}">${options}</select></div>`;
+    return `<div class="parameter-row" id="${field}-row"><span class="field-label" data-help="${this.parameterHelp(field)}">${label}</span><select id="descriptor-${field}" data-field="${field}" aria-label="${label}">${options}</select></div>`;
   }
 
   private segmentedField(field: string, label: string, options: Array<[string, string]>): string {
     const buttons = options.map(([value, text]) => `<button type="button" data-value="${value}" aria-pressed="false">${text}</button>`).join("");
-    return `<div class="parameter-row"><span class="field-label" id="${field}-label" data-help="${this.parameterHelp(field)}">${label}</span><div class="segmented-control" data-field="${field}" role="group" aria-labelledby="${field}-label">${buttons}</div></div>`;
+    return `<div class="parameter-row" id="${field}-row"><span class="field-label" id="${field}-label" data-help="${this.parameterHelp(field)}">${label}</span><div class="segmented-control" data-field="${field}" role="group" aria-labelledby="${field}-label">${buttons}</div></div>`;
   }
 
   private numberField(field: string, label: string, unit: string, min: number, max?: number, hint?: string, descriptorField = true, adjustable = false): string {
@@ -657,7 +666,7 @@ export class ErawApp {
     this.root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => button.addEventListener("click", () => this.setDisplayMode(button.dataset.mode as DisplayMode)));
     this.root.querySelectorAll<HTMLElement>("[data-field]").forEach((element) => {
       if (element instanceof HTMLSelectElement) element.addEventListener("change", () => {
-        this.synchronizePackingAndDepth(element.dataset.field ?? "");
+        this.updatePackingDependentUi();
         if (element.dataset.field === "cfa") this.updateCfaDependentUi();
         void this.commitDescriptor();
       });
@@ -730,17 +739,14 @@ export class ErawApp {
     });
   }
 
-  private synchronizePackingAndDepth(changedField: string): void {
+  private updatePackingDependentUi(): void {
     const depth = this.root.querySelector<HTMLSelectElement>('[data-field="bitDepth"]')!;
     const packing = this.root.querySelector<HTMLSelectElement>('[data-field="packing"]')!;
-    if (changedField === "bitDepth" && [9, 11, 13, 15].includes(Number(depth.value))) {
-      packing.value = "unpacked16";
-      return;
-    }
-    if (changedField !== "packing") return;
-    const fixedDepth: Partial<Record<Packing, string>> = { unpacked8: "8", mipiRaw10: "10", mipiRaw12: "12", mipiRaw14: "14" };
-    const value = fixedDepth[packing.value as Packing];
-    if (value) depth.value = value;
+    const state = packingControlState(packing.value as Packing, Number(depth.value));
+    depth.value = String(state.bitDepth);
+    depth.disabled = state.bitDepthLocked;
+    this.get("endianness-row").toggleAttribute("hidden", !state.endiannessVisible);
+    this.get("bitAlignment-row").toggleAttribute("hidden", !state.bitAlignmentVisible);
   }
 
   private bindParameterHelp(): void {

@@ -5,10 +5,10 @@
 | 字段 | 语义 |
 | --- | --- |
 | `width` / `height` | 每帧有效像素尺寸；前端限制为 `1–100000` |
-| `bitDepth` | 有效 DN 位深，当前支持 8–16 bit |
+| `bitDepth` | 有效 DN 位深；Unpacked16 支持 8–16 bit，其余 packing 使用固定位深 |
 | `packing` | 像素在文件中的存储方式 |
 | `endianness` | Unpacked16 容器的大小端 |
-| `bitAlignment` | Unpacked 容器中的有效位位于 LSB 或 MSB |
+| `bitAlignment` | Unpacked16 容器中的有效位位于 LSB 或 MSB；16 bit 时两者等价 |
 | `cfa` | MONO、四种标准 Bayer 或四种 Quad CFA |
 | `cfaPhaseX/Y` | Quad CFA 相位偏移，范围 0–3 |
 | `rowAlignment` / `rowStride` | 行对齐或显式行字节步长 |
@@ -28,13 +28,15 @@ frameStride = align_up(frameBytes, frameAlignment)
 
 | Packing | 位深约束 | 组织方式 |
 | --- | --- | --- |
-| Unpacked8 | 8 bit | 每像素 1 字节；更高描述位深会产生容器不足警告 |
+| Unpacked8 | 8 bit | 每像素 1 字节 |
 | Unpacked16 | 8–16 bit | 每像素 2 字节；支持奇数位深、大小端和 LSB/MSB |
 | MIPI RAW10 | 10 bit | 4 像素 / 5 字节 |
 | MIPI RAW12 | 12 bit | 2 像素 / 3 字节 |
 | MIPI RAW14 | 14 bit | 4 像素 / 7 字节 |
 
 MIPI packing 不是任意连续位流 packing，不能用单一 `packed` 布尔值替代具体格式。
+
+主界面先选择 packing：Unpacked8 与 MIPI RAW10/12/14 会锁定对应位深，并隐藏不参与解码的字节序和有效位位置；Unpacked16 允许选择 8–16 bit，16 bit 时隐藏无实际作用的有效位位置。
 
 ## CFA 与处理链
 
