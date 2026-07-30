@@ -146,10 +146,19 @@ test("theme choices keep full labels available at wide and compact widths", () =
 });
 
 test("the empty-state RGGB mark animates only while motion is allowed", () => {
-  assert.match(styleSource, /\.empty-grid span:nth-child\(1\)[^{]*\{[^}]*--empty-cell-rgb:\s*240 104 123/);
-  assert.match(styleSource, /\.empty-grid span:nth-child\(2\)[^{]*\{[^}]*--empty-cell-rgb:\s*94 211 160/);
-  assert.match(styleSource, /\.empty-grid span:nth-child\(3\)[^{]*\{[^}]*--empty-cell-rgb:\s*94 211 160/);
-  assert.match(styleSource, /\.empty-grid span:nth-child\(4\)[^{]*\{[^}]*--empty-cell-rgb:\s*78 155 244/);
+  assert.match(styleSource, /\.empty-grid\s*\{[^}]*--empty-red-rgb:\s*255 91 124/);
+  assert.match(styleSource, /\.empty-grid\s*\{[^}]*--empty-green-rgb:\s*91 239 157/);
+  assert.match(styleSource, /\.empty-grid\s*\{[^}]*--empty-blue-rgb:\s*79 160 255/);
+  assert.match(
+    styleSource,
+    /html\[data-theme\^="light-"\] \.empty-grid\s*\{[^}]*--empty-green-rgb:\s*9 143 88/,
+  );
+  assert.match(
+    styleSource,
+    /html\[data-theme\^="light-"\] \.empty-grid\s*\{[^}]*--empty-underlay-alpha:\s*\.3/,
+  );
+  assert.match(styleSource, /--empty-near-max:\s*\.58/);
+  assert.match(styleSource, /--empty-far-max:\s*\.32/);
   assert.match(styleSource, /@keyframes empty-grid-spectrum/);
   assert.match(styleSource, /@keyframes empty-grid-halo/);
   assert.match(
