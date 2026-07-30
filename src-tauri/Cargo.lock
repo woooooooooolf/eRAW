@@ -761,7 +761,7 @@ dependencies = [
 
 [[package]]
 name = "eraw"
-version = "0.2.14"
+version = "0.2.13"
 dependencies = [
  "memmap2",
  "serde",
