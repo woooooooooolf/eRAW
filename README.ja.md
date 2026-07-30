@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/woooooooooolf/eRAW/actions/workflows/ci.yml"><img src="https://github.com/woooooooooolf/eRAW/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/woooooooooolf/eRAW?style=flat-square" alt="ライセンス"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-2ea44f?style=flat-square" alt="ライセンス"></a>
   <img src="https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&amp;logo=tauri&amp;logoColor=white" alt="Tauri 2"></a>
 </p>
@@ -19,9 +19,7 @@
 
 ## スクリーンショット
 
-![黒曜石パープルのダークテーマを使用した eRAW メイン画面](docs/images/readme-main-dark.png)
-
-![極昼ブルーのライトテーマを使用した eRAW 設定画面](docs/images/readme-settings-light.png)
+![eRAW 日本語メイン画面](docs/images/readme-main-ja.jpg)
 
 ## 主な機能
 
