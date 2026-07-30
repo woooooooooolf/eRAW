@@ -4,6 +4,11 @@ import {
   channelTint,
   type ChannelRenderingMode,
 } from "./channel-rendering";
+import {
+  drawViewportBackground,
+  renderPreviewCanvas,
+  type PreviewCaptureSnapshot,
+} from "./image-capture";
 import { t, type MessageKey } from "./i18n";
 import {
   hexColorToUnitRgb,
@@ -154,6 +159,7 @@ function createProgram(gl: WebGL2RenderingContext): WebGLProgram {
 export class RawViewport {
   private readonly container: HTMLElement;
   private readonly canvas: HTMLCanvasElement;
+  private readonly pixelCanvas: HTMLCanvasElement;
   private readonly pixelValueOverlay: PixelValueOverlay;
   private readonly gl: WebGL2RenderingContext;
   private readonly callbacks: ViewportCallbacks;
@@ -225,8 +231,9 @@ export class RawViewport {
     this.container = container;
     this.callbacks = callbacks;
     this.canvas = container.querySelector<HTMLCanvasElement>(".raw-canvas")!;
+    this.pixelCanvas = container.querySelector<HTMLCanvasElement>(".pixel-value-overlay")!;
     this.pixelValueOverlay = new PixelValueOverlay(
-      container.querySelector<HTMLCanvasElement>(".pixel-value-overlay")!,
+      this.pixelCanvas,
       {
         onError: (error, messageKey) => this.callbacks.onError(error, messageKey),
         requestDraw: () => this.requestDraw(),
@@ -407,6 +414,143 @@ export class RawViewport {
     ) return;
     this.missingPixelAppearance = { ...appearance };
     this.requestDraw();
+  }
+
+  captureCurrentView(): HTMLCanvasElement {
+    if (!this.document) throw new Error("document_not_open");
+    this.draw();
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+    const output = document.createElement("canvas");
+    output.width = width;
+    output.height = height;
+    const context = output.getContext("2d", { alpha: true });
+    if (!context) throw new Error("capture_canvas_unavailable");
+    const computed = getComputedStyle(this.container);
+    drawViewportBackground(
+      context,
+      width,
+      height,
+      this.width,
+      this.height,
+      {
+        surface: computed.getPropertyValue("--viewport-surface").trim() || computed.backgroundColor,
+        pattern: computed.getPropertyValue("--viewport-pattern").trim() || "transparent",
+        glow: computed.getPropertyValue("--viewport-glow").trim() || "transparent",
+      },
+    );
+
+    const pixels = new Uint8Array(width * height * 4);
+    this.gl.readPixels(0, 0, width, height, this.gl.RGBA, this.gl.UNSIGNED_BYTE, pixels);
+    const rowBytes = width * 4;
+    const flipped = new Uint8ClampedArray(pixels.length);
+    for (let y = 0; y < height; y += 1) {
+      const source = (height - 1 - y) * rowBytes;
+      flipped.set(pixels.subarray(source, source + rowBytes), y * rowBytes);
+    }
+    const rawLayer = document.createElement("canvas");
+    rawLayer.width = width;
+    rawLayer.height = height;
+    const rawContext = rawLayer.getContext("2d");
+    if (!rawContext) throw new Error("capture_canvas_unavailable");
+    rawContext.putImageData(new ImageData(flipped, width, height), 0, 0);
+    context.drawImage(rawLayer, 0, 0);
+    context.drawImage(this.pixelCanvas, 0, 0, width, height);
+    this.drawCaptureOverlays(context, width / this.width, height / this.height);
+    return output;
+  }
+
+  captureFullPreview(): Promise<HTMLCanvasElement> {
+    return renderPreviewCanvas(this.captureSnapshot());
+  }
+
+  private captureSnapshot(): PreviewCaptureSnapshot {
+    if (!this.document) throw new Error("document_not_open");
+    return {
+      generation: this.document.generation,
+      renderRevision: this.renderRevision,
+      frame: this.frame,
+      imageWidth: this.document.descriptor.width,
+      imageHeight: this.document.descriptor.height,
+      mode: this.settings.mode,
+      processing: {
+        ...this.settings.processing,
+        remosaic: { ...this.settings.processing.remosaic },
+      },
+      displayMin: this.settings.displayMin,
+      displayMax: this.settings.displayMax,
+      channelRendering: this.channelRendering,
+      missingPixelAppearance: { ...this.missingPixelAppearance },
+    };
+  }
+
+  private drawCaptureOverlays(
+    context: CanvasRenderingContext2D,
+    scaleX: number,
+    scaleY: number,
+  ): void {
+    context.save();
+    context.scale(scaleX, scaleY);
+    const svg = this.container.querySelector<SVGSVGElement>(".image-boundary");
+    if (svg?.classList.contains("visible")) {
+      svg.querySelectorAll<SVGRectElement>("rect").forEach((rect) => {
+        if (rect.classList.contains("image-selection") && !rect.classList.contains("visible")) return;
+        const style = getComputedStyle(rect);
+        const x = Number(rect.getAttribute("x") ?? 0);
+        const y = Number(rect.getAttribute("y") ?? 0);
+        const width = Number(rect.getAttribute("width") ?? 0);
+        const height = Number(rect.getAttribute("height") ?? 0);
+        if (style.fill && style.fill !== "none" && style.fill !== "rgba(0, 0, 0, 0)") {
+          context.fillStyle = style.fill;
+          context.fillRect(x, y, width, height);
+        }
+        if (style.stroke && style.stroke !== "none") {
+          context.strokeStyle = style.stroke;
+          context.lineWidth = Number.parseFloat(style.strokeWidth) || 1;
+          const dash = style.strokeDasharray
+            .split(/[,\s]+/)
+            .map(Number)
+            .filter((value) => Number.isFinite(value) && value > 0);
+          context.setLineDash(dash);
+          context.strokeRect(x, y, width, height);
+          context.setLineDash([]);
+        }
+      });
+    }
+
+    if (this.crosshair.classList.contains("visible")) {
+      const x = Number.parseFloat(this.crosshair.style.getPropertyValue("--crosshair-x"));
+      const y = Number.parseFloat(this.crosshair.style.getPropertyValue("--crosshair-y"));
+      const line = this.crosshair.querySelector<HTMLElement>(".crosshair-horizontal");
+      context.strokeStyle = line ? getComputedStyle(line).backgroundColor : "rgba(255,255,255,.35)";
+      context.lineWidth = 1;
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(this.width, y);
+      context.moveTo(x, 0);
+      context.lineTo(x, this.height);
+      context.stroke();
+    }
+
+    const containerRect = this.container.getBoundingClientRect();
+    this.container.querySelectorAll<HTMLElement>(".image-scrollbar.visible .scroll-thumb").forEach((thumb) => {
+      const rect = thumb.getBoundingClientRect();
+      const style = getComputedStyle(thumb);
+      context.fillStyle = style.backgroundColor;
+      context.strokeStyle = style.borderColor;
+      context.lineWidth = Number.parseFloat(style.borderWidth) || 1;
+      context.beginPath();
+      context.roundRect(
+        rect.left - containerRect.left,
+        rect.top - containerRect.top,
+        rect.width,
+        rect.height,
+        Number.parseFloat(style.borderRadius) || 0,
+      );
+      context.fill();
+      context.stroke();
+    });
+    context.restore();
   }
 
   setPixelInspectionPreferences(preferences: {

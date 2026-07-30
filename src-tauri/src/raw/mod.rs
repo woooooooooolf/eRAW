@@ -1545,7 +1545,7 @@ fn commit_temporary_output(temporary: &Path, target: &Path) -> Result<(), String
         return fs::rename(temporary, target).map_err(|error| format!("无法完成输出文件：{error}"));
     }
     if target.is_dir() {
-        return Err("所选输出路径是目录，无法写入 RAW 文件".into());
+        return Err("所选输出路径是目录，无法写入输出文件".into());
     }
     let backup = loop {
         let candidate = sibling_path(target, "backup");
@@ -1564,6 +1564,28 @@ fn commit_temporary_output(temporary: &Path, target: &Path) -> Result<(), String
         });
     }
     let _ = fs::remove_file(backup);
+    Ok(())
+}
+
+pub fn write_output_bytes(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let (temporary_path, temporary_file) = create_temporary_output(path)?;
+    let write_result = (|| {
+        let mut writer = BufWriter::with_capacity(1024 * 1024, temporary_file);
+        writer
+            .write_all(bytes)
+            .map_err(|error| format!("写入输出文件失败：{error}"))?;
+        writer
+            .flush()
+            .map_err(|error| format!("刷新输出文件失败：{error}"))
+    })();
+    if let Err(error) = write_result {
+        let _ = fs::remove_file(&temporary_path);
+        return Err(error);
+    }
+    if let Err(error) = commit_temporary_output(&temporary_path, path) {
+        let _ = fs::remove_file(&temporary_path);
+        return Err(error);
+    }
     Ok(())
 }
 
@@ -1865,6 +1887,17 @@ mod tests {
                 blue: 0,
             },
         }
+    }
+
+    #[test]
+    fn output_bytes_create_and_safely_replace_files() {
+        let output = test_output_path("output-bytes");
+        write_output_bytes(&output, b"first").unwrap();
+        assert_eq!(fs::read(&output).unwrap(), b"first");
+
+        write_output_bytes(&output, b"replacement").unwrap();
+        assert_eq!(fs::read(&output).unwrap(), b"replacement");
+        fs::remove_file(&output).unwrap();
     }
 
     #[test]

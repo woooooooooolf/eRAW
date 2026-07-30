@@ -27,6 +27,9 @@ const ERROR_MESSAGES: Record<string, MessageKey> = {
   export_quad_required: "backend.exportQuadRequired",
   export_mono_demosaic: "backend.exportMonoDemosaic",
   export_invalid_alignment: "backend.exportInvalidAlignment",
+  capture_invalid_png: "backend.captureInvalidPng",
+  capture_overwrites_source: "backend.captureOverwritesSource",
+  capture_save_failed: "backend.captureSaveFailed",
 };
 
 function parseBackendError(error: unknown): BackendError | null {

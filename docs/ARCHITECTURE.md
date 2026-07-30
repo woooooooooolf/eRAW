@@ -22,7 +22,7 @@ flowchart LR
 
 前端负责交互、可见瓦片调度和 GPU 合成；Rust 负责文件会话、格式计算、像素读取、处理算法和确定性导出。IPC 只传递结构化请求、文档信息和二进制结果，不传递整幅 RAW 副本。
 
-Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予原生全屏和文件对话框所需权限；F11 直接调用窗口 API，不通过 CSS 模拟或新增 Rust 命令。
+Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予原生全屏、文件对话框和写入图像剪贴板所需权限；F11 直接调用窗口 API，不通过 CSS 模拟或新增 Rust 命令。
 
 ## 模块职责
 
@@ -33,6 +33,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | `src/theme-catalog.ts` | 九套主题的稳定标识、菜单预览元数据、合法性判断和本地化键映射 |
 | `src/descriptor-input.ts` | 数值参数的整数化、边界限制和空值默认规则 |
 | `src/export-dialog.ts` | 冻结导出快照、范围联动、字段校验和导出反馈 |
+| `src/image-capture.ts` / `src/image-output.ts` | 当前画面合成、完整预览瓦片拼接，以及共用的 PNG/剪贴板输出 |
 | `src/i18n.ts` | 语言偏好、系统语言解析、七语文案目录、日期时间格式化和静态 DOM 翻译 |
 | `src/backend-error.ts` | 解析后端结构化错误码，并在当前语言下生成用户消息 |
 | `src/channel-rendering.ts` | 将显示模式与通道渲染偏好映射为纯 GPU 着色参数 |
@@ -43,7 +44,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | `src/pixel-overlay.ts` / `src/pixel-value-display.ts` / `src/pixel-grid-rendering.ts` | 高倍率像素网格、颜色校验，以及与当前显示模式一致的原始、单通道或 RGB 数值叠加 |
 | `src/api.ts` / `src/types.ts` | Tauri 调用封装及前后端共享数据契约 |
 | `src-tauri/src/commands.rs` | 当前文档会话、内存映射、缓存、任务快照和命令边界 |
-| `src-tauri/src/raw/mod.rs` | 布局、packing、CFA、预览、Remosaic、Demosaic、检查与导出 |
+| `src-tauri/src/raw/mod.rs` | 布局、packing、CFA、预览、Remosaic、Demosaic、检查、RAW 导出与原子输出写入 |
 
 `raw/mod.rs` 是无 UI 的领域核心。新格式和算法应优先在这里形成可测试的纯逻辑；`app.ts` 不应承担像素语义。
 
@@ -74,6 +75,7 @@ RawDocument
 - 预览另有 `renderRevision`；帧、模式、参数或 LOD 计划变化时，旧任务协作取消并返回 `stale_render`。
 - 前端 `inFlight` 记录 revision，旧任务结束时不会误删同键的新任务。
 - 导出同时校验来源路径和 `sourceGeneration`，防止对过期配置写文件。
+- 完整预览抓拍同时携带文档世代与渲染 revision；帧、显示或处理状态变化后，旧瓦片结果不会被拼入输出。
 
 ## 缓存与数据传递
 

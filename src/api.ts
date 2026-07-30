@@ -30,6 +30,15 @@ export async function chooseExportFile(defaultPath: string): Promise<string | nu
   return result ?? null;
 }
 
+export async function choosePngFile(defaultPath: string): Promise<string | null> {
+  const result = await save({
+    title: t("capture.saveTitle"),
+    defaultPath,
+    filters: [{ name: "PNG", extensions: ["png"] }],
+  });
+  return result ?? null;
+}
+
 export function openDocument(path: string, descriptor: RawDescriptor): Promise<DocumentInfo> {
   return invoke("open_document", { path, descriptor });
 }
@@ -62,4 +71,8 @@ export function samplePixel(x: number, y: number, frame: number): Promise<PixelS
 
 export function exportDocument(request: ExportRequest): Promise<ExportResult> {
   return invoke("export_document", { request });
+}
+
+export function savePng(path: string, png: Uint8Array): Promise<void> {
+  return invoke("save_png", { path, png });
 }

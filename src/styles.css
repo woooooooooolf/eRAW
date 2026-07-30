@@ -847,6 +847,46 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 .vertical .scroll-thumb { width: 6px; min-height: 42px; }
 .image-scrollbar:hover .scroll-thumb { background: rgba(75, 175, 214, .52); }
 
+.canvas-context-menu {
+  position: fixed;
+  z-index: 90;
+  width: max-content;
+  min-width: 190px;
+  padding: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--modal-surface) 97%, transparent);
+  box-shadow: 0 16px 46px var(--raised-shadow);
+  backdrop-filter: blur(12px);
+}
+.canvas-context-menu[hidden] { display: none; }
+.canvas-context-menu button {
+  display: block;
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--text);
+  background: transparent;
+  font-size: var(--font-sm);
+  text-align: left;
+  white-space: nowrap;
+}
+.canvas-context-menu button:hover,
+.canvas-context-menu button:focus-visible {
+  color: var(--cyan-bright);
+  background: var(--soft-hover);
+  outline: none;
+}
+.canvas-context-menu button:disabled { opacity: .45; pointer-events: none; }
+.canvas-context-menu hr {
+  height: 1px;
+  margin: 4px 6px;
+  border: 0;
+  background: var(--border);
+}
+
 .frame-strip { position: absolute; z-index: 10; left: 50%; bottom: 13px; display: flex; align-items: center; gap: 3px; height: 34px; padding: 3px; border: 1px solid rgba(115, 164, 196, .17); border-radius: 8px; opacity: 0; background: rgba(9, 14, 20, .88); box-shadow: 0 8px 28px rgba(0, 0, 0, .3); backdrop-filter: blur(10px); transform: translate(-50%, 12px); transition: .18s ease; pointer-events: none; }
 .frame-strip.visible { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 .frame-strip button { width: 27px; height: 26px; border-radius: 4px; color: #71879b; background: transparent; font-size: 16px; }

@@ -1,6 +1,12 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import erawIconUrl from "./assets/eraw-icon.svg";
-import { chooseRawFile, closeDocument, openDocument, updateDescriptor } from "./api";
+import {
+  choosePngFile,
+  chooseRawFile,
+  closeDocument,
+  openDocument,
+  updateDescriptor,
+} from "./api";
 import {
   DEFAULT_SETTINGS,
   DEFAULT_SIDEBAR_WIDTH,
@@ -14,7 +20,7 @@ import {
   type UiFontSize,
   type WheelSpeed,
 } from "./app-settings";
-import { localizeBackendError } from "./backend-error";
+import { backendErrorCode, localizeBackendError } from "./backend-error";
 import type { ChannelRenderingMode } from "./channel-rendering";
 import { normalizeIntegerInput } from "./descriptor-input";
 import { ExportDialog, exportDialogTemplate } from "./export-dialog";
@@ -38,6 +44,7 @@ import {
   normalizeMissingPixelColor,
   type MissingPixelPattern,
 } from "./missing-pixel-rendering";
+import { copyCanvasImage, saveCanvasPng } from "./image-output";
 import { normalizePixelGridColor } from "./pixel-grid-rendering";
 import {
   THEMES,
@@ -182,6 +189,7 @@ export class ErawApp {
   private committing = false;
   private commitRevision = 0;
   private fileOperationInProgress = false;
+  private imageCaptureInProgress = false;
   private toastTimer = 0;
   private sidebarWidth = this.settings.sidebarWidth;
   private sidebarResizeStartX = 0;
@@ -394,6 +402,13 @@ export class ErawApp {
               </div>
               <div class="image-scrollbar horizontal"><div class="scroll-thumb"></div></div>
               <div class="image-scrollbar vertical"><div class="scroll-thumb"></div></div>
+            </div>
+            <div id="canvas-context-menu" class="canvas-context-menu" role="menu" aria-label="图像抓拍" hidden>
+              <button type="button" role="menuitem" data-capture-kind="current" data-capture-destination="save">当前画面另存为…</button>
+              <button type="button" role="menuitem" data-capture-kind="current" data-capture-destination="copy">复制当前画面</button>
+              <hr role="separator"/>
+              <button type="button" role="menuitem" data-capture-kind="preview" data-capture-destination="save">完整预览图另存为…</button>
+              <button type="button" role="menuitem" data-capture-kind="preview" data-capture-destination="copy">复制完整预览图</button>
             </div>
             <div class="frame-strip" id="frame-strip">
               <button id="first-frame" title="第一帧">|‹</button><button id="previous-frame" title="上一帧">‹</button>
@@ -636,6 +651,15 @@ export class ErawApp {
       if (!(event.target instanceof Element) || !event.target.closest("#theme-control")) this.setThemeMenuOpen(false);
       if (!(event.target instanceof Element) || !event.target.closest("#utility-control")) this.setUtilityMenuOpen(false);
       if (!(event.target instanceof Element) || !event.target.closest("#export-control")) this.setExportMenuOpen(false);
+      if (!(event.target instanceof Element) || !event.target.closest("#canvas-context-menu")) this.setCanvasContextMenuOpen(false);
+    });
+    document.addEventListener("contextmenu", (event) => this.onContextMenu(event));
+    this.root.querySelectorAll<HTMLButtonElement>("[data-capture-kind][data-capture-destination]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const kind = button.dataset.captureKind as "current" | "preview";
+        const destination = button.dataset.captureDestination as "save" | "copy";
+        void this.performImageCapture(kind, destination);
+      });
     });
     this.get("settings-button").addEventListener("click", () => {
       this.setLanguageMenuOpen(false);
@@ -733,7 +757,11 @@ export class ErawApp {
     this.get("close-zoom-dialog").addEventListener("click", () => this.get<HTMLDialogElement>("zoom-dialog").close());
     this.get("cancel-zoom-dialog").addEventListener("click", () => this.get<HTMLDialogElement>("zoom-dialog").close());
     window.addEventListener("keydown", (event) => this.onKeyDown(event));
-    window.addEventListener("resize", () => this.setSidebarWidth(this.settings.sidebarWidth, false));
+    window.addEventListener("resize", () => {
+      this.setCanvasContextMenuOpen(false);
+      this.setSidebarWidth(this.settings.sidebarWidth, false);
+    });
+    window.addEventListener("blur", () => this.setCanvasContextMenuOpen(false));
     window.addEventListener("languagechange", () => {
       if (this.settings.language === "system") this.setLanguage("system");
     });
@@ -840,6 +868,7 @@ export class ErawApp {
       this.runtimeDiagnostics = [];
       this.viewport.clearDocument();
       this.setExportMenuOpen(false);
+      this.setCanvasContextMenuOpen(false);
       this.setDiagnosticsOpen(false);
       this.get<HTMLDialogElement>("pixel-locator-dialog").close();
       this.get<HTMLDialogElement>("zoom-dialog").close();
@@ -946,6 +975,7 @@ export class ErawApp {
     this.get<HTMLButtonElement>("empty-open-button").disabled = Boolean(info) || this.fileOperationInProgress;
     this.get<HTMLButtonElement>("export-button").disabled = !info || info.layout.frameCount === 0;
     this.updateExportAvailability();
+    this.updateCaptureMenuAvailability();
     this.get<HTMLButtonElement>("pixel-status").disabled = !info;
     this.get<HTMLButtonElement>("zoom-status").disabled = !info;
     const fileStatus = this.get("file-status");
@@ -1249,6 +1279,112 @@ export class ErawApp {
     this.updateDisplay();
   }
 
+  private onContextMenu(event: MouseEvent): void {
+    event.preventDefault();
+    const target = event.target;
+    if (
+      !this.document?.layout.frameCount
+      || !(target instanceof Element)
+      || !target.closest("#viewport")
+    ) {
+      this.setCanvasContextMenuOpen(false);
+      return;
+    }
+    this.openCanvasContextMenu(event.clientX, event.clientY);
+  }
+
+  private openCanvasContextMenu(clientX: number, clientY: number): void {
+    const menu = this.get("canvas-context-menu");
+    const viewportRect = this.get("viewport").getBoundingClientRect();
+    menu.hidden = false;
+    menu.setAttribute("aria-hidden", "false");
+    const margin = 5;
+    const left = Math.max(
+      viewportRect.left + margin,
+      Math.min(clientX, viewportRect.right - menu.offsetWidth - margin),
+    );
+    const top = Math.max(
+      viewportRect.top + margin,
+      Math.min(clientY, viewportRect.bottom - menu.offsetHeight - margin),
+    );
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+    menu.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+  }
+
+  private setCanvasContextMenuOpen(open: boolean): void {
+    const menu = this.get("canvas-context-menu");
+    menu.hidden = !open;
+    menu.setAttribute("aria-hidden", String(!open));
+  }
+
+  private captureDefaultPath(kind: "current" | "preview"): string {
+    const info = this.document;
+    if (!info) return `eRAW-${kind}.png`;
+    const suffix = `-frame-${this.frame + 1}-${this.displayMode}-${kind}.png`;
+    return info.path.replace(/(?:\.[^\\/.]+)?$/, suffix);
+  }
+
+  private async performImageCapture(
+    kind: "current" | "preview",
+    destination: "save" | "copy",
+  ): Promise<void> {
+    if (this.imageCaptureInProgress || !this.document?.layout.frameCount) return;
+    this.setCanvasContextMenuOpen(false);
+    let path: string | null = null;
+    if (destination === "save") {
+      try {
+        path = await choosePngFile(this.captureDefaultPath(kind));
+      } catch (error) {
+        this.reportRuntimeError(error, "capture.failed");
+        return;
+      }
+      if (!path) return;
+    }
+    this.imageCaptureInProgress = true;
+    this.updateCaptureMenuAvailability();
+    try {
+      await this.flushDescriptor();
+      const generation = this.document?.generation;
+      if (generation === undefined) return;
+      this.showToast(
+        t(kind === "current" ? "capture.generatingCurrent" : "capture.generatingPreview"),
+        "busy",
+        60_000,
+      );
+      const canvas = kind === "current"
+        ? this.viewport.captureCurrentView()
+        : await this.viewport.captureFullPreview();
+      if (this.document?.generation !== generation) {
+        this.showToast(t("capture.stale"), "error");
+        return;
+      }
+      if (destination === "save" && path) {
+        await saveCanvasPng(canvas, path);
+        this.showToast(t("capture.saved"), "success");
+      } else {
+        await copyCanvasImage(canvas);
+        this.showToast(t("capture.copied"), "success");
+      }
+    } catch (error) {
+      const code = backendErrorCode(error);
+      if (code === "stale_generation" || code === "stale_render") {
+        this.showToast(t("capture.stale"), "error");
+      } else {
+        this.reportRuntimeError(error, "capture.failed");
+      }
+    } finally {
+      this.imageCaptureInProgress = false;
+      this.updateCaptureMenuAvailability();
+    }
+  }
+
+  private updateCaptureMenuAvailability(): void {
+    const disabled = this.imageCaptureInProgress || !this.document?.layout.frameCount;
+    this.root.querySelectorAll<HTMLButtonElement>("[data-capture-kind][data-capture-destination]")
+      .forEach((button) => { button.disabled = disabled; });
+  }
+
   private updateDisplay(): void {
     this.viewport.setDisplay({
       mode: this.displayMode,
@@ -1423,12 +1559,13 @@ export class ErawApp {
   }
 
   private onKeyDown(event: KeyboardEvent): void {
-    if (event.key === "Escape" && (!this.get("language-popover").hidden || !this.get("theme-popover").hidden || !this.get("utility-popover").hidden || !this.get("export-popover").hidden)) {
+    if (event.key === "Escape" && (!this.get("language-popover").hidden || !this.get("theme-popover").hidden || !this.get("utility-popover").hidden || !this.get("export-popover").hidden || !this.get("canvas-context-menu").hidden)) {
       event.preventDefault();
       this.setLanguageMenuOpen(false);
       this.setThemeMenuOpen(false);
       this.setUtilityMenuOpen(false);
       this.setExportMenuOpen(false);
+      this.setCanvasContextMenuOpen(false);
     }
     else if (event.key === "Escape" && this.root.querySelector(".app-shell")!.classList.contains("diagnostics-open")) { event.preventDefault(); this.setDiagnosticsOpen(false); }
     else if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); void this.openFile(); }

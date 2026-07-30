@@ -1,7 +1,7 @@
 use crate::raw::{
     ExportRequest, ExportResult, PixelInspectionRequest, PixelSample, RawDescriptor, RawLayout,
     RawWarning, TileRequest, calculate_layout, cfa_name_at, export_raw, inspect_pixels, read_pixel,
-    render_tile_cancellable,
+    render_tile_cancellable, write_output_bytes,
 };
 use memmap2::{Mmap, MmapOptions};
 use serde::Serialize;
@@ -438,6 +438,36 @@ pub async fn export_document(
     })
     .await
     .map_err(|error| CommandError::new("export_task_failed").with_cause(error))?
+}
+
+#[tauri::command]
+pub async fn save_png(
+    path: String,
+    png: Vec<u8>,
+    state: State<'_, AppState>,
+) -> Result<(), CommandError> {
+    const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
+    if !png.starts_with(PNG_SIGNATURE) {
+        return Err(CommandError::new("capture_invalid_png"));
+    }
+    let source_path = {
+        let guard = lock_document(&state)?;
+        guard.as_ref().map(|document| document.path.clone())
+    };
+    if let Some(source_path) = source_path {
+        if let (Ok(source), Ok(target)) = (
+            std::fs::canonicalize(source_path),
+            std::fs::canonicalize(&path),
+        ) {
+            if source == target {
+                return Err(CommandError::new("capture_overwrites_source"));
+            }
+        }
+    }
+    tauri::async_runtime::spawn_blocking(move || write_output_bytes(Path::new(&path), &png))
+        .await
+        .map_err(|error| CommandError::new("capture_save_failed").with_cause(error))?
+        .map_err(|error| CommandError::new("capture_save_failed").with_cause(error))
 }
 
 #[cfg(all(test, windows))]
