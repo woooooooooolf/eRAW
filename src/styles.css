@@ -826,11 +826,157 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
   pointer-events: none;
 }
 .empty-state.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-.empty-grid { display: grid; grid-template-columns: 42px 42px; gap: 5px; margin-bottom: 22px; transform: rotate(45deg); }
-.empty-grid span { height: 42px; border: 1px solid rgba(91, 194, 234, .2); background: rgba(58, 159, 201, .035); }
-.empty-grid span:nth-child(1) { border-color: rgba(240, 104, 123, .36); }
-.empty-grid span:nth-child(2), .empty-grid span:nth-child(3) { border-color: rgba(94, 211, 160, .3); }
-.empty-grid span:nth-child(4) { border-color: rgba(78, 155, 244, .36); }
+.empty-grid {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 42px 42px;
+  gap: 5px;
+  margin-bottom: 22px;
+  transform: rotate(45deg);
+}
+.empty-grid::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -22px;
+  border-radius: 50%;
+  opacity: .16;
+  background: conic-gradient(
+    from 0deg,
+    rgba(246, 91, 127, .32),
+    rgba(255, 210, 101, .24),
+    rgba(75, 224, 158, .3),
+    rgba(66, 201, 246, .32),
+    rgba(139, 107, 245, .3),
+    rgba(246, 91, 127, .32)
+  );
+  filter: blur(18px);
+  animation: empty-grid-halo 14s linear infinite;
+  pointer-events: none;
+}
+.empty-grid span {
+  --empty-cell-rgb: 91 194 234;
+  --empty-cell-delay: 0s;
+  position: relative;
+  height: 42px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--empty-cell-rgb) / .32);
+  background: rgb(var(--empty-cell-rgb) / .035);
+  box-shadow:
+    inset 0 0 8px rgb(var(--empty-cell-rgb) / .035),
+    0 0 5px rgb(var(--empty-cell-rgb) / .06);
+  animation: empty-grid-breathe 5.8s ease-in-out infinite;
+  animation-delay: var(--empty-cell-delay);
+}
+.empty-grid span::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  padding: 1px;
+  opacity: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 22%,
+    rgba(246, 91, 127, 0) 31%,
+    rgba(246, 91, 127, .94) 38%,
+    rgba(255, 217, 102, .98) 43%,
+    rgba(75, 224, 158, .98) 48%,
+    rgba(66, 201, 246, .98) 53%,
+    rgba(139, 107, 245, .94) 58%,
+    rgba(246, 91, 127, 0) 66%,
+    transparent 78%
+  );
+  background-position: 130% 130%;
+  background-size: 300% 300%;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: empty-grid-spectrum 9s ease-in-out infinite;
+  animation-delay: var(--empty-cell-delay);
+  pointer-events: none;
+}
+.empty-grid span::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  opacity: .4;
+  background:
+    radial-gradient(
+      circle at 32% 28%,
+      rgb(var(--empty-cell-rgb) / .17),
+      transparent 65%
+    ),
+    linear-gradient(
+      115deg,
+      transparent 24%,
+      rgba(246, 91, 127, 0) 32%,
+      rgba(246, 91, 127, .13) 38%,
+      rgba(255, 217, 102, .15) 44%,
+      rgba(75, 224, 158, .15) 50%,
+      rgba(66, 201, 246, .15) 56%,
+      rgba(139, 107, 245, .13) 62%,
+      rgba(246, 91, 127, 0) 69%,
+      transparent 78%
+    );
+  background-position: center, 130% 130%;
+  background-size: 100% 100%, 300% 300%;
+  animation:
+    empty-grid-inner-glow 5.8s ease-in-out infinite,
+    empty-grid-inner-spectrum 9s ease-in-out infinite;
+  animation-delay: var(--empty-cell-delay), var(--empty-cell-delay);
+  pointer-events: none;
+}
+.empty-grid span:nth-child(1) { --empty-cell-rgb: 240 104 123; --empty-cell-delay: -1.2s; }
+.empty-grid span:nth-child(2) { --empty-cell-rgb: 94 211 160; --empty-cell-delay: -.9s; }
+.empty-grid span:nth-child(3) { --empty-cell-rgb: 94 211 160; --empty-cell-delay: -.6s; }
+.empty-grid span:nth-child(4) { --empty-cell-rgb: 78 155 244; --empty-cell-delay: -.3s; }
+.empty-state.hidden .empty-grid::before,
+.empty-state.hidden .empty-grid span,
+.empty-state.hidden .empty-grid span::before,
+.empty-state.hidden .empty-grid span::after { animation-play-state: paused; }
+@keyframes empty-grid-spectrum {
+  0%, 18% { opacity: 0; background-position: 130% 130%; }
+  30% { opacity: .9; }
+  65% { opacity: .74; }
+  78%, 100% { opacity: 0; background-position: -30% -30%; }
+}
+@keyframes empty-grid-breathe {
+  0%, 100% {
+    background-color: rgb(var(--empty-cell-rgb) / .026);
+    box-shadow:
+      inset 0 0 7px rgb(var(--empty-cell-rgb) / .03),
+      0 0 4px rgb(var(--empty-cell-rgb) / .05);
+  }
+  50% {
+    background-color: rgb(var(--empty-cell-rgb) / .062);
+    box-shadow:
+      inset 0 0 14px rgb(var(--empty-cell-rgb) / .09),
+      0 0 13px rgb(var(--empty-cell-rgb) / .15);
+  }
+}
+@keyframes empty-grid-inner-glow {
+  0%, 100% { opacity: .28; transform: translate(-2px, -2px) scale(.9); }
+  50% { opacity: .72; transform: translate(2px, 2px) scale(1.08); }
+}
+@keyframes empty-grid-inner-spectrum {
+  0%, 18% { background-position: center, 130% 130%; }
+  78%, 100% { background-position: center, -30% -30%; }
+}
+@keyframes empty-grid-halo {
+  0% { opacity: .11; transform: rotate(0deg) scale(.92); }
+  50% { opacity: .23; transform: rotate(180deg) scale(1.08); }
+  100% { opacity: .11; transform: rotate(360deg) scale(.92); }
+}
+html[data-reduce-motion="true"] .empty-grid span { animation: none !important; box-shadow: none; }
+html[data-reduce-motion="true"] .empty-grid::before,
+html[data-reduce-motion="true"] .empty-grid span::before,
+html[data-reduce-motion="true"] .empty-grid span::after { content: none; animation: none !important; }
 .empty-state h1 { margin: 0; color: var(--canvas-text); font-size: 21px; font-weight: 420; letter-spacing: .03em; }
 .empty-state p { margin: 8px 0 20px; color: var(--canvas-muted); font-size: var(--font-md); }
 .empty-state button { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 15px; border: 1px solid rgb(var(--canvas-accent-rgb) / .34); border-radius: 7px; color: var(--canvas-accent); background: rgb(var(--canvas-accent-rgb) / .14); pointer-events: auto; }

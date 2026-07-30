@@ -144,3 +144,20 @@ test("theme choices keep full labels available at wide and compact widths", () =
     /@media \(max-width:\s*1120px\)[\s\S]*?\.theme-options\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)/,
   );
 });
+
+test("the empty-state RGGB mark animates only while motion is allowed", () => {
+  assert.match(styleSource, /\.empty-grid span:nth-child\(1\)[^{]*\{[^}]*--empty-cell-rgb:\s*240 104 123/);
+  assert.match(styleSource, /\.empty-grid span:nth-child\(2\)[^{]*\{[^}]*--empty-cell-rgb:\s*94 211 160/);
+  assert.match(styleSource, /\.empty-grid span:nth-child\(3\)[^{]*\{[^}]*--empty-cell-rgb:\s*94 211 160/);
+  assert.match(styleSource, /\.empty-grid span:nth-child\(4\)[^{]*\{[^}]*--empty-cell-rgb:\s*78 155 244/);
+  assert.match(styleSource, /@keyframes empty-grid-spectrum/);
+  assert.match(styleSource, /@keyframes empty-grid-halo/);
+  assert.match(
+    styleSource,
+    /\.empty-state\.hidden \.empty-grid span::after\s*\{\s*animation-play-state:\s*paused/,
+  );
+  assert.match(
+    styleSource,
+    /html\[data-reduce-motion="true"\] \.empty-grid span\s*\{[^}]*animation:\s*none !important/,
+  );
+});
