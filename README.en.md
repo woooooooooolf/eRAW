@@ -10,7 +10,7 @@
   <a href="README.md">简体中文</a> · English · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.de.md">Deutsch</a>
 </p>
 
-<p align="center"><strong>Current version: V0.2.12</strong></p>
+<p align="center"><strong>Current version: V0.2.13</strong></p>
 
 ## Screenshots
 
