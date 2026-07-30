@@ -59,4 +59,7 @@ test("RGB channel buttons are explicit children of the Demosaic control", () => 
   for (const mode of ["red", "green", "blue"]) {
     assert.ok(styleSource.includes(`.channel-modes button[data-mode="${mode}"].active`));
   }
+  assert.match(styleSource, /\.channel-modes button \{[^}]*width:\s*30px;[^}]*height:\s*26px;/);
+  assert.match(styleSource, /\.channel-modes button::before \{[^}]*inset:\s*3px;/);
+  assert.match(styleSource, /\.demosaic-group \{[^}]*border-left:\s*1px solid var\(--border\)/);
 });

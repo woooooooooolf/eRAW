@@ -30,6 +30,33 @@ function variables(block) {
   );
 }
 
+function resolvedThemeVariables(theme) {
+  const result = variables(selectorBlock(":root"));
+  if (theme.startsWith("light-")) {
+    for (const [name, value] of variables(selectorBlock('html[data-theme^="light-"]'))) {
+      result.set(name, value);
+    }
+  }
+  for (const [name, value] of variables(selectorBlock(`html[data-theme="${theme}"]`))) {
+    result.set(name, value);
+  }
+  return result;
+}
+
+function resolvedValue(values, name) {
+  let value = values.get(name);
+  const visited = new Set([name]);
+  while (value?.startsWith("var(")) {
+    const target = value.match(/^var\((--[a-z0-9-]+)\)$/)?.[1];
+    assert.ok(target, `${name} has an unsupported reference`);
+    assert.equal(visited.has(target), false, `${name} has a circular reference`);
+    visited.add(target);
+    value = values.get(target);
+  }
+  assert.ok(value, `${name} is defined`);
+  return value;
+}
+
 function rgb(hex) {
   assert.match(hex, /^#[0-9a-f]{6}$/i);
   return [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
@@ -68,27 +95,32 @@ test("theme catalog has unique ids and complete localization keys", () => {
   assert.equal(themes.isAppTheme("unknown"), false);
 });
 
-test("new theme title and surface colors meet readable contrast", () => {
+test("every theme keeps primary, secondary, and tertiary text readable", () => {
   const required = [
     "--text",
+    "--muted",
+    "--dim",
+    "--surface-0",
     "--surface-2",
-    "--danger-rgb",
     "--section-title-open-color",
     "--section-title-open-bg",
-    "--section-title-open-edge",
   ];
-  for (const id of ["dark-contrast", "dark-flat", "light-flat"]) {
-    const values = variables(selectorBlock(`html[data-theme="${id}"]`));
+  for (const id of themes.THEMES.map(({ id }) => id)) {
+    const values = resolvedThemeVariables(id);
     for (const name of required) assert.ok(values.has(name), `${id}:${name}`);
+    const surface = resolvedValue(values, "--surface-2");
+    for (const name of ["--text", "--muted", "--dim"]) {
+      assert.ok(
+        contrast(resolvedValue(values, name), surface) >= 4.5,
+        `${id} ${name} contrast`,
+      );
+    }
+    const openBackground = resolvedValue(values, "--section-title-open-bg");
+    const resolvedBackground = openBackground === "transparent"
+      ? resolvedValue(values, "--surface-0")
+      : openBackground;
     assert.ok(
-      contrast(values.get("--text"), values.get("--surface-2")) >= 4.5,
-      `${id} normal text contrast`,
-    );
-    assert.ok(
-      contrast(
-        values.get("--section-title-open-color"),
-        values.get("--section-title-open-bg"),
-      ) >= 4.5,
+      contrast(resolvedValue(values, "--section-title-open-color"), resolvedBackground) >= 4.5,
       `${id} section title contrast`,
     );
   }
@@ -96,4 +128,19 @@ test("new theme title and surface colors meet readable contrast", () => {
   const openRule = selectorBlock(".parameter-section.open > .section-title");
   assert.match(openRule, /var\(--section-title-open-bg\)/);
   assert.match(openRule, /var\(--section-title-open-edge\)/);
+});
+
+test("theme choices keep full labels available at wide and compact widths", () => {
+  const popover = selectorBlock(".theme-popover");
+  const options = selectorBlock(".theme-options");
+  assert.match(popover, /width:\s*540px/);
+  assert.match(options, /grid-template-columns:\s*repeat\(2,/);
+  assert.match(
+    styleSource,
+    /@media \(max-width:\s*1120px\)[\s\S]*?\.theme-popover\s*\{\s*width:\s*304px/,
+  );
+  assert.match(
+    styleSource,
+    /@media \(max-width:\s*1120px\)[\s\S]*?\.theme-options\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)/,
+  );
 });
