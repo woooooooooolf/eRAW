@@ -155,15 +155,16 @@ test("the empty-state RGGB mark animates only while motion is allowed", () => {
   );
   assert.match(
     styleSource,
-    /html\[data-theme\^="light-"\] \.empty-grid\s*\{[^}]*--empty-underlay-alpha:\s*\.3/,
+    /html\[data-theme\^="light-"\] \.empty-grid\s*\{[^}]*--empty-halo-max:\s*\.16/,
   );
-  assert.match(styleSource, /--empty-near-max:\s*\.58/);
-  assert.match(styleSource, /--empty-far-max:\s*\.32/);
+  assert.match(styleSource, /\.empty-grid span\s*\{[^}]*background:\s*transparent/);
+  assert.match(styleSource, /@property --empty-spectrum-angle/);
+  assert.match(styleSource, /\.empty-grid span::before\s*\{[\s\S]*?background:\s*conic-gradient/);
   assert.match(styleSource, /@keyframes empty-grid-spectrum/);
   assert.match(styleSource, /@keyframes empty-grid-halo/);
   assert.match(
     styleSource,
-    /\.empty-state\.hidden \.empty-grid span::after\s*\{\s*animation-play-state:\s*paused/,
+    /\.empty-state\.hidden \.empty-grid span::before\s*\{\s*animation-play-state:\s*paused/,
   );
   assert.match(
     styleSource,
