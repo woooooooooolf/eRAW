@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "V*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build Windows x64 release
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Require a version tag
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+        run: |
+          if ($env:RELEASE_REF_TYPE -ne "tag") {
+            throw "Release must run from a pushed tag."
+          }
+
+          $tag = $env:RELEASE_TAG
+          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($tag -cne "V$packageVersion") {
+            throw "Tag $tag does not match package version V$packageVersion."
+          }
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      - name: Install frontend dependencies
+        run: npm.cmd ci
+
+      - name: Check TypeScript
+        run: npm.cmd run check
+
+      - name: Run frontend tests
+        run: npm.cmd run test:frontend
+
+      - name: Run Rust tests
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+
+      - name: Build release executable
+        run: npm.cmd run release
+
+      - name: Prepare release asset
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $tag = $env:RELEASE_TAG
+          $assetDirectory = "artifacts"
+          $assetPath = "$assetDirectory/eRAW-$tag-windows-x64.exe"
+
+          New-Item -ItemType Directory -Force -Path $assetDirectory | Out-Null
+          Copy-Item -LiteralPath "src-tauri/target/release/eraw.exe" -Destination $assetPath
+          "RELEASE_ASSET=$assetPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $tag = $env:RELEASE_TAG
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $env:RELEASE_ASSET --clobber --repo $env:GITHUB_REPOSITORY
+          } else {
+            gh release create $tag $env:RELEASE_ASSET `
+              --repo $env:GITHUB_REPOSITORY `
+              --verify-tag `
+              --title "eRAW $tag" `
+              --generate-notes
+          }
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub release creation failed."
+          }
