@@ -48,6 +48,12 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 
 `raw/mod.rs` 是无 UI 的领域核心。新格式和算法应优先在这里形成可测试的纯逻辑；`app.ts` 不应承担像素语义。
 
+## 规划中的图像统计边界
+
+[图像统计设计](IMAGE_STATISTICS.md)已经确认以当前文档、当前帧和 L0 原始 CFA DN 为唯一数据源。实现时新增独立 Rust `analysis` 领域模块，通过内存映射扫描整帧或矩形 ROI；`app.ts` 和 `viewport.ts` 只负责任务编排、选区和结果呈现。
+
+统计任务使用独立 revision，不复用预览 `renderRevision`；IPC 只传递摘要、精确 Histogram、Profile 和溯源元数据，不传递整幅 DN。QCFA 以 4×4 周期内的 16 个原子平面为最小累加单元，R/Gr/Gb/B 是结果层的可验证合并。
+
 ## 国际化与错误契约
 
 - 应用设置保存语言、主题、交互、性能和画面呈现偏好；`system` 会按 BCP 47 语言族解析系统首选语言，不支持的语言回退英文。

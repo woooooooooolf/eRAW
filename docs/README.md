@@ -8,6 +8,7 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 系统分层、模块职责、状态与并发模型 |
 | [RAW_FORMAT.md](RAW_FORMAT.md) | RAW 描述符、存储、CFA、容错与导出语义 |
 | [RENDERING.md](RENDERING.md) | 瓦片、LOD、WebGL、像素检查与区域选择 |
+| [IMAGE_STATISTICS.md](IMAGE_STATISTICS.md) | 单帧原始 DN 统计、CFA/QCFA 分组、图表与报告设计 |
 | [TESTING.md](TESTING.md) | 自动化覆盖、人工验证范围与已知空白 |
 | [WORKFLOW.md](WORKFLOW.md) | 需求评审、分支、提交、版本、构建与发布流程 |
 
