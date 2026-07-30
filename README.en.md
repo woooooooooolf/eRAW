@@ -1,0 +1,92 @@
+<p align="center">
+  <img src="src/assets/eraw-icon.svg" width="96" alt="eRAW icon">
+</p>
+
+<h1 align="center">eRAW</h1>
+
+<p align="center">A RAW image viewer, diagnostic tool, and format converter for SoC and image-sensor bring-up.</p>
+
+<p align="center">
+  <a href="README.md">简体中文</a> · English · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.de.md">Deutsch</a>
+</p>
+
+<p align="center"><strong>Current version: V0.2.12</strong></p>
+
+## Screenshots
+
+![eRAW main window with the dark Obsidian Violet theme](docs/images/readme-main-dark.png)
+
+![eRAW settings with the light Polar Blue theme](docs/images/readme-settings-light.png)
+
+## Highlights
+
+- Reads RAW8, RAW9–RAW16 in 16-bit containers, and MIPI RAW10/12/14.
+- Supports Mono, four Bayer patterns, and four Quad CFA patterns.
+- Configurable active size, file-header offset, row/frame stride and alignment, with multi-frame navigation.
+- RAW intensity, CFA, Remosaic, Demosaic, and individual R/G/B channel views.
+- Hierarchical tiled rendering, LOD, and a GPU tile cache for large images.
+- Zooming, panning, pixel inspection, raw CFA channel identification, and DN readout.
+- Nine UI themes and seven interface languages, switchable at runtime.
+
+## Formats and display
+
+| Category | Current support |
+| --- | --- |
+| Storage | Unpacked 8, Unpacked 16, MIPI RAW10, MIPI RAW12, MIPI RAW14 |
+| Bit depth | RAW8–RAW16; MIPI bit depth is determined by the storage mode |
+| CFA | Mono, RGGB, BGGR, GBRG, GRBG, and the four matching Quad CFA patterns |
+| Byte layout | Little/Big Endian, LSB/MSB valid bits, header offset, row/frame stride and alignment |
+| Processing | Quad CFA rearrangement, same-color bilinear reconstruction, bilinear Demosaic |
+| Inspection | Multi-frame navigation, zoom/pan, pixel grid, coordinates, CFA channel, and DN |
+
+The viewer path tolerates truncated or incomplete input where possible and reports diagnostics explicitly. Export uses strict validation to prevent incomplete or ambiguous output.
+
+## Export and capture
+
+- Convert and export original CFA data, including cropping, padding removal, packed/unpacked conversion, and byte-order conversion.
+- Export the current frame as Remosaic Bayer or RGB48 Interleaved data.
+- Save the canvas window or the complete preview as PNG, or copy either to the clipboard.
+
+## Platform and stack
+
+eRAW currently targets Windows first and is built with Tauri 2:
+
+- Frontend: TypeScript, WebGL2, Canvas 2D, native HTML/CSS
+- Backend: Rust, read-only memory mapping, binary Tauri IPC
+- Runtime dependency: Windows WebView2 Runtime
+
+## Run from source
+
+Install Node.js, stable Rust, Windows WebView2, and the system dependencies required by Tauri 2.
+
+```powershell
+npm.cmd install
+npm.cmd run tauri dev
+```
+
+## Check, test, and build
+
+```powershell
+npm.cmd run check
+npm.cmd run test:frontend
+npm.cmd run build
+cargo test --manifest-path src-tauri/Cargo.toml
+npm.cmd run release
+```
+
+`npm.cmd run release` uses the Tauri CLI to produce a Windows Release EXE with the frontend assets embedded. Do not replace it with a bare `cargo build --release`, which skips the frontend build and resource-embedding pipeline.
+
+## Engineering documentation
+
+See the [engineering documentation index](docs/README.md) for product decisions, architecture, RAW semantics, rendering, testing, and the development workflow.
+
+## Current scope
+
+- eRAW diagnoses raw sensor data; it does not perform photo enhancement such as denoising, sharpening, color correction, or bad-pixel repair.
+- Demosaic currently uses a bilinear algorithm.
+- A rectangular-selection model is reserved but not yet connected to region statistics.
+- There is no general-purpose batch-processing workflow.
+
+## License
+
+eRAW is released under the [GNU General Public License v3.0 or later](LICENSE).
