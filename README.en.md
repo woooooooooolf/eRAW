@@ -7,10 +7,15 @@
 <p align="center">A RAW image viewer, diagnostic tool, and format converter for SoC and image-sensor bring-up.</p>
 
 <p align="center">
-  <a href="README.md">简体中文</a> · English · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.de.md">Deutsch</a>
+  <a href="https://github.com/woooooooooolf/eRAW/stargazers"><img src="https://img.shields.io/github/stars/woooooooooolf/eRAW?style=flat-square&amp;logo=github" alt="GitHub Stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/woooooooooolf/eRAW?style=flat-square" alt="License"></a>
+  <img src="https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows">
+  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&amp;logo=tauri&amp;logoColor=white" alt="Tauri 2"></a>
 </p>
 
-<p align="center"><strong>Current version: V0.2.13</strong></p>
+<p align="center">
+  <a href="README.md">简体中文</a> · English · <a href="README.zh-TW.md">繁體中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.es.md">Español</a> · <a href="README.fr.md">Français</a> · <a href="README.de.md">Deutsch</a>
+</p>
 
 ## Screenshots
 
