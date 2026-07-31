@@ -1,5 +1,5 @@
 use crate::raw::{
-    CfaPattern, CfaSite, RawDescriptor, RawLayout, cfa_atomic_position, cfa_period,
+    CfaPattern, CfaSite, Packing, RawDescriptor, RawLayout, cfa_atomic_position, cfa_period,
     cfa_site_with_phase, read_pixel,
 };
 use serde::{Deserialize, Serialize};
@@ -30,8 +30,13 @@ pub struct AnalysisSnapshot {
     pub analysis_revision: u64,
     pub frame: u64,
     pub roi: AnalysisRect,
+    pub width: u32,
+    pub height: u32,
     pub bit_depth: u8,
+    pub packing: Packing,
     pub cfa: CfaPattern,
+    pub cfa_phase_x: u8,
+    pub cfa_phase_y: u8,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -403,8 +408,13 @@ pub fn analyze_image(
             analysis_revision: request.analysis_revision,
             frame: request.frame,
             roi,
+            width: descriptor.width,
+            height: descriptor.height,
             bit_depth: descriptor.bit_depth,
+            packing: descriptor.packing,
             cfa: descriptor.cfa,
+            cfa_phase_x: descriptor.cfa_phase_x,
+            cfa_phase_y: descriptor.cfa_phase_y,
         },
         groups: group_results,
         atomic_planes,

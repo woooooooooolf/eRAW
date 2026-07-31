@@ -98,6 +98,11 @@ export class SelectionModel {
     this.anchor = null;
   }
 
+  set(rect: ImageRect | null): void {
+    this.value = rect ? { ...rect } : null;
+    this.anchor = null;
+  }
+
   begin(point: ImagePoint, imageWidth: number, imageHeight: number): void {
     const x = Math.max(0, Math.min(imageWidth - 1, Math.floor(point.x)));
     const y = Math.max(0, Math.min(imageHeight - 1, Math.floor(point.y)));

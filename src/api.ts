@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { t } from "./i18n";
 import type {
+  AnalysisRequest,
+  AnalysisResult,
   DocumentInfo,
   ExportRequest,
   ExportResult,
@@ -67,6 +69,14 @@ export async function inspectPixels(request: PixelInspectionRequest): Promise<Ui
 
 export function samplePixel(x: number, y: number, frame: number): Promise<PixelSample> {
   return invoke("sample_raw_pixel", { x, y, frame });
+}
+
+export function analyzeRawImage(request: AnalysisRequest): Promise<AnalysisResult> {
+  return invoke("analyze_raw_image", { request });
+}
+
+export function cancelRawAnalysis(analysisRevision: number): Promise<void> {
+  return invoke("cancel_raw_analysis", { analysisRevision });
 }
 
 export function exportDocument(request: ExportRequest): Promise<ExportResult> {

@@ -101,6 +101,82 @@ export interface PixelSample {
   channel: string;
 }
 
+export interface AnalysisRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface AnalysisRequest {
+  generation: number;
+  analysisRevision: number;
+  frame: number;
+  roi: AnalysisRect | null;
+}
+
+export interface StatisticalSummary {
+  expectedCount: number;
+  validCount: number;
+  missingCount: number;
+  minimum: number | null;
+  maximum: number | null;
+  mean: number | null;
+  median: number | null;
+  mode: number | null;
+  variance: number | null;
+  standardDeviation: number | null;
+  p1: number | null;
+  p5: number | null;
+  p95: number | null;
+  p99: number | null;
+  zeroCount: number;
+  fullScaleCount: number;
+}
+
+export interface ProfilePoint {
+  coordinate: number;
+  expectedCount: number;
+  validCount: number;
+  missingCount: number;
+  mean: number | null;
+  standardDeviation: number | null;
+}
+
+export interface GroupStatistics {
+  key: string;
+  summary: StatisticalSummary;
+  histogram: number[];
+  rowProfile: ProfilePoint[];
+  columnProfile: ProfilePoint[];
+}
+
+export interface AtomicPlaneStatistics {
+  key: string;
+  phaseX: number;
+  phaseY: number;
+  semantic: string;
+  summary: StatisticalSummary;
+}
+
+export interface AnalysisResult {
+  snapshot: {
+    generation: number;
+    analysisRevision: number;
+    frame: number;
+    roi: AnalysisRect;
+    width: number;
+    height: number;
+    bitDepth: number;
+    packing: Packing;
+    cfa: CfaPattern;
+    cfaPhaseX: number;
+    cfaPhaseY: number;
+  };
+  groups: GroupStatistics[];
+  atomicPlanes: AtomicPlaneStatistics[];
+}
+
 export type ValueMapping = "preserve" | "scaleFullRange";
 export type ExportTarget = "originalCfa" | "remosaic" | "demosaic";
 

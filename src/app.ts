@@ -1,6 +1,11 @@
+import { isTauri } from "@tauri-apps/api/core";
+import { emitTo, listen } from "@tauri-apps/api/event";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import erawIconUrl from "./assets/eraw-icon.svg";
 import {
+  analyzeRawImage,
+  cancelRawAnalysis,
   choosePngFile,
   chooseRawFile,
   closeDocument,
@@ -53,7 +58,13 @@ import {
   type AppTheme,
 } from "./theme-catalog";
 import { RawViewport, type ImagePoint, type TileTimingStats } from "./viewport";
+import {
+  StatisticsPanel,
+  type StatisticsPanelAction,
+  type StatisticsPanelState,
+} from "./statistics-panel";
 import type {
+  AnalysisResult,
   BitAlignment,
   CfaPattern,
   DemosaicPixelValueMode,
@@ -65,6 +76,7 @@ import type {
   ProcessingSettings,
   RawDescriptor,
 } from "./types";
+import type { ImageRect } from "./viewport-transform";
 import {
   DEFAULT_DESCRIPTOR,
   DEFAULT_PROCESSING_SETTINGS,
@@ -77,6 +89,7 @@ const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
 const PROCESSING_KEY = "eraw.processingSettings.v1";
+const STATISTICS_PRESENTATION_KEY = "eraw.statisticsPresentation.v1";
 
 interface RuntimeDiagnostic {
   source: unknown;
@@ -180,6 +193,7 @@ export class ErawApp {
   private readonly root: HTMLElement;
   private readonly viewport: RawViewport;
   private readonly exportDialog: ExportDialog;
+  private readonly statisticsPanel: StatisticsPanel;
   private settings = loadSettings();
   private descriptor = loadDescriptor(this.settings.rememberDescriptor);
   private processing = loadProcessingSettings();
@@ -197,6 +211,16 @@ export class ErawApp {
   private settingsFormSidebarWidth = this.settings.sidebarWidth;
   private runtimeDiagnostics: RuntimeDiagnostic[] = [];
   private lastSample: ImagePoint | null = null;
+  private statisticsOpen = false;
+  private statisticsDetached = localStorage.getItem(STATISTICS_PRESENTATION_KEY) === "detached";
+  private statisticsUseSelection = false;
+  private statisticsRevision = 0;
+  private statisticsResult: AnalysisResult | null = null;
+  private statisticsLoading = false;
+  private statisticsError: string | null = null;
+  private statisticsDockHeight = 330;
+  private statisticsResizeStartY = 0;
+  private statisticsResizeStartHeight = 0;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -221,13 +245,21 @@ export class ErawApp {
       onRenderStats: (levelLabel, loaded, pending, timing) => {
         this.updateRenderStatus(levelLabel, loaded, pending, timing);
       },
+      onSelectionChange: (selection) => this.onStatisticsSelectionChange(selection),
       onError: (error, messageKey) => this.reportRuntimeError(error, messageKey),
+    });
+    this.statisticsPanel = new StatisticsPanel(this.get("statistics-panel"), {
+      detached: false,
+      onAction: (action) => this.onStatisticsAction(action),
+      onError: (error) => this.reportRuntimeError(error),
+      onNotify: (message) => this.showToast(message, "success"),
     });
     this.get<HTMLInputElement>("processing-same-color-reconstruction").checked =
       this.processing.remosaic.sameColorReconstruction;
     this.applySettings();
     this.setLanguage(this.settings.language);
     this.bindEvents();
+    if (isTauri()) void this.bindStatisticsWindowEvents();
     this.updateCfaDependentUi(false);
     this.updateDisplay();
     this.updateDocumentUi();
@@ -404,6 +436,8 @@ export class ErawApp {
               <div class="image-scrollbar vertical"><div class="scroll-thumb"></div></div>
             </div>
             <div id="canvas-context-menu" class="canvas-context-menu" role="menu" aria-label="图像抓拍" hidden>
+              <button type="button" role="menuitem" data-statistics-open>图像统计…</button>
+              <hr role="separator"/>
               <button type="button" role="menuitem" data-capture-kind="current" data-capture-destination="save">当前画面另存为…</button>
               <button type="button" role="menuitem" data-capture-kind="current" data-capture-destination="copy">复制当前画面</button>
               <hr role="separator"/>
@@ -415,6 +449,10 @@ export class ErawApp {
               <div class="frame-counter"><span>FRAME</span><input id="frame-input" type="number" min="1" value="1"/><b>/</b><strong id="frame-total">0</strong></div>
               <button id="next-frame" title="下一帧">›</button><button id="last-frame" title="最后一帧">›|</button>
             </div>
+            <section id="statistics-dock" class="statistics-dock" hidden>
+              <div id="statistics-resizer" class="statistics-resizer" role="separator" aria-orientation="horizontal" aria-label="调整图像统计区域高度"></div>
+              <div id="statistics-panel" class="statistics-panel"></div>
+            </section>
           </main>
         </div>
 
@@ -654,12 +692,40 @@ export class ErawApp {
       if (!(event.target instanceof Element) || !event.target.closest("#canvas-context-menu")) this.setCanvasContextMenuOpen(false);
     });
     document.addEventListener("contextmenu", (event) => this.onContextMenu(event));
+    this.root.querySelector<HTMLButtonElement>("[data-statistics-open]")?.addEventListener("click", () => {
+      this.setCanvasContextMenuOpen(false);
+      void this.openStatistics();
+    });
     this.root.querySelectorAll<HTMLButtonElement>("[data-capture-kind][data-capture-destination]").forEach((button) => {
       button.addEventListener("click", () => {
         const kind = button.dataset.captureKind as "current" | "preview";
         const destination = button.dataset.captureDestination as "save" | "copy";
         void this.performImageCapture(kind, destination);
       });
+    });
+    this.get("statistics-resizer").addEventListener("pointerdown", (event) => {
+      const pointer = event as PointerEvent;
+      pointer.preventDefault();
+      this.statisticsResizeStartY = pointer.clientY;
+      this.statisticsResizeStartHeight = this.statisticsDockHeight;
+      this.get("statistics-resizer").setPointerCapture(pointer.pointerId);
+      this.root.querySelector(".app-shell")?.classList.add("resizing-statistics");
+    });
+    this.get("statistics-resizer").addEventListener("pointermove", (event) => {
+      const pointer = event as PointerEvent;
+      if (!this.get("statistics-resizer").hasPointerCapture(pointer.pointerId)) return;
+      this.statisticsDockHeight = Math.max(
+        210,
+        Math.min(window.innerHeight * 0.72, this.statisticsResizeStartHeight + this.statisticsResizeStartY - pointer.clientY),
+      );
+      this.updateStatisticsDock();
+    });
+    this.get("statistics-resizer").addEventListener("pointerup", (event) => {
+      const pointer = event as PointerEvent;
+      if (this.get("statistics-resizer").hasPointerCapture(pointer.pointerId)) {
+        this.get("statistics-resizer").releasePointerCapture(pointer.pointerId);
+      }
+      this.root.querySelector(".app-shell")?.classList.remove("resizing-statistics");
     });
     this.get("settings-button").addEventListener("click", () => {
       this.setLanguageMenuOpen(false);
@@ -837,8 +903,13 @@ export class ErawApp {
       this.descriptor = info.descriptor;
       this.frame = 0;
       this.viewport.setDocument(info);
+      this.statisticsResult = null;
+      this.statisticsError = null;
+      this.statisticsUseSelection = false;
       if (this.settings.openView === "actual") this.viewport.actualSize();
       this.updateDocumentUi();
+      this.syncStatisticsState();
+      if (this.statisticsOpen) void this.requestStatistics();
       this.showToast(t("runtime.opened", { name: info.name }), "success");
     } catch (error) {
       this.reportRuntimeError(error);
@@ -867,6 +938,13 @@ export class ErawApp {
       this.lastSample = null;
       this.runtimeDiagnostics = [];
       this.viewport.clearDocument();
+      this.statisticsRevision += 1;
+      void cancelRawAnalysis(this.statisticsRevision);
+      this.statisticsResult = null;
+      this.statisticsLoading = false;
+      this.statisticsError = null;
+      this.statisticsUseSelection = false;
+      this.syncStatisticsState();
       this.setExportMenuOpen(false);
       this.setCanvasContextMenuOpen(false);
       this.setDiagnosticsOpen(false);
@@ -938,8 +1016,11 @@ export class ErawApp {
             this.descriptor = info.descriptor;
             this.frame = Math.min(this.frame, Math.max(0, info.layout.frameCount - 1));
             this.viewport.setDocument(info, true);
+            this.statisticsResult = null;
             this.updateCfaDependentUi();
             this.updateDocumentUi();
+            this.syncStatisticsState();
+            if (this.statisticsOpen) void this.requestStatistics();
           } catch (error) {
             this.reportRuntimeError(error);
           }
@@ -1158,6 +1239,7 @@ export class ErawApp {
     this.updateCfaDependentUi(false);
     this.updateDocumentUi();
     this.updateZoomStatus(this.viewport.getZoom());
+    this.syncStatisticsState();
     this.setLanguageMenuOpen(false);
   }
 
@@ -1176,6 +1258,7 @@ export class ErawApp {
     this.settings.theme = theme;
     this.persistSettings();
     this.applyTheme();
+    void this.emitStatisticsState();
     this.setThemeMenuOpen(false);
   }
 
@@ -1277,6 +1360,235 @@ export class ErawApp {
     this.displayMode = mode;
     this.root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => button.classList.toggle("active", button.dataset.mode === mode));
     this.updateDisplay();
+  }
+
+  private statisticsState(): StatisticsPanelState {
+    return {
+      result: this.statisticsResult,
+      documentName: this.document?.name ?? null,
+      loading: this.statisticsLoading,
+      error: this.statisticsError,
+      hasSelection: Boolean(this.viewport.getSelection()),
+      useSelection: this.statisticsUseSelection,
+    };
+  }
+
+  private async bindStatisticsWindowEvents(): Promise<void> {
+    await listen<StatisticsPanelAction>("statistics:action", (event) => {
+      this.onStatisticsAction(event.payload);
+    });
+    await listen("statistics:ready", () => {
+      void this.emitStatisticsState();
+    });
+    await listen<string>("statistics:window-error", (event) => {
+      this.reportRuntimeError(event.payload);
+    });
+    await listen<string>("statistics:notify", (event) => {
+      this.showToast(event.payload, "success");
+    });
+  }
+
+  private syncStatisticsState(): void {
+    const state = this.statisticsState();
+    this.statisticsPanel.setState(state);
+    if (this.statisticsDetached) void this.emitStatisticsState();
+  }
+
+  private async emitStatisticsState(): Promise<void> {
+    if (!this.statisticsOpen || !this.statisticsDetached) return;
+    try {
+      await emitTo("statistics", "statistics:state", {
+        state: this.statisticsState(),
+        language: this.settings.language,
+        theme: this.settings.theme,
+      });
+    } catch {
+      // 独立窗口可能尚未完成初始化；statistics:ready 会再次同步。
+    }
+  }
+
+  private updateStatisticsDock(): void {
+    const dock = this.get("statistics-dock");
+    const visible = this.statisticsOpen && !this.statisticsDetached;
+    dock.toggleAttribute("hidden", !visible);
+    dock.style.setProperty("--statistics-height", `${Math.round(this.statisticsDockHeight)}px`);
+    const shell = this.root.querySelector<HTMLElement>(".app-shell");
+    shell?.style.setProperty("--statistics-height", `${Math.round(this.statisticsDockHeight)}px`);
+    shell?.classList.toggle("statistics-docked", visible);
+  }
+
+  private async openStatistics(): Promise<void> {
+    if (!this.document?.layout.frameCount) return;
+    this.statisticsOpen = true;
+    this.viewport.setSelectionVisible(true);
+    if (this.statisticsDetached) {
+      await this.openDetachedStatisticsWindow();
+    } else {
+      this.updateStatisticsDock();
+    }
+    this.syncStatisticsState();
+    const result = this.statisticsResult;
+    if (
+      !result
+      || result.snapshot.generation !== this.document.generation
+      || result.snapshot.frame !== this.frame
+      || JSON.stringify(result.snapshot.roi) !== JSON.stringify(this.statisticsRequestedRoi())
+    ) {
+      void this.requestStatistics();
+    }
+  }
+
+  private async openDetachedStatisticsWindow(): Promise<void> {
+    const existing = await WebviewWindow.getByLabel("statistics");
+    if (existing) {
+      await existing.show();
+      await existing.setFocus();
+      await this.emitStatisticsState();
+      return;
+    }
+    const statisticsWindow = new WebviewWindow("statistics", {
+      url: "index.html?statistics=1",
+      title: t("statistics.title"),
+      width: 1180,
+      height: 760,
+      minWidth: 760,
+      minHeight: 520,
+      center: true,
+      resizable: true,
+    });
+    statisticsWindow.once("tauri://created", () => {
+      void this.emitStatisticsState();
+    });
+    statisticsWindow.once("tauri://error", (event) => {
+      this.statisticsDetached = false;
+      localStorage.setItem(STATISTICS_PRESENTATION_KEY, "docked");
+      this.updateStatisticsDock();
+      this.reportRuntimeError(event.payload);
+    });
+  }
+
+  private statisticsRequestedRoi(): ImageRect {
+    const selection = this.statisticsUseSelection ? this.viewport.getSelection() : null;
+    return selection ?? {
+      x: 0,
+      y: 0,
+      width: this.document?.descriptor.width ?? 0,
+      height: this.document?.descriptor.height ?? 0,
+    };
+  }
+
+  private async requestStatistics(): Promise<void> {
+    const info = this.document;
+    if (!this.statisticsOpen || !info?.layout.frameCount) {
+      this.syncStatisticsState();
+      return;
+    }
+    const revision = ++this.statisticsRevision;
+    const roi = this.statisticsRequestedRoi();
+    if (
+      this.statisticsResult
+      && (
+        this.statisticsResult.snapshot.generation !== info.generation
+        || this.statisticsResult.snapshot.frame !== this.frame
+        || JSON.stringify(this.statisticsResult.snapshot.roi) !== JSON.stringify(roi)
+      )
+    ) {
+      this.statisticsResult = null;
+    }
+    this.statisticsLoading = true;
+    this.statisticsError = null;
+    this.syncStatisticsState();
+    try {
+      const result = await analyzeRawImage({
+        generation: info.generation,
+        analysisRevision: revision,
+        frame: this.frame,
+        roi,
+      });
+      if (
+        revision !== this.statisticsRevision
+        || this.document?.generation !== info.generation
+        || this.frame !== result.snapshot.frame
+      ) return;
+      this.statisticsResult = result;
+    } catch (error) {
+      const code = backendErrorCode(error);
+      if (code !== "stale_analysis" && code !== "stale_generation") {
+        this.statisticsError = localizeBackendError(error).message;
+      }
+    } finally {
+      if (revision === this.statisticsRevision) {
+        this.statisticsLoading = false;
+        this.syncStatisticsState();
+      }
+    }
+  }
+
+  private onStatisticsSelectionChange(selection: ImageRect | null): void {
+    if (!this.statisticsOpen) return;
+    this.statisticsUseSelection = Boolean(selection);
+    this.syncStatisticsState();
+    void this.requestStatistics();
+  }
+
+  private onStatisticsAction(action: StatisticsPanelAction): void {
+    if (action === "close") {
+      this.statisticsOpen = false;
+      this.statisticsRevision += 1;
+      void cancelRawAnalysis(this.statisticsRevision);
+      this.statisticsLoading = false;
+      this.viewport.setInteractionMode("pan");
+      this.viewport.setSelectionVisible(false);
+      this.updateStatisticsDock();
+      void WebviewWindow.getByLabel("statistics").then((window) => window?.close());
+      return;
+    }
+    if (action === "toggleDetached") {
+      this.statisticsDetached = !this.statisticsDetached;
+      localStorage.setItem(
+        STATISTICS_PRESENTATION_KEY,
+        this.statisticsDetached ? "detached" : "docked",
+      );
+      if (this.statisticsDetached) {
+        this.updateStatisticsDock();
+        void this.openDetachedStatisticsWindow();
+      } else {
+        void WebviewWindow.getByLabel("statistics").then((window) => window?.close());
+        this.updateStatisticsDock();
+      }
+      this.syncStatisticsState();
+      return;
+    }
+    if (action === "selectRoi") {
+      void getCurrentWindow().setFocus();
+      this.viewport.setSelectionVisible(true);
+      this.viewport.setInteractionMode("select");
+      return;
+    }
+    if (action === "clearRoi") {
+      this.statisticsUseSelection = false;
+      this.viewport.clearSelection();
+      return;
+    }
+    if (action === "useFullFrame") {
+      this.statisticsUseSelection = false;
+      this.syncStatisticsState();
+      void this.requestStatistics();
+      return;
+    }
+    if (action === "useSelection") {
+      if (!this.viewport.getSelection()) return;
+      this.statisticsUseSelection = true;
+      this.syncStatisticsState();
+      void this.requestStatistics();
+      return;
+    }
+    if (action === "cancelAnalysis") {
+      this.statisticsRevision += 1;
+      this.statisticsLoading = false;
+      void cancelRawAnalysis(this.statisticsRevision);
+      this.syncStatisticsState();
+    }
   }
 
   private onContextMenu(event: MouseEvent): void {
@@ -1397,9 +1709,14 @@ export class ErawApp {
   private setFrame(frame: number): void {
     const count = this.document?.layout.frameCount ?? 0;
     if (!count) return;
-    this.frame = Math.max(0, Math.min(Math.trunc(frame), count - 1));
+    const nextFrame = Math.max(0, Math.min(Math.trunc(frame), count - 1));
+    if (nextFrame === this.frame) return;
+    this.frame = nextFrame;
     this.viewport.setFrame(this.frame);
     this.get<HTMLInputElement>("frame-input").value = String(this.frame + 1);
+    this.statisticsResult = null;
+    this.syncStatisticsState();
+    if (this.statisticsOpen) void this.requestStatistics();
   }
 
   private updateSample(sample: ImagePoint | null): void {
@@ -1559,7 +1876,10 @@ export class ErawApp {
   }
 
   private onKeyDown(event: KeyboardEvent): void {
-    if (event.key === "Escape" && (!this.get("language-popover").hidden || !this.get("theme-popover").hidden || !this.get("utility-popover").hidden || !this.get("export-popover").hidden || !this.get("canvas-context-menu").hidden)) {
+    if (event.key === "Escape" && this.viewport.cancelSelection()) {
+      event.preventDefault();
+    }
+    else if (event.key === "Escape" && (!this.get("language-popover").hidden || !this.get("theme-popover").hidden || !this.get("utility-popover").hidden || !this.get("export-popover").hidden || !this.get("canvas-context-menu").hidden)) {
       event.preventDefault();
       this.setLanguageMenuOpen(false);
       this.setThemeMenuOpen(false);

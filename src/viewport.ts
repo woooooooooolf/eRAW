@@ -29,6 +29,7 @@ import {
   snapCoordinateToPhysicalPixels,
   ViewportTransform,
   type ImagePoint,
+  type ImageRect,
 } from "./viewport-transform";
 
 export type { ImagePoint } from "./viewport-transform";
@@ -71,6 +72,7 @@ export interface ViewportCallbacks {
   onZoomChange(zoom: number): void;
   onSampleChange(sample: ImagePoint | null): void;
   onRenderStats(levelLabel: string, loaded: number, pending: number, timing: TileTimingStats): void;
+  onSelectionChange(selection: ImageRect | null): void;
   onError(error: unknown, messageKey: MessageKey): void;
 }
 
@@ -197,6 +199,7 @@ export class RawViewport {
   private height = 1;
   private dragging = false;
   private selecting = false;
+  private selectionBeforeInteraction: ImageRect | null = null;
   private interactionMode: "pan" | "select" = "pan";
   private dragX = 0;
   private dragY = 0;
@@ -340,7 +343,10 @@ export class RawViewport {
       || document.descriptor.width !== this.document.descriptor.width
       || document.descriptor.height !== this.document.descriptor.height;
     this.document = document;
-    if (dimensionsChanged) this.overlayLayer.clearSelection();
+    if (dimensionsChanged) {
+      this.overlayLayer.clearSelection();
+      this.callbacks.onSelectionChange(null);
+    }
     this.updatePointerPosition(null);
     this.frame = Math.min(this.frame, Math.max(0, document.layout.frameCount - 1));
     this.clearTextures();
@@ -359,6 +365,7 @@ export class RawViewport {
     this.canvas.classList.remove("dragging");
     this.hideCrosshair();
     this.overlayLayer.clearSelection();
+    this.callbacks.onSelectionChange(null);
     this.overlayLayer.hide();
     this.lastSampleKey = "";
     this.clearTextures();
@@ -562,10 +569,36 @@ export class RawViewport {
   }
 
   setInteractionMode(mode: "pan" | "select"): void {
+    if (this.selecting) this.cancelSelection();
     this.interactionMode = mode;
     this.dragging = false;
     this.selecting = false;
     this.canvas.classList.remove("dragging");
+  }
+
+  getSelection(): ImageRect | null {
+    return this.overlayLayer.selection.rect;
+  }
+
+  clearSelection(): void {
+    this.overlayLayer.clearSelection();
+    this.callbacks.onSelectionChange(null);
+    this.requestDraw();
+  }
+
+  setSelectionVisible(visible: boolean): void {
+    this.overlayLayer.setSelectionVisible(visible);
+    this.requestDraw();
+  }
+
+  cancelSelection(): boolean {
+    if (!this.selecting) return false;
+    this.selecting = false;
+    this.overlayLayer.setSelection(this.selectionBeforeInteraction);
+    this.selectionBeforeInteraction = null;
+    this.interactionMode = "pan";
+    this.requestDraw();
+    return true;
   }
 
   fit(): void {
@@ -679,6 +712,7 @@ export class RawViewport {
     const point = this.eventPoint(event);
     if (this.interactionMode === "select") {
       this.selecting = true;
+      this.selectionBeforeInteraction = this.overlayLayer.selection.rect;
       this.overlayLayer.beginSelection(
         this.transform.screenToImage(point),
         this.document.descriptor.width,
@@ -726,8 +760,11 @@ export class RawViewport {
     if (this.selecting) {
       this.selecting = false;
       this.overlayLayer.endSelection();
+      this.selectionBeforeInteraction = null;
+      this.interactionMode = "pan";
       if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
       this.updatePointerPosition(this.updateCrosshair(event));
+      this.callbacks.onSelectionChange(this.overlayLayer.selection.rect);
       this.requestDraw();
       return;
     }

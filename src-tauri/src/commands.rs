@@ -426,6 +426,13 @@ pub async fn analyze_raw_image(
 }
 
 #[tauri::command]
+pub fn cancel_raw_analysis(analysis_revision: u64, state: State<'_, AppState>) {
+    state
+        .analysis_revision
+        .fetch_max(analysis_revision, Ordering::AcqRel);
+}
+
+#[tauri::command]
 pub fn sample_raw_pixel(
     x: u32,
     y: u32,

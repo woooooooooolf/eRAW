@@ -1,11 +1,16 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "eRAW 主窗口权限",
-  "windows": ["main"],
+  "description": "eRAW 主窗口与图像统计窗口权限",
+  "windows": ["main", "statistics"],
   "permissions": [
     "core:default",
+    "core:window:allow-create",
+    "core:window:allow-close",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
     "core:window:allow-set-fullscreen",
+    "core:webview:allow-create-webview-window",
     "clipboard-manager:allow-write-image",
     "dialog:allow-open",
     "dialog:allow-save"
