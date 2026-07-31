@@ -21,6 +21,7 @@ const [
   readFile(new URL("../src-tauri/src/commands.rs", import.meta.url), "utf8"),
   readFile(new URL("../src-tauri/capabilities/default.json", import.meta.url), "utf8"),
 ]);
+const capability = JSON.parse(capabilitySource);
 
 test("canvas context menu exposes one statistics entry before the four capture actions", () => {
   const menu = appSource.match(/<div id="canvas-context-menu"[\s\S]*?<\/div>/)?.[0] ?? "";
@@ -61,7 +62,6 @@ test("statistics view supports docking, detaching, charts and structured report 
   assert.match(panelSource, /drawProfile/);
   assert.match(panelSource, /drawReport/);
   assert.match(panelSource, /not an EMVA 1288 compliant measurement|statistics\.disclaimer/);
-  const capability = JSON.parse(capabilitySource);
   assert.ok(capability.windows.includes("statistics"));
   assert.ok(capability.permissions.includes("core:webview:allow-create-webview-window"));
 });
@@ -70,12 +70,14 @@ test("detached statistics window closes itself and uses explicit dock semantics"
   assert.match(panelSource, /data-stat-action="\$\{this\.options\.detached \? "dock" : "detach"\}"/);
   assert.match(windowSource, /await this\.emitAction\(action\)/);
   assert.match(windowSource, /action === "close" \|\| action === "dock"/);
-  assert.match(windowSource, /await this\.appWindow\.close\(\)/);
   assert.match(windowSource, /event\.preventDefault\(\)[\s\S]*?this\.handleAction\("close"\)/);
+  assert.match(windowSource, /await this\.appWindow\.destroy\(\)/);
+  assert.doesNotMatch(windowSource, /this\.appWindow\.close\(\)/);
   assert.match(windowSource, /emit\("statistics:action", message\)/);
   assert.doesNotMatch(windowSource, /emitTo\("main", "statistics:action"/);
   assert.match(appSource, /if \(action === "dock"\)[\s\S]*?this\.statisticsDetached = false/);
   assert.match(appSource, /source === "main"/);
+  assert.ok(capability.permissions.includes("core:window:allow-destroy"));
 });
 
 test("reset view does not clear ROI or trigger a backend scan", () => {

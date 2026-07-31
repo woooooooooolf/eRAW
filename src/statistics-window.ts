@@ -23,7 +23,6 @@ interface StatisticsWindowPayload {
 export class StatisticsWindowApp {
   private readonly panel: StatisticsPanel;
   private readonly appWindow = getCurrentWindow();
-  private closingLocally = false;
 
   constructor(root: HTMLElement) {
     root.innerHTML = '<main id="statistics-window-panel" class="statistics-panel statistics-window-panel detached"></main>';
@@ -52,7 +51,6 @@ export class StatisticsWindowApp {
         : t("statistics.title");
     });
     await this.appWindow.onCloseRequested((event) => {
-      if (this.closingLocally) return;
       event.preventDefault();
       void this.handleAction("close");
     });
@@ -68,11 +66,9 @@ export class StatisticsWindowApp {
     try {
       await this.emitAction(action);
       if (action === "close" || action === "dock") {
-        this.closingLocally = true;
-        await this.appWindow.close();
+        await this.appWindow.destroy();
       }
     } catch (error) {
-      this.closingLocally = false;
       const message = error instanceof Error ? error.message : String(error);
       await emit("statistics:window-error", message);
     }
