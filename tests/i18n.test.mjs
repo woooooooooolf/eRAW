@@ -58,3 +58,26 @@ test("language options use stable autonyms", () => {
     ["English", "简体中文", "繁體中文", "日本語", "Español", "Français", "Deutsch"],
   );
 });
+
+test("statistics terminology follows each interface language", () => {
+  const cases = {
+    "zh-CN": ["DN 直方图", "行剖面", "均值", "保存 PNG 报告…"],
+    "zh-TW": ["DN 直方圖", "列剖面", "平均值", "儲存 PNG 報告…"],
+    ja: ["DN ヒストグラム", "行プロファイル", "平均", "PNG レポートを保存…"],
+    es: ["Histograma de DN", "Perfil de filas", "Media", "Guardar informe PNG…"],
+    fr: ["Histogramme DN", "Profil des lignes", "Moyenne", "Enregistrer le rapport PNG…"],
+    de: ["DN-Histogramm", "Zeilenprofil", "Mittelwert", "PNG-Bericht speichern…"],
+  };
+  for (const [locale, expected] of Object.entries(cases)) {
+    i18n.setLanguagePreference(locale);
+    assert.deepEqual(
+      [
+        i18n.t("statistics.histogram"),
+        i18n.t("statistics.rowProfile"),
+        i18n.t("statistics.mean"),
+        i18n.t("statistics.saveReport"),
+      ],
+      expected,
+    );
+  }
+});

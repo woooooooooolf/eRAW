@@ -1,5 +1,5 @@
 import { choosePngFile } from "./api";
-import { copyCanvasImage, saveCanvasPng } from "./image-output";
+import { saveCanvasPng } from "./image-output";
 import { t } from "./i18n";
 import type {
   AnalysisResult,
@@ -39,7 +39,6 @@ interface StatisticsPanelOptions {
   onNotify(message: string): void;
 }
 
-type StatisticsTab = "overview" | "histogram" | "profiles" | "report";
 type ProfileMetric = "mean" | "standardDeviation";
 
 const GROUP_COLORS: Record<string, string> = {
@@ -83,7 +82,7 @@ function prepareCanvas(canvas: HTMLCanvasElement, width?: number, height?: numbe
     canvas.height = pixelHeight;
   }
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas 2D is unavailable");
+  if (!context) throw new Error(t("statistics.canvasUnavailable"));
   context.setTransform(dpr, 0, 0, dpr, 0, 0);
   context.clearRect(0, 0, cssWidth, cssHeight);
   return context;
@@ -148,7 +147,7 @@ function drawHistogram(
     height,
     cumulative ? t("statistics.histogramCumulative") : t("statistics.histogram"),
     "DN",
-    logarithmic ? "log(count)" : "count",
+    logarithmic ? t("statistics.logCount") : t("statistics.count"),
   );
   const selected = result.groups.find((group) => group.key === selectedKey) ?? result.groups[0];
   const groups = comparison && selected.key === "all"
@@ -186,11 +185,12 @@ function drawHistogram(
   context.textAlign = "left";
   let legendX = plot.left + 8;
   for (const item of series) {
+    const legendLabel = item.group.key === "all" ? t("statistics.allCfa") : item.group.key;
     context.fillStyle = GROUP_COLORS[item.group.key] ?? "#6a8ca3";
     context.fillRect(legendX, plot.top + 8, 12, 2);
     context.fillStyle = "#405563";
-    context.fillText(item.group.key === "all" ? "All CFA" : item.group.key, legendX + 16, plot.top + 12);
-    legendX += 58;
+    context.fillText(legendLabel, legendX + 16, plot.top + 12);
+    legendX += Math.max(58, context.measureText(legendLabel).width + 28);
   }
 }
 
@@ -245,12 +245,12 @@ function summaryRows(summary: StatisticalSummary): Array<[string, string]> {
     [t("statistics.expected"), formatInteger(summary.expectedCount)],
     [t("statistics.valid"), formatInteger(summary.validCount)],
     [t("statistics.missing"), formatInteger(summary.missingCount)],
-    ["Min / Max DN", `${formatValue(summary.minimum, 0)} / ${formatValue(summary.maximum, 0)}`],
-    ["Mean / Median DN", `${formatValue(summary.mean)} / ${formatValue(summary.median, 0)}`],
-    ["Mode DN", formatValue(summary.mode, 0)],
-    ["Variance / StdDev", `${formatValue(summary.variance)} / ${formatValue(summary.standardDeviation)}`],
-    ["P1 / P5 / P95 / P99", `${formatValue(summary.p1, 0)} / ${formatValue(summary.p5, 0)} / ${formatValue(summary.p95, 0)} / ${formatValue(summary.p99, 0)}`],
-    ["Zero / Full-scale DN", `${formatInteger(summary.zeroCount)} / ${formatInteger(summary.fullScaleCount)}`],
+    [t("statistics.minimumMaximumDn"), `${formatValue(summary.minimum, 0)} / ${formatValue(summary.maximum, 0)}`],
+    [t("statistics.meanMedianDn"), `${formatValue(summary.mean)} / ${formatValue(summary.median, 0)}`],
+    [t("statistics.modeDn"), formatValue(summary.mode, 0)],
+    [t("statistics.varianceStdDev"), `${formatValue(summary.variance)} / ${formatValue(summary.standardDeviation)}`],
+    [t("statistics.percentiles"), `${formatValue(summary.p1, 0)} / ${formatValue(summary.p5, 0)} / ${formatValue(summary.p95, 0)} / ${formatValue(summary.p99, 0)}`],
+    [t("statistics.zeroFullScaleDn"), `${formatInteger(summary.zeroCount)} / ${formatInteger(summary.fullScaleCount)}`],
   ];
 }
 
@@ -265,11 +265,7 @@ export class StatisticsPanel {
     hasSelection: false,
     useSelection: false,
   };
-  private activeTab: StatisticsTab = "overview";
   private selectedGroup = "all";
-  private cumulative = false;
-  private logarithmic = false;
-  private profileMetric: ProfileMetric = "mean";
   private readonly resizeObserver: ResizeObserver;
 
   constructor(root: HTMLElement, options: StatisticsPanelOptions) {
@@ -290,11 +286,7 @@ export class StatisticsPanel {
   }
 
   resetView(): void {
-    this.activeTab = "overview";
     this.selectedGroup = "all";
-    this.cumulative = false;
-    this.logarithmic = false;
-    this.profileMetric = "mean";
     this.render();
   }
 
@@ -323,9 +315,7 @@ export class StatisticsPanel {
           <button type="button" data-stat-action="clearRoi" ${this.state.hasSelection ? "" : "disabled"}>${t("statistics.clearSelection")}</button>
           <small>${rangeText}</small>
         </div>
-        <nav class="statistics-tabs">
-          ${(["overview", "histogram", "profiles", "report"] as StatisticsTab[]).map((tab) => `<button type="button" data-stat-tab="${tab}" class="${tab === this.activeTab ? "active" : ""}">${t(`statistics.tab.${tab}` as Parameters<typeof t>[0])}</button>`).join("")}
-        </nav>
+        <button type="button" class="statistics-report-button" data-stat-report ${this.state.result && !this.state.loading ? "" : "disabled"}>${t("statistics.saveReport")}</button>
       </div>
       <div class="statistics-body">
         ${this.renderBody(selected)}
@@ -341,22 +331,9 @@ export class StatisticsPanel {
     }
     if (this.state.error) return `<div class="statistics-empty error">${escapeHtml(this.state.error)}</div>`;
     if (!selected || !this.state.result) return `<div class="statistics-empty">${t("statistics.noData")}</div>`;
-    const channelSelector = `<div class="statistics-channels">${this.state.result.groups.map((group) => `<button type="button" data-stat-group="${group.key}" class="${group.key === selected.key ? "active" : ""}">${group.key === "all" ? "All CFA" : group.key}</button>`).join("")}</div>`;
+    const channelSelector = `<div class="statistics-channels">${this.state.result.groups.map((group) => `<button type="button" data-stat-group="${group.key}" class="${group.key === selected.key ? "active" : ""}">${group.key === "all" ? t("statistics.allCfa") : group.key}</button>`).join("")}</div>`;
     const summary = `<div class="statistics-summary">${summaryRows(selected.summary).map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join("")}</div>`;
-    if (this.activeTab === "histogram") {
-      return `${channelSelector}<div class="statistics-chart-controls"><label><input type="checkbox" data-stat-option="cumulative" ${this.cumulative ? "checked" : ""}/> ${t("statistics.cumulative")}</label><label><input type="checkbox" data-stat-option="logarithmic" ${this.logarithmic ? "checked" : ""}/> ${t("statistics.logScale")}</label>${this.outputButtons("histogram")}</div><canvas class="statistics-chart statistics-histogram"></canvas>`;
-    }
-    if (this.activeTab === "profiles") {
-      return `${channelSelector}<div class="statistics-chart-controls"><select data-stat-option="profileMetric"><option value="mean" ${this.profileMetric === "mean" ? "selected" : ""}>${t("statistics.mean")}</option><option value="standardDeviation" ${this.profileMetric === "standardDeviation" ? "selected" : ""}>${t("statistics.standardDeviation")}</option></select></div><div class="statistics-profile-grid"><section class="statistics-profile-card"><header><strong>${t("statistics.rowProfile")}</strong>${this.outputButtons("row")}</header><canvas class="statistics-chart statistics-row-profile"></canvas></section><section class="statistics-profile-card"><header><strong>${t("statistics.columnProfile")}</strong>${this.outputButtons("column")}</header><canvas class="statistics-chart statistics-column-profile"></canvas></section></div>`;
-    }
-    if (this.activeTab === "report") {
-      return `<div class="statistics-report-actions">${this.outputButtons("report")}</div><canvas class="statistics-report-preview"></canvas><p class="statistics-disclaimer">${t("statistics.disclaimer")}</p>`;
-    }
     return `${channelSelector}<div class="statistics-overview-grid"><section>${summary}</section><section><canvas class="statistics-chart statistics-histogram"></canvas></section><section><canvas class="statistics-chart statistics-row-profile"></canvas></section><section><canvas class="statistics-chart statistics-column-profile"></canvas></section></div>`;
-  }
-
-  private outputButtons(kind: "histogram" | "row" | "column" | "report"): string {
-    return `<span class="statistics-output-actions"><button type="button" data-stat-output="${kind}:copy">${kind === "report" ? t("statistics.copyReport") : t("statistics.copyChart")}</button><button type="button" data-stat-output="${kind}:save">${kind === "report" ? t("statistics.saveReport") : t("statistics.saveChart")}</button></span>`;
   }
 
   private bindEvents(): void {
@@ -370,32 +347,14 @@ export class StatisticsPanel {
         this.options.onAction(action as StatisticsPanelAction);
       });
     });
-    this.root.querySelectorAll<HTMLButtonElement>("[data-stat-tab]").forEach((button) => {
-      button.addEventListener("click", () => {
-        this.activeTab = button.dataset.statTab as StatisticsTab;
-        this.render();
-      });
-    });
     this.root.querySelectorAll<HTMLButtonElement>("[data-stat-group]").forEach((button) => {
       button.addEventListener("click", () => {
         this.selectedGroup = button.dataset.statGroup ?? "all";
         this.render();
       });
     });
-    this.root.querySelectorAll<HTMLInputElement>("[data-stat-option]").forEach((input) => {
-      input.addEventListener("change", () => {
-        if (input.dataset.statOption === "cumulative") this.cumulative = input.checked;
-        if (input.dataset.statOption === "logarithmic") this.logarithmic = input.checked;
-        this.drawCharts();
-      });
-    });
-    this.root.querySelector<HTMLSelectElement>('[data-stat-option="profileMetric"]')?.addEventListener("change", (event) => {
-      this.profileMetric = (event.currentTarget as HTMLSelectElement).value as ProfileMetric;
-      this.drawCharts();
-    });
-    this.root.querySelectorAll<HTMLButtonElement>("[data-stat-output]").forEach((button) => {
-      button.addEventListener("click", () => void this.output(button.dataset.statOutput ?? ""));
-    });
+    this.root.querySelector<HTMLButtonElement>("[data-stat-report]")
+      ?.addEventListener("click", () => void this.saveReport());
   }
 
   private drawCharts(): void {
@@ -403,35 +362,14 @@ export class StatisticsPanel {
     if (!result) return;
     const selected = result.groups.find((group) => group.key === this.selectedGroup) ?? result.groups[0];
     this.root.querySelectorAll<HTMLCanvasElement>(".statistics-histogram").forEach((canvas) => {
-      drawHistogram(canvas, result, selected.key, this.cumulative, this.logarithmic, true);
+      drawHistogram(canvas, result, selected.key, false, false, true);
     });
     this.root.querySelectorAll<HTMLCanvasElement>(".statistics-row-profile").forEach((canvas) => {
-      drawProfile(canvas, selected.rowProfile, t("statistics.rowProfile"), this.profileMetric);
+      drawProfile(canvas, selected.rowProfile, t("statistics.rowProfile"), "mean");
     });
     this.root.querySelectorAll<HTMLCanvasElement>(".statistics-column-profile").forEach((canvas) => {
-      drawProfile(canvas, selected.columnProfile, t("statistics.columnProfile"), this.profileMetric);
+      drawProfile(canvas, selected.columnProfile, t("statistics.columnProfile"), "mean");
     });
-    this.root.querySelectorAll<HTMLCanvasElement>(".statistics-report-preview").forEach((canvas) => {
-      this.drawReport(canvas, 960, 540);
-    });
-  }
-
-  private createChart(kind: "histogram" | "row" | "column"): HTMLCanvasElement {
-    const result = this.state.result!;
-    const selected = result.groups.find((group) => group.key === this.selectedGroup) ?? result.groups[0];
-    const canvas = document.createElement("canvas");
-    if (kind === "histogram") {
-      drawHistogram(canvas, result, selected.key, this.cumulative, this.logarithmic, true, { width: 1600, height: 900 });
-      return canvas;
-    }
-    drawProfile(
-      canvas,
-      kind === "row" ? selected.rowProfile : selected.columnProfile,
-      kind === "row" ? t("statistics.rowProfile") : t("statistics.columnProfile"),
-      this.profileMetric,
-      { width: 1600, height: 900 },
-    );
-    return canvas;
   }
 
   private drawReport(canvas: HTMLCanvasElement, width = 1920, height = 1080): void {
@@ -452,7 +390,7 @@ export class StatisticsPanel {
     context.font = "16px system-ui";
     const roi = result.snapshot.roi;
     context.fillText(
-      `${this.state.documentName ?? ""} · Frame ${result.snapshot.frame + 1} · ${result.snapshot.width}×${result.snapshot.height} · ${result.snapshot.packing} ${result.snapshot.bitDepth} bit · ${result.snapshot.cfa} Phase ${result.snapshot.cfaPhaseX}/${result.snapshot.cfaPhaseY} · ROI ${roi.x},${roi.y} ${roi.width}×${roi.height}`,
+      `${this.state.documentName ?? ""} · ${t("statistics.frame")} ${result.snapshot.frame + 1} · ${result.snapshot.width}×${result.snapshot.height} · ${result.snapshot.packing} ${result.snapshot.bitDepth} ${t("statistics.bit")} · ${result.snapshot.cfa} ${t("statistics.phase")} ${result.snapshot.cfaPhaseX}/${result.snapshot.cfaPhaseY} · ROI ${roi.x},${roi.y} ${roi.width}×${roi.height}`,
       64,
       100,
     );
@@ -466,7 +404,7 @@ export class StatisticsPanel {
     context.stroke();
     context.fillStyle = "#1d3545";
     context.font = "650 18px system-ui";
-    context.fillText("All CFA", 90, 172);
+    context.fillText(t("statistics.allCfa"), 90, 172);
     context.font = "14px system-ui";
     summaryRows(all.summary).forEach(([label, value], index) => {
       const y = 210 + index * 48;
@@ -484,9 +422,9 @@ export class StatisticsPanel {
     context.fillStyle = "#738491";
     context.font = "11px system-ui";
     context.fillText("CFA", 90, 686);
-    context.fillText("Mean", 145, 686);
-    context.fillText("StdDev", 245, 686);
-    context.fillText("Zero / FS", 350, 686);
+    context.fillText(t("statistics.mean"), 145, 686);
+    context.fillText(t("statistics.standardDeviationShort"), 245, 686);
+    context.fillText(t("statistics.zeroFullScaleShort"), 350, 686);
     comparisonGroups.forEach((group, index) => {
       const y = 715 + index * 34;
       context.fillStyle = GROUP_COLORS[group.key] ?? "#456273";
@@ -513,22 +451,16 @@ export class StatisticsPanel {
     context.restore();
   }
 
-  private async output(specification: string): Promise<void> {
+  private async saveReport(): Promise<void> {
     if (!this.state.result) return;
-    const [kind, destination] = specification.split(":") as ["histogram" | "row" | "column" | "report", "copy" | "save"];
     try {
-      const canvas = kind === "report" ? document.createElement("canvas") : this.createChart(kind);
-      if (kind === "report") this.drawReport(canvas);
-      if (destination === "copy") {
-        await copyCanvasImage(canvas);
-        this.options.onNotify(t(kind === "report" ? "statistics.reportCopied" : "statistics.chartCopied"));
-        return;
-      }
+      const canvas = document.createElement("canvas");
+      this.drawReport(canvas);
       const baseName = (this.state.documentName ?? "eRAW").replace(/\.[^.]+$/, "");
-      const path = await choosePngFile(`${baseName}-${kind}.png`);
+      const path = await choosePngFile(`${baseName}-statistics.png`);
       if (path) {
         await saveCanvasPng(canvas, path);
-        this.options.onNotify(t(kind === "report" ? "statistics.reportSaved" : "statistics.chartSaved"));
+        this.options.onNotify(t("statistics.reportSaved"));
       }
     } catch (error) {
       this.options.onError(error);

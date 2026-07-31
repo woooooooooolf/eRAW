@@ -11,6 +11,7 @@ const [
   rustSource,
   commandSource,
   capabilitySource,
+  styleSource,
 ] = await Promise.all([
   readFile(new URL("../src/app.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/api.ts", import.meta.url), "utf8"),
@@ -20,6 +21,7 @@ const [
   readFile(new URL("../src-tauri/src/analysis/mod.rs", import.meta.url), "utf8"),
   readFile(new URL("../src-tauri/src/commands.rs", import.meta.url), "utf8"),
   readFile(new URL("../src-tauri/capabilities/default.json", import.meta.url), "utf8"),
+  readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
 ]);
 const capability = JSON.parse(capabilitySource);
 
@@ -62,8 +64,19 @@ test("statistics view supports docking, detaching, charts and structured report 
   assert.match(panelSource, /drawProfile/);
   assert.match(panelSource, /drawReport/);
   assert.match(panelSource, /not an EMVA 1288 compliant measurement|statistics\.disclaimer/);
+  assert.match(panelSource, /data-stat-report/);
+  assert.match(panelSource, /choosePngFile\(`\$\{baseName\}-statistics\.png`\)/);
+  assert.match(panelSource, /saveCanvasPng\(canvas, path\)/);
+  assert.doesNotMatch(panelSource, /data-stat-tab|statistics-report-preview|copyCanvasImage/);
   assert.ok(capability.windows.includes("statistics"));
   assert.ok(capability.permissions.includes("core:webview:allow-create-webview-window"));
+});
+
+test("ROI selection uses a high-contrast two-pixel boundary", () => {
+  const rule = styleSource.match(/\.image-selection\s*\{[\s\S]*?\}/)?.[0] ?? "";
+  assert.match(rule, /stroke-width:\s*2px/);
+  assert.match(rule, /stroke-dasharray:\s*8 4/);
+  assert.match(rule, /drop-shadow/);
 });
 
 test("detached statistics window closes itself and uses explicit dock semantics", () => {
@@ -83,6 +96,6 @@ test("detached statistics window closes itself and uses explicit dock semantics"
 test("reset view does not clear ROI or trigger a backend scan", () => {
   const reset = panelSource.match(/resetView\(\): void \{[\s\S]*?\n  \}/)?.[0] ?? "";
   assert.match(reset, /selectedGroup = "all"/);
-  assert.match(reset, /cumulative = false/);
-  assert.doesNotMatch(reset, /clearRoi|analyzeRawImage|requestStatistics/);
+  assert.doesNotMatch(reset, /activeTab|cumulative|logarithmic|profileMetric/);
+  assert.doesNotMatch(reset, /clearRoi|analyzeRawImage|requestStatistics|saveReport/);
 });
