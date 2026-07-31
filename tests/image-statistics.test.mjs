@@ -58,30 +58,45 @@ test("ROI selection keeps absolute coordinates and remains active for repeated r
   assert.doesNotMatch(pointerUp, /interactionMode = "pan"/);
   assert.match(appSource, /consumeContextMenuSuppression/);
   assert.match(appSource, /event\.key === "Escape" && this\.viewport\.cancelSelection\(\)/);
+  assert.match(viewportSource, /cancelSelection\(\): boolean \{[\s\S]*?this\.selectionPointerId === null[\s\S]*?this\.abortSelectionGesture\(\)/);
+  const escapeSelection = appSource.match(/event\.key === "Escape" && this\.viewport\.cancelSelection\(\)[\s\S]*?\n    \}/)?.[0] ?? "";
+  assert.doesNotMatch(escapeSelection, /clearRoi/);
 });
 
 test("QCFA analysis retains atomic planes while the UI consumes semantic groups", () => {
   assert.match(rustSource, /let mut atoms = \(0\.\.period\)/);
   assert.match(rustSource, /&\["all", "R", "G", "Gr", "Gb", "B"\]/);
   assert.match(rustSource, /AtomicPlaneStatistics/);
-  assert.match(panelSource, /selectedGroup = "all"/);
-  assert.match(chartSource, /\["all", "R", "Gr", "Gb", "B"\]/);
+  assert.match(panelSource, /private availableGroups\(\): GroupStatistics\[\]/);
+  assert.match(panelSource, /this\.viewState\.charts\[key\]\.visibleGroups/);
+  assert.match(chartSource, /series: groups\.map/);
+  assert.match(chartSource, /selected: Object\.fromEntries\(groups\.map/);
 });
 
-test("statistics view supports docking, detaching, vertical interactive charts and dormant report output", () => {
+test("statistics view supports three presentations, independent curves, two-axis zoom and dormant report output", () => {
   assert.match(appSource, /new WebviewWindow\("statistics"/);
   assert.match(appSource, /class="statistics-dock"/);
+  assert.match(appSource, /type StatisticsDockPlacement = "bottom" \| "side"/);
+  assert.match(appSource, /toggleDockPlacement/);
+  assert.match(styleSource, /\.statistics-dock-side \.canvas-area/);
   assert.match(panelSource, /statistics-sections/);
-  assert.match(panelSource, /data-stat-chart="histogram"/);
-  assert.match(panelSource, /data-stat-chart="row"/);
-  assert.match(panelSource, /data-stat-chart="column"/);
+  assert.match(panelSource, /this\.chartSection\("histogram", groups, summary\)/);
+  assert.match(panelSource, /this\.chartSection\("row", groups\)/);
+  assert.match(panelSource, /this\.chartSection\("column", groups\)/);
+  assert.match(panelSource, /data-stat-chart="\$\{key\}"/);
   assert.match(chartSource, /import\("\.\/statistics-chart-runtime"\)/);
   assert.match(chartSource, /runtime\.init/);
   assert.match(chartRuntimeSource, /AxisPointerComponent/);
   assert.match(chartRuntimeSource, /DataZoomComponent/);
   assert.match(chartSource, /type: "slider"/);
   assert.match(chartSource, /zoomOnMouseWheel:\s*"ctrl"/);
+  assert.match(chartSource, /orient: "vertical"/);
   assert.match(chartSource, /backgroundColor: "transparent"/);
+  assert.match(panelSource, /data-stat-group-chart=/);
+  assert.match(panelSource, /data-stat-y-reset=/);
+  assert.match(panelSource, /data-stat-range-edge="start"/);
+  assert.match(panelSource, /data-stat-range-edge="end"/);
+  assert.match(panelSource, /data-stat-resize=/);
   assert.match(reportSource, /renderStatisticsReport/);
   assert.match(reportSource, /statistics\.disclaimer/);
   assert.doesNotMatch(panelSource, /data-stat-report|saveReport|report-preview/);
@@ -102,11 +117,13 @@ test("statistics charts release plain wheel scrolling and state refreshes preser
 });
 
 test("ROI is a main-window tool with inclusive coordinate entry and a high-contrast boundary", () => {
-  assert.match(appSource, /id="roi-control"/);
-  assert.ok(appSource.indexOf('id="roi-control"') < appSource.indexOf('id="fit-button"'));
+  assert.match(appSource, /id="roi-mouse-button"/);
+  assert.match(appSource, /id="roi-coordinates-button"/);
+  assert.ok(appSource.indexOf('id="roi-mouse-button"') < appSource.indexOf('id="fit-button"'));
   assert.match(appSource, /class="toolbar-separator"/);
-  assert.match(appSource, /data-roi-action="mouse"/);
-  assert.match(appSource, /data-roi-action="coordinates"/);
+  assert.match(appSource, /private roiSource: "mouse" \| "coordinates" \| null/);
+  assert.match(appSource, /if \(this\.roiSource === "mouse"\) this\.clearRoi\(\)/);
+  assert.match(appSource, /if \(this\.roiSource === "coordinates" && this\.viewport\.getSelection\(\)\) this\.clearRoi\(\)/);
   assert.match(appSource, /validateRoiCoordinates/);
   assert.match(appSource, /const selection = this\.viewport\.getSelection\(\);[\s\S]*?return selection \?\?/);
   assert.doesNotMatch(appSource, /statisticsUseSelection/);
@@ -116,7 +133,25 @@ test("ROI is a main-window tool with inclusive coordinate entry and a high-contr
   assert.match(rule, /rgb\(0 0 0/);
   assert.match(rule, /rgb\(255 255 255/);
   assert.match(rule, /pointer-events:\s*none/);
+  assert.match(appSource, /Boolean\(selection\) \|\| this\.viewport\.getInteractionMode\(\) === "select"/);
   assert.match(appSource, /<strong>Apache ECharts<\/strong>[\s\S]*?<code>Apache-2\.0<\/code>/);
+});
+
+test("ROI, pixel, zoom, statistics and capture actions expose the agreed shortcuts", () => {
+  assert.match(appSource, /event\.shiftKey && event\.key\.toLowerCase\(\) === "r"/);
+  assert.match(appSource, /!event\.shiftKey && event\.key\.toLowerCase\(\) === "r"/);
+  assert.match(appSource, /event\.key\.toLowerCase\(\) === "p"/);
+  assert.match(appSource, /event\.key\.toLowerCase\(\) === "z"/);
+  assert.match(appSource, /event\.key\.toLowerCase\(\) === "i"/);
+  assert.match(appSource, /performImageCapture\("preview", "save"\)/);
+  assert.match(appSource, /performImageCapture\("preview", "copy"\)/);
+  assert.match(appSource, /performImageCapture\("current", "save"\)/);
+  assert.match(appSource, /performImageCapture\("current", "copy"\)/);
+  assert.match(appSource, /<span>鼠标框选 ROI<\/span><kbd>R<\/kbd>/);
+  assert.match(appSource, /<span>输入坐标 ROI<\/span><kbd>Shift<\/kbd><kbd>R<\/kbd>/);
+  assert.match(appSource, /<span>定位像素<\/span><kbd>P<\/kbd>/);
+  assert.match(appSource, /<span>输入缩放比例<\/span><kbd>Z<\/kbd>/);
+  assert.match(appSource, /<span>打开图像统计<\/span><kbd>Ctrl<\/kbd><kbd>I<\/kbd>/);
 });
 
 test("detached statistics window relies on the native title bar and uses explicit dock semantics", () => {
@@ -137,7 +172,8 @@ test("detached statistics window relies on the native title bar and uses explici
 
 test("reset view does not clear ROI or trigger a backend scan", () => {
   const reset = panelSource.match(/resetView\(\): void \{[\s\S]*?\n  \}/)?.[0] ?? "";
-  assert.match(reset, /selectedGroup = "all"/);
+  assert.match(reset, /resetStatisticsViewState\(this\.viewState, this\.layout\)/);
+  assert.match(reset, /this\.savedScrollTop = 0/);
   assert.doesNotMatch(reset, /activeTab|cumulative|logarithmic|profileMetric/);
   assert.doesNotMatch(reset, /clearRoi|analyzeRawImage|requestStatistics|saveReport/);
 });

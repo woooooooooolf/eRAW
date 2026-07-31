@@ -1,14 +1,14 @@
 {
   "name": "eraw",
   "private": true,
-  "version": "0.3.6",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "check": "tsc --noEmit",
     "test:i18n": "node --test --test-timeout=30000 tests/i18n.test.mjs",
-    "test:frontend": "node --test --test-timeout=30000 tests/app-settings.test.mjs tests/i18n.test.mjs tests/channel-rendering.test.mjs tests/descriptor-input.test.mjs tests/document-close.test.mjs tests/fullscreen.test.mjs tests/image-capture.test.mjs tests/image-statistics.test.mjs tests/missing-pixel-rendering.test.mjs tests/packing-controls.test.mjs tests/pixel-overlay.test.mjs tests/pixel-value-display.test.mjs tests/roi-selection.test.mjs tests/theme-styles.test.mjs tests/viewport-pixel-alignment.test.mjs tests/viewport-transform.test.mjs",
+    "test:frontend": "node --test --test-timeout=30000 tests/app-settings.test.mjs tests/i18n.test.mjs tests/channel-rendering.test.mjs tests/descriptor-input.test.mjs tests/document-close.test.mjs tests/fullscreen.test.mjs tests/image-capture.test.mjs tests/image-statistics.test.mjs tests/missing-pixel-rendering.test.mjs tests/packing-controls.test.mjs tests/pixel-overlay.test.mjs tests/pixel-value-display.test.mjs tests/roi-selection.test.mjs tests/statistics-view-state.test.mjs tests/theme-styles.test.mjs tests/viewport-pixel-alignment.test.mjs tests/viewport-transform.test.mjs",
     "release": "tauri build --no-bundle",
     "tauri": "tauri"
   },

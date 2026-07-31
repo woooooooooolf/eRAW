@@ -633,9 +633,9 @@ export class RawViewport {
   }
 
   cancelSelection(): boolean {
-    if (this.interactionMode !== "select" && this.selectionPointerId === null) return false;
+    if (this.selectionPointerId === null) return false;
     this.abortSelectionGesture();
-    this.interactionMode = "pan";
+    this.requestDraw();
     return true;
   }
 

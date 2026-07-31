@@ -90,12 +90,21 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.3.6";
+const VERSION = "0.4.0";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
 const PROCESSING_KEY = "eraw.processingSettings.v1";
 const STATISTICS_PRESENTATION_KEY = "eraw.statisticsPresentation.v1";
+
+type StatisticsDockPlacement = "bottom" | "side";
+
+interface StatisticsPresentationSettings {
+  mode: "docked" | "detached";
+  dock: StatisticsDockPlacement;
+  bottomHeight: number;
+  sideWidth: number;
+}
 
 interface RuntimeDiagnostic {
   source: unknown;
@@ -106,6 +115,30 @@ interface RuntimeDiagnostic {
 }
 
 const MAX_IMAGE_DIMENSION = 100_000;
+
+function loadStatisticsPresentation(): StatisticsPresentationSettings {
+  const fallback: StatisticsPresentationSettings = {
+    mode: "docked",
+    dock: "bottom",
+    bottomHeight: 330,
+    sideWidth: 440,
+  };
+  try {
+    const raw = localStorage.getItem(STATISTICS_PRESENTATION_KEY);
+    if (!raw) return fallback;
+    if (raw === "detached") return { ...fallback, mode: "detached" };
+    if (raw === "docked") return fallback;
+    const value = JSON.parse(raw) as Partial<StatisticsPresentationSettings>;
+    return {
+      mode: value.mode === "detached" ? "detached" : "docked",
+      dock: value.dock === "side" ? "side" : "bottom",
+      bottomHeight: Number.isFinite(value.bottomHeight) ? Math.max(210, Math.min(720, Number(value.bottomHeight))) : 330,
+      sideWidth: Number.isFinite(value.sideWidth) ? Math.max(320, Math.min(620, Number(value.sideWidth))) : 440,
+    };
+  } catch {
+    return fallback;
+  }
+}
 
 const WARNING_MESSAGES: Record<string, MessageKey> = {
   empty_dimensions: "warning.emptyDimensions",
@@ -132,6 +165,7 @@ const icons = {
   fit: icon("M4 9V4h5v2H6v3H4Zm11-5h5v5h-2V6h-3V4ZM4 15h2v3h3v2H4v-5Zm14 0h2v5h-5v-2h3v-3Z"),
   actual: icon("M4 4h16v16H4V4Zm2 2v12h12V6H6Zm2 2h2v2H8V8Zm6 6h2v2h-2v-2Z"),
   roi: icon("M5 3h5v2H7v3H5V3Zm9 0h5v5h-2V5h-3V3ZM5 14h2v3h3v2H5v-5Zm12 0h2v5h-5v-2h3v-3Zm-7-5h4v2h-4V9Zm-1 4h6v2H9v-2Z"),
+  roiCoordinates: icon("M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm14 0h2v6h-6v-2h4v-4ZM8 8l3 4-3 4h2.5l1.8-2.4 1.7 2.4h2.5l-3-4 3-4H14l-1.7 2.3L10.5 8H8Z"),
   settings: icon("M19.4 13a7.9 7.9 0 0 0 .1-1 7.9 7.9 0 0 0-.1-1l2.1-1.6-2-3.4-2.5 1a7.3 7.3 0 0 0-1.7-1L15 3.3h-4L10.7 6A7.3 7.3 0 0 0 9 7L6.5 6l-2 3.4L6.6 11a7.9 7.9 0 0 0-.1 1 7.9 7.9 0 0 0 .1 1l-2.1 1.6 2 3.4L9 17a7.3 7.3 0 0 0 1.7 1l.3 2.7h4l.3-2.7a7.3 7.3 0 0 0 1.7-1l2.5 1 2-3.4L19.4 13ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"),
   theme: icon("M12 3a9 9 0 0 0 0 18h1.2a2.3 2.3 0 0 0 1.6-4l-.4-.4a1.2 1.2 0 0 1 .9-2h1.8A3.9 3.9 0 0 0 21 10.7C21 6.5 17 3 12 3Zm-4 9.2a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Zm1.5-4.4a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Zm4.3-.7a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Zm3 3a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8Z"),
   language: icon("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 9h-3.1a15.7 15.7 0 0 0-1.4-5A8.1 8.1 0 0 1 18.9 11ZM12 4c1 1.2 1.7 3.7 1.8 7H10.2C10.3 7.7 11 5.2 12 4ZM9.6 6a15.7 15.7 0 0 0-1.4 5H5.1A8.1 8.1 0 0 1 9.6 6ZM5.1 13h3.1a15.7 15.7 0 0 0 1.4 5A8.1 8.1 0 0 1 5.1 13Zm6.9 7c-1-1.2-1.7-3.7-1.8-7h3.6c-.1 3.3-.8 5.8-1.8 7Zm2.4-2a15.7 15.7 0 0 0 1.4-5h3.1a8.1 8.1 0 0 1-4.5 5Z"),
@@ -218,15 +252,20 @@ export class ErawApp {
   private settingsFormSidebarWidth = this.settings.sidebarWidth;
   private runtimeDiagnostics: RuntimeDiagnostic[] = [];
   private lastSample: ImagePoint | null = null;
+  private roiSource: "mouse" | "coordinates" | null = null;
   private statisticsOpen = false;
-  private statisticsDetached = localStorage.getItem(STATISTICS_PRESENTATION_KEY) === "detached";
+  private statisticsPresentation = loadStatisticsPresentation();
+  private statisticsDetached = this.statisticsPresentation.mode === "detached";
+  private statisticsDockPlacement: StatisticsDockPlacement = this.statisticsPresentation.dock;
   private statisticsRevision = 0;
   private statisticsResult: AnalysisResult | null = null;
   private statisticsLoading = false;
   private statisticsError: string | null = null;
-  private statisticsDockHeight = 330;
+  private statisticsDockHeight = this.statisticsPresentation.bottomHeight;
+  private statisticsDockWidth = this.statisticsPresentation.sideWidth;
+  private statisticsResizeStartX = 0;
   private statisticsResizeStartY = 0;
-  private statisticsResizeStartHeight = 0;
+  private statisticsResizeStartSize = 0;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -256,6 +295,7 @@ export class ErawApp {
     });
     this.statisticsPanel = new StatisticsPanel(this.get("statistics-panel"), {
       detached: false,
+      layout: this.statisticsDockPlacement,
       onAction: (action) => this.onStatisticsAction(action),
     });
     this.statisticsPanel.setActive(false);
@@ -307,12 +347,8 @@ export class ErawApp {
           </div>
           <div class="toolbar view-actions">
             <div id="roi-control" class="roi-control">
-              <button id="roi-button" class="icon-button" title="${t("roi.button")}" aria-label="${t("roi.button")}" aria-haspopup="menu" aria-expanded="false" disabled>${icons.roi}</button>
-              <button id="roi-clear-button" class="roi-clear-button" type="button" title="${t("roi.clear")}" aria-label="${t("roi.clear")}" hidden>×</button>
-              <div id="roi-popover" class="roi-popover" role="menu" aria-label="${t("roi.menuTitle")}" hidden>
-                <button type="button" role="menuitem" data-roi-action="mouse"><i>↗</i><span><strong>${t("roi.mouse")}</strong><small>${t("roi.mouseHint")}</small></span></button>
-                <button type="button" role="menuitem" data-roi-action="coordinates"><i>XY</i><span><strong>${t("roi.coordinates")}</strong><small>${t("roi.coordinatesHint")}</small></span></button>
-              </div>
+              <button id="roi-mouse-button" class="icon-button" type="button" title="${t("roi.mouseShortcut")}" aria-label="${t("roi.mouse")}" aria-pressed="false" disabled>${icons.roi}</button>
+              <button id="roi-coordinates-button" class="icon-button" type="button" title="${t("roi.coordinatesShortcut")}" aria-label="${t("roi.coordinates")}" aria-pressed="false" disabled>${icons.roiCoordinates}</button>
             </div>
             <i class="toolbar-separator" aria-hidden="true"></i>
             <button id="fit-button" class="icon-button" title="适应窗口 (Ctrl+0)">${icons.fit}</button>
@@ -430,7 +466,8 @@ export class ErawApp {
           <div id="sidebar-resizer" class="sidebar-resizer" role="separator" aria-label="调整参数面板宽度" aria-orientation="vertical" tabindex="0"></div>
 
           <main class="canvas-area">
-            <div class="viewport" id="viewport">
+            <div class="canvas-stage">
+              <div class="viewport" id="viewport">
               <canvas class="raw-canvas"></canvas>
               <canvas class="pixel-value-overlay" aria-hidden="true"></canvas>
               <svg class="image-boundary" aria-hidden="true" width="100%" height="100%" preserveAspectRatio="none">
@@ -448,20 +485,21 @@ export class ErawApp {
               </div>
               <div class="image-scrollbar horizontal"><div class="scroll-thumb"></div></div>
               <div class="image-scrollbar vertical"><div class="scroll-thumb"></div></div>
-            </div>
-            <div id="canvas-context-menu" class="canvas-context-menu" role="menu" aria-label="图像抓拍" hidden>
-              <button type="button" role="menuitem" data-statistics-open>图像统计…</button>
-              <hr role="separator"/>
-              <button type="button" role="menuitem" data-capture-kind="current" data-capture-destination="save">当前画面另存为…</button>
-              <button type="button" role="menuitem" data-capture-kind="current" data-capture-destination="copy">复制当前画面</button>
-              <hr role="separator"/>
-              <button type="button" role="menuitem" data-capture-kind="preview" data-capture-destination="save">完整预览图另存为…</button>
-              <button type="button" role="menuitem" data-capture-kind="preview" data-capture-destination="copy">复制完整预览图</button>
-            </div>
-            <div class="frame-strip" id="frame-strip">
-              <button id="first-frame" title="第一帧">|‹</button><button id="previous-frame" title="上一帧">‹</button>
-              <div class="frame-counter"><span>FRAME</span><input id="frame-input" type="number" min="1" value="1"/><b>/</b><strong id="frame-total">0</strong></div>
-              <button id="next-frame" title="下一帧">›</button><button id="last-frame" title="最后一帧">›|</button>
+              </div>
+              <div id="canvas-context-menu" class="canvas-context-menu" role="menu" aria-label="图像抓拍" hidden>
+                <button type="button" role="menuitem" data-statistics-open><span>图像统计…</span><kbd>Ctrl I</kbd></button>
+                <hr role="separator"/>
+                <button type="button" role="menuitem" data-capture-kind="current" data-capture-destination="save"><span>当前画面另存为…</span><kbd>Ctrl S</kbd></button>
+                <button type="button" role="menuitem" data-capture-kind="current" data-capture-destination="copy"><span>复制当前画面</span><kbd>Ctrl C</kbd></button>
+                <hr role="separator"/>
+                <button type="button" role="menuitem" data-capture-kind="preview" data-capture-destination="save"><span>完整预览图另存为…</span><kbd>Ctrl Shift S</kbd></button>
+                <button type="button" role="menuitem" data-capture-kind="preview" data-capture-destination="copy"><span>复制完整预览图</span><kbd>Ctrl Shift C</kbd></button>
+              </div>
+              <div class="frame-strip" id="frame-strip">
+                <button id="first-frame" title="第一帧">|‹</button><button id="previous-frame" title="上一帧">‹</button>
+                <div class="frame-counter"><span>FRAME</span><input id="frame-input" type="number" min="1" value="1"/><b>/</b><strong id="frame-total">0</strong></div>
+                <button id="next-frame" title="下一帧">›</button><button id="last-frame" title="最后一帧">›|</button>
+              </div>
             </div>
             <section id="statistics-dock" class="statistics-dock" hidden>
               <div id="statistics-resizer" class="statistics-resizer" role="separator" aria-orientation="horizontal" aria-label="调整图像统计区域高度"></div>
@@ -618,7 +656,18 @@ export class ErawApp {
           <div><span>以指针位置连续缩放</span><kbd>滚轮</kbd></div>
           <div><span>平移图像</span><kbd>左键拖动</kbd></div>
           <div><span>切换适应窗口 / 100%</span><kbd>双击</kbd></div>
+          <div><span>鼠标框选 ROI</span><kbd>R</kbd></div>
+          <div><span>输入坐标 ROI</span><kbd>Shift</kbd><kbd>R</kbd></div>
+          <div><span>定位像素</span><kbd>P</kbd></div>
+          <div><span>输入缩放比例</span><kbd>Z</kbd></div>
           <div><span>关闭菜单或诊断面板</span><kbd>Esc</kbd></div>
+        </section>
+        <section><h3>统计与抓拍</h3>
+          <div><span>打开图像统计</span><kbd>Ctrl</kbd><kbd>I</kbd></div>
+          <div><span>当前画面另存为</span><kbd>Ctrl</kbd><kbd>S</kbd></div>
+          <div><span>复制当前画面</span><kbd>Ctrl</kbd><kbd>C</kbd></div>
+          <div><span>完整预览图另存为</span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>S</kbd></div>
+          <div><span>复制完整预览图</span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>C</kbd></div>
         </section>
         <section><h3>参数输入</h3>
           <div><span>提交当前输入并离开</span><kbd>Enter</kbd></div>
@@ -696,27 +745,21 @@ export class ErawApp {
         void this.openExport(button.dataset.exportTarget as ExportTarget);
       });
     });
-    this.get("roi-button").addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.setRoiMenuOpen(this.get("roi-popover").hidden);
+    this.get("roi-mouse-button").addEventListener("click", () => {
+      if (this.roiSource === "mouse") this.clearRoi();
+      else this.beginMouseRoiSelection();
     });
-    this.get("roi-clear-button").addEventListener("click", (event) => {
-      event.stopPropagation();
-      this.clearRoi();
-    });
-    this.root.querySelectorAll<HTMLButtonElement>("[data-roi-action]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const action = button.dataset.roiAction;
-        this.setRoiMenuOpen(false);
-        if (action === "mouse") this.beginMouseRoiSelection();
-        else if (action === "coordinates") this.openRoiCoordinateDialog();
-      });
+    this.get("roi-coordinates-button").addEventListener("click", () => {
+      if (this.roiSource === "coordinates" && this.viewport.getSelection()) this.clearRoi();
+      else this.openRoiCoordinateDialog();
     });
     this.get("fit-button").addEventListener("click", () => this.viewport.fit());
     this.get("actual-button").addEventListener("click", () => this.viewport.actualSize());
     this.get("panel-button").addEventListener("click", () => {
       this.root.querySelector(".app-shell")!.classList.toggle("panel-hidden");
       this.get("panel-button").classList.toggle("active");
+      this.updateStatisticsDock();
+      this.syncStatisticsState();
     });
     this.get("language-button").addEventListener("click", (event) => {
       event.stopPropagation();
@@ -740,7 +783,6 @@ export class ErawApp {
       if (!(event.target instanceof Element) || !event.target.closest("#theme-control")) this.setThemeMenuOpen(false);
       if (!(event.target instanceof Element) || !event.target.closest("#utility-control")) this.setUtilityMenuOpen(false);
       if (!(event.target instanceof Element) || !event.target.closest("#export-control")) this.setExportMenuOpen(false);
-      if (!(event.target instanceof Element) || !event.target.closest("#roi-control")) this.setRoiMenuOpen(false);
       if (!(event.target instanceof Element) || !event.target.closest("#canvas-context-menu")) this.setCanvasContextMenuOpen(false);
     });
     document.addEventListener("contextmenu", (event) => this.onContextMenu(event));
@@ -757,19 +799,31 @@ export class ErawApp {
     });
     this.get("statistics-resizer").addEventListener("pointerdown", (event) => {
       const pointer = event as PointerEvent;
+      if (pointer.button !== 0) return;
       pointer.preventDefault();
+      this.statisticsResizeStartX = pointer.clientX;
       this.statisticsResizeStartY = pointer.clientY;
-      this.statisticsResizeStartHeight = this.statisticsDockHeight;
+      this.statisticsResizeStartSize = this.statisticsDockPlacement === "side"
+        ? this.statisticsDockWidth
+        : this.statisticsDockHeight;
       this.get("statistics-resizer").setPointerCapture(pointer.pointerId);
       this.root.querySelector(".app-shell")?.classList.add("resizing-statistics");
     });
     this.get("statistics-resizer").addEventListener("pointermove", (event) => {
       const pointer = event as PointerEvent;
       if (!this.get("statistics-resizer").hasPointerCapture(pointer.pointerId)) return;
-      this.statisticsDockHeight = Math.max(
-        210,
-        Math.min(window.innerHeight * 0.72, this.statisticsResizeStartHeight + this.statisticsResizeStartY - pointer.clientY),
-      );
+      if (this.statisticsDockPlacement === "side") {
+        const statisticsOnLeft = this.settings.sidebarPosition === "right";
+        const delta = statisticsOnLeft
+          ? pointer.clientX - this.statisticsResizeStartX
+          : this.statisticsResizeStartX - pointer.clientX;
+        this.statisticsDockWidth = this.clampStatisticsDockWidth(this.statisticsResizeStartSize + delta);
+      } else {
+        this.statisticsDockHeight = Math.max(
+          210,
+          Math.min(window.innerHeight * 0.72, this.statisticsResizeStartSize + this.statisticsResizeStartY - pointer.clientY),
+        );
+      }
       this.updateStatisticsDock();
     });
     this.get("statistics-resizer").addEventListener("pointerup", (event) => {
@@ -778,6 +832,7 @@ export class ErawApp {
         this.get("statistics-resizer").releasePointerCapture(pointer.pointerId);
       }
       this.root.querySelector(".app-shell")?.classList.remove("resizing-statistics");
+      this.saveStatisticsPresentation();
     });
     this.get("settings-button").addEventListener("click", () => {
       this.setLanguageMenuOpen(false);
@@ -886,12 +941,12 @@ export class ErawApp {
     window.addEventListener("keydown", (event) => this.onKeyDown(event));
     window.addEventListener("resize", () => {
       this.setCanvasContextMenuOpen(false);
-      this.setRoiMenuOpen(false);
       this.setSidebarWidth(this.settings.sidebarWidth, false);
+      this.updateStatisticsDock();
+      this.syncStatisticsState();
     });
     window.addEventListener("blur", () => {
       this.setCanvasContextMenuOpen(false);
-      this.setRoiMenuOpen(false);
     });
     window.addEventListener("languagechange", () => {
       if (this.settings.language === "system") this.setLanguage("system");
@@ -1009,7 +1064,6 @@ export class ErawApp {
       this.statisticsError = null;
       this.syncStatisticsState();
       this.setExportMenuOpen(false);
-      this.setRoiMenuOpen(false);
       this.setCanvasContextMenuOpen(false);
       this.setDiagnosticsOpen(false);
       this.get<HTMLDialogElement>("pixel-locator-dialog").close();
@@ -1314,7 +1368,6 @@ export class ErawApp {
       this.setThemeMenuOpen(false);
       this.setUtilityMenuOpen(false);
       this.setExportMenuOpen(false);
-      this.setRoiMenuOpen(false);
     }
     this.get("language-popover").hidden = !open;
     this.get("language-button").setAttribute("aria-expanded", String(open));
@@ -1349,7 +1402,6 @@ export class ErawApp {
       this.setLanguageMenuOpen(false);
       this.setUtilityMenuOpen(false);
       this.setExportMenuOpen(false);
-      this.setRoiMenuOpen(false);
     }
     const popover = this.get("theme-popover");
     popover.hidden = !open;
@@ -1363,7 +1415,6 @@ export class ErawApp {
       themePopover.hidden = true;
       this.get("theme-button").setAttribute("aria-expanded", "false");
       this.setExportMenuOpen(false);
-      this.setRoiMenuOpen(false);
     }
     this.get("utility-popover").hidden = !open;
     this.get("about-button").setAttribute("aria-expanded", String(open));
@@ -1374,21 +1425,9 @@ export class ErawApp {
       this.setLanguageMenuOpen(false);
       this.setThemeMenuOpen(false);
       this.setUtilityMenuOpen(false);
-      this.setRoiMenuOpen(false);
     }
     this.get("export-popover").hidden = !open;
     this.get("export-button").setAttribute("aria-expanded", String(open));
-  }
-
-  private setRoiMenuOpen(open: boolean): void {
-    if (open) {
-      this.setLanguageMenuOpen(false);
-      this.setThemeMenuOpen(false);
-      this.setUtilityMenuOpen(false);
-      this.setExportMenuOpen(false);
-    }
-    this.get("roi-popover").hidden = !open;
-    this.get("roi-button").setAttribute("aria-expanded", String(open));
   }
 
   private updateExportAvailability(): void {
@@ -1452,7 +1491,31 @@ export class ErawApp {
       roi: this.viewport.getSelection(),
       imageWidth: this.document?.descriptor.width ?? 0,
       imageHeight: this.document?.descriptor.height ?? 0,
+      sideDockAvailable: this.canUseSideStatisticsDock(),
     };
+  }
+
+  private canUseSideStatisticsDock(): boolean {
+    const shell = this.root.querySelector<HTMLElement>(".app-shell");
+    const sidebarWidth = shell?.classList.contains("panel-hidden") ? 0 : this.sidebarWidth;
+    return window.innerWidth - sidebarWidth >= 720;
+  }
+
+  private clampStatisticsDockWidth(width: number): number {
+    const shell = this.root.querySelector<HTMLElement>(".app-shell");
+    const sidebarWidth = shell?.classList.contains("panel-hidden") ? 0 : this.sidebarWidth;
+    const maximum = Math.max(320, Math.min(620, window.innerWidth - sidebarWidth - 320));
+    return Math.max(320, Math.min(maximum, Math.round(width)));
+  }
+
+  private saveStatisticsPresentation(): void {
+    this.statisticsPresentation = {
+      mode: this.statisticsDetached ? "detached" : "docked",
+      dock: this.statisticsDockPlacement,
+      bottomHeight: this.statisticsDockHeight,
+      sideWidth: this.statisticsDockWidth,
+    };
+    localStorage.setItem(STATISTICS_PRESENTATION_KEY, JSON.stringify(this.statisticsPresentation));
   }
 
   private async bindStatisticsWindowEvents(): Promise<void> {
@@ -1492,12 +1555,19 @@ export class ErawApp {
   private updateStatisticsDock(): void {
     const dock = this.get("statistics-dock");
     const visible = this.statisticsOpen && !this.statisticsDetached;
+    if (this.statisticsDockPlacement === "side" && !this.canUseSideStatisticsDock()) {
+      this.statisticsDockPlacement = "bottom";
+    }
     dock.toggleAttribute("hidden", !visible);
     this.statisticsPanel.setActive(visible);
+    this.statisticsPanel.setLayout(this.statisticsDockPlacement);
     dock.style.setProperty("--statistics-height", `${Math.round(this.statisticsDockHeight)}px`);
+    dock.style.setProperty("--statistics-width", `${Math.round(this.clampStatisticsDockWidth(this.statisticsDockWidth))}px`);
     const shell = this.root.querySelector<HTMLElement>(".app-shell");
     shell?.style.setProperty("--statistics-height", `${Math.round(this.statisticsDockHeight)}px`);
+    shell?.style.setProperty("--statistics-width", `${Math.round(this.clampStatisticsDockWidth(this.statisticsDockWidth))}px`);
     shell?.classList.toggle("statistics-docked", visible);
+    shell?.classList.toggle("statistics-dock-side", visible && this.statisticsDockPlacement === "side");
   }
 
   private async openStatistics(): Promise<void> {
@@ -1543,7 +1613,7 @@ export class ErawApp {
     });
     statisticsWindow.once("tauri://error", (event) => {
       this.statisticsDetached = false;
-      localStorage.setItem(STATISTICS_PRESENTATION_KEY, "docked");
+      this.saveStatisticsPresentation();
       this.updateStatisticsDock();
       this.reportRuntimeError(event.payload);
     });
@@ -1607,6 +1677,8 @@ export class ErawApp {
   }
 
   private onRoiSelectionChange(_selection: ImageRect | null): void {
+    if (_selection && this.viewport.getInteractionMode() === "select") this.roiSource = "mouse";
+    if (!_selection) this.roiSource = null;
     this.updateRoiPresentation();
     this.syncStatisticsState();
     if (this.statisticsOpen && !this.fileOperationInProgress) void this.requestStatistics();
@@ -1621,7 +1693,6 @@ export class ErawApp {
       this.statisticsRevision += 1;
       void cancelRawAnalysis(this.statisticsRevision);
       this.statisticsLoading = false;
-      this.viewport.setInteractionMode("pan");
       this.updateStatisticsDock();
       if (source === "main") {
         void WebviewWindow.getByLabel("statistics").then((window) => window?.close());
@@ -1630,10 +1701,7 @@ export class ErawApp {
     }
     if (action === "detach") {
       this.statisticsDetached = true;
-      localStorage.setItem(
-        STATISTICS_PRESENTATION_KEY,
-        "detached",
-      );
+      this.saveStatisticsPresentation();
       this.updateStatisticsDock();
       void this.openDetachedStatisticsWindow();
       this.syncStatisticsState();
@@ -1641,7 +1709,22 @@ export class ErawApp {
     }
     if (action === "dock") {
       this.statisticsDetached = false;
-      localStorage.setItem(STATISTICS_PRESENTATION_KEY, "docked");
+      this.saveStatisticsPresentation();
+      this.updateStatisticsDock();
+      this.syncStatisticsState();
+      return;
+    }
+    if (action === "toggleDockPlacement") {
+      if (this.statisticsDockPlacement === "bottom") {
+        if (!this.canUseSideStatisticsDock()) {
+          this.showToast(t("statistics.sideUnavailable"), "error");
+          return;
+        }
+        this.statisticsDockPlacement = "side";
+      } else {
+        this.statisticsDockPlacement = "bottom";
+      }
+      this.saveStatisticsPresentation();
       this.updateStatisticsDock();
       this.syncStatisticsState();
       return;
@@ -1949,6 +2032,7 @@ export class ErawApp {
       this.showToast(t("roi.mouseUnavailable"), "error");
       return;
     }
+    this.roiSource = "mouse";
     this.viewport.setSelectionVisible(true);
     this.viewport.setInteractionMode("select");
     this.updateRoiPresentation();
@@ -2031,54 +2115,104 @@ export class ErawApp {
       return;
     }
     this.viewport.setInteractionMode("pan");
+    this.roiSource = "coordinates";
     this.viewport.setSelection(validation.rect);
     this.get<HTMLDialogElement>("roi-coordinate-dialog").close();
   }
 
   private clearRoi(): void {
+    this.roiSource = null;
     this.viewport.setInteractionMode("pan");
     this.viewport.clearSelection();
-    this.setRoiMenuOpen(false);
   }
 
   private updateRoiPresentation(): void {
     const selection = this.viewport.getSelection();
-    const button = this.get<HTMLButtonElement>("roi-button");
+    const mouseButton = this.get<HTMLButtonElement>("roi-mouse-button");
+    const coordinatesButton = this.get<HTMLButtonElement>("roi-coordinates-button");
     const available = Boolean(this.document?.layout.frameCount);
     const supportsMouseSelection = ["raw", "bayer"].includes(this.displayMode);
     if (!supportsMouseSelection && this.viewport.getInteractionMode() === "select") {
       this.viewport.setInteractionMode("pan");
     }
-    button.disabled = !available;
-    button.classList.toggle("active", Boolean(selection));
-    button.classList.toggle("selecting", this.viewport.getInteractionMode() === "select");
-    const clearButton = this.get<HTMLButtonElement>("roi-clear-button");
-    clearButton.hidden = !selection;
-    clearButton.disabled = !available;
+    mouseButton.disabled = !available || !supportsMouseSelection;
+    coordinatesButton.disabled = !available;
+    const mouseActive = this.roiSource === "mouse";
+    const coordinatesActive = this.roiSource === "coordinates";
+    mouseButton.classList.toggle("active", mouseActive);
+    mouseButton.classList.toggle("selecting", mouseActive && this.viewport.getInteractionMode() === "select");
+    coordinatesButton.classList.toggle("active", coordinatesActive);
+    mouseButton.setAttribute("aria-pressed", String(mouseActive));
+    coordinatesButton.setAttribute("aria-pressed", String(coordinatesActive));
     const title = selection
-      ? `${t("roi.button")}: X[${selection.x}, ${selection.x + selection.width - 1}] Y[${selection.y}, ${selection.y + selection.height - 1}]`
-      : t("roi.button");
-    button.setAttribute("title", title);
-    button.setAttribute("aria-label", title);
-    const selectionVisible = Boolean(selection) && supportsMouseSelection;
+      ? `X[${selection.x}, ${selection.x + selection.width - 1}] Y[${selection.y}, ${selection.y + selection.height - 1}]`
+      : "";
+    mouseButton.setAttribute("title", title ? `${t("roi.mouseShortcut")} · ${title}` : t("roi.mouseShortcut"));
+    coordinatesButton.setAttribute("title", title ? `${t("roi.coordinatesShortcut")} · ${title}` : t("roi.coordinatesShortcut"));
+    const selectionVisible = supportsMouseSelection
+      && (Boolean(selection) || this.viewport.getInteractionMode() === "select");
     this.viewport.setSelectionVisible(selectionVisible);
+  }
+
+  private shortcutTargetIsEditable(event: KeyboardEvent): boolean {
+    const target = event.target;
+    return target instanceof HTMLInputElement
+      || target instanceof HTMLTextAreaElement
+      || target instanceof HTMLSelectElement
+      || (target instanceof HTMLElement && target.isContentEditable);
   }
 
   private onKeyDown(event: KeyboardEvent): void {
     if (event.key === "Escape" && this.viewport.cancelSelection()) {
       event.preventDefault();
-      this.clearRoi();
+      this.updateRoiPresentation();
     }
-    else if (event.key === "Escape" && (!this.get("language-popover").hidden || !this.get("theme-popover").hidden || !this.get("utility-popover").hidden || !this.get("export-popover").hidden || !this.get("roi-popover").hidden || !this.get("canvas-context-menu").hidden)) {
+    else if (event.key === "Escape" && (!this.get("language-popover").hidden || !this.get("theme-popover").hidden || !this.get("utility-popover").hidden || !this.get("export-popover").hidden || !this.get("canvas-context-menu").hidden)) {
       event.preventDefault();
       this.setLanguageMenuOpen(false);
       this.setThemeMenuOpen(false);
       this.setUtilityMenuOpen(false);
       this.setExportMenuOpen(false);
-      this.setRoiMenuOpen(false);
       this.setCanvasContextMenuOpen(false);
     }
     else if (event.key === "Escape" && this.root.querySelector(".app-shell")!.classList.contains("diagnostics-open")) { event.preventDefault(); this.setDiagnosticsOpen(false); }
+    else if (this.shortcutTargetIsEditable(event) || this.root.querySelector("dialog[open]")) return;
+    else if (!event.ctrlKey && !event.altKey && event.shiftKey && event.key.toLowerCase() === "r" && this.document?.layout.frameCount) {
+      event.preventDefault();
+      if (this.roiSource === "coordinates" && this.viewport.getSelection()) this.clearRoi(); else this.openRoiCoordinateDialog();
+    }
+    else if (!event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "r" && this.document?.layout.frameCount) {
+      event.preventDefault();
+      if (this.roiSource === "mouse") this.clearRoi(); else this.beginMouseRoiSelection();
+    }
+    else if (!event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "p" && this.document?.layout.frameCount) {
+      event.preventDefault();
+      this.openPixelLocator();
+    }
+    else if (!event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "z" && this.document?.layout.frameCount) {
+      event.preventDefault();
+      this.openZoomDialog();
+    }
+    else if (event.ctrlKey && !event.altKey && event.key.toLowerCase() === "i" && this.document?.layout.frameCount) {
+      event.preventDefault();
+      void this.openStatistics();
+    }
+    else if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s" && this.document?.layout.frameCount) {
+      event.preventDefault();
+      void this.performImageCapture("preview", "save");
+    }
+    else if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "c" && this.document?.layout.frameCount) {
+      event.preventDefault();
+      void this.performImageCapture("preview", "copy");
+    }
+    else if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === "s" && this.document?.layout.frameCount) {
+      event.preventDefault();
+      void this.performImageCapture("current", "save");
+    }
+    else if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === "c" && this.document?.layout.frameCount && !window.getSelection()?.toString()) {
+      event.preventDefault();
+      void this.performImageCapture("current", "copy");
+    }
     else if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); void this.openFile(); }
     else if (event.ctrlKey && event.key.toLowerCase() === "w" && this.document) {
       event.preventDefault();
@@ -2180,6 +2314,7 @@ export class ErawApp {
     });
     this.writePresentationControls();
     this.setSidebarWidth(this.settings.sidebarWidth, false);
+    this.updateStatisticsDock();
   }
 
   private writePresentationControls(): void {

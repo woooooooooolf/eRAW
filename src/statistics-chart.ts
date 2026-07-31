@@ -4,11 +4,18 @@ import type {
   GroupStatistics,
   ProfilePoint,
 } from "./types";
+import {
+  normalizeStatisticsRange,
+  type StatisticsAxisRange,
+  type StatisticsChartKey,
+  type StatisticsViewState,
+} from "./statistics-view-state";
 
 type EChartsRuntime = typeof import("./statistics-chart-runtime")["echarts"];
 type ChartInstance = ReturnType<EChartsRuntime["init"]>;
 type ChartOption = Parameters<ChartInstance["setOption"]>[0];
 type ProfileMetric = "mean" | "standardDeviation";
+type StatisticsAxis = "x" | "y";
 
 interface HistogramDatum {
   value: [number, number];
@@ -19,19 +26,29 @@ interface HistogramDatum {
 interface TooltipSeriesParameter {
   marker?: string;
   seriesName?: string;
-  data?: HistogramDatum | [number, number];
-  value?: [number, number];
+  data?: HistogramDatum | [number, number | null];
+  value?: [number, number | null];
 }
 
-const GROUP_COLORS: Record<string, string> = {
-  all: "#5fc7e8",
-  Y: "#d5e4ee",
-  R: "#ef6680",
-  G: "#72d995",
-  Gr: "#a4e86f",
-  Gb: "#50d7bd",
-  B: "#689cff",
-};
+interface ChartDomains {
+  x: StatisticsAxisRange;
+  y: StatisticsAxisRange;
+}
+
+interface DataZoomEventItem {
+  dataZoomId?: string;
+  dataZoomIndex?: number;
+  start?: number;
+  end?: number;
+}
+
+interface DataZoomEvent extends DataZoomEventItem {
+  batch?: DataZoomEventItem[];
+}
+
+interface StatisticsChartCallbacks {
+  onRangeChange(chart: StatisticsChartKey, axis: StatisticsAxis, range: StatisticsAxisRange | null): void;
+}
 
 let runtimePromise: Promise<EChartsRuntime> | null = null;
 
@@ -44,7 +61,36 @@ function cssValue(style: CSSStyleDeclaration, name: string, fallback: string): s
   return style.getPropertyValue(name).trim() || fallback;
 }
 
-function groupLabel(key: string): string {
+function rgbVariable(style: CSSStyleDeclaration, name: string, fallback: string): string {
+  const value = cssValue(style, name, fallback).replace(/,/g, " ").trim();
+  return `rgb(${value})`;
+}
+
+function mixRgb(left: string, right: string, ratio: number): string {
+  const values = (value: string) => value.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [128, 128, 128];
+  const a = values(left);
+  const b = values(right);
+  return `rgb(${a.map((value, index) => Math.round(value * (1 - ratio) + b[index] * ratio)).join(" ")})`;
+}
+
+function groupColors(root: HTMLElement): Record<string, string> {
+  const style = getComputedStyle(root);
+  const red = rgbVariable(style, "--channel-red-rgb", "239 91 111");
+  const green = rgbVariable(style, "--channel-green-rgb", "68 196 126");
+  const blue = rgbVariable(style, "--channel-blue-rgb", "76 137 241");
+  const accent = rgbVariable(style, "--accent-rgb", "82 202 244");
+  return {
+    all: accent,
+    Y: cssValue(style, "--text", "#d7e3ea"),
+    R: red,
+    G: green,
+    Gr: mixRgb(green, accent, 0.22),
+    Gb: mixRgb(green, blue, 0.28),
+    B: blue,
+  };
+}
+
+export function groupLabel(key: string): string {
   return key === "all" ? t("statistics.allCfa") : key;
 }
 
@@ -60,11 +106,7 @@ function histogramData(histogram: number[], maximumPoints = 4096): HistogramDatu
     const end = Math.min(histogram.length - 1, start + bucketSize - 1);
     let count = 0;
     for (let index = start; index <= end; index += 1) count += histogram[index];
-    data.push({
-      value: [(start + end) / 2, count],
-      dnStart: start,
-      dnEnd: end,
-    });
+    data.push({ value: [(start + end) / 2, count], dnStart: start, dnEnd: end });
   }
   return data;
 }
@@ -83,7 +125,7 @@ function histogramTooltip(parameters: unknown): string {
   const range = start === end ? `DN ${start}` : `DN ${start}–${end}`;
   const rows = items.map((item) => {
     const value = Array.isArray(item.data) ? item.data[1] : item.data?.value[1] ?? item.value?.[1] ?? 0;
-    return `${item.marker ?? ""}${item.seriesName ?? ""}: ${formatNumber(value)}`;
+    return `${item.marker ?? ""}${item.seriesName ?? ""}: ${formatNumber(Number(value ?? 0))}`;
   });
   return [range, ...rows].join("<br/>");
 }
@@ -104,38 +146,60 @@ function profileTooltip(parameters: unknown): string {
   return [`${t("statistics.sourceCoordinate")}: ${coordinate}`, ...rows].join("<br/>");
 }
 
+function availableGroups(result: AnalysisResult): GroupStatistics[] {
+  if (result.snapshot.cfa === "MONO") {
+    return [result.groups.find((group) => group.key === "Y") ?? result.groups[0]];
+  }
+  return result.groups;
+}
+
+function profileDomain(groups: GroupStatistics[], axis: "rowProfile" | "columnProfile"): StatisticsAxisRange {
+  let start = Number.POSITIVE_INFINITY;
+  let end = Number.NEGATIVE_INFINITY;
+  for (const group of groups) {
+    for (const point of group[axis]) {
+      if (point.mean === null) continue;
+      start = Math.min(start, point.mean);
+      end = Math.max(end, point.mean);
+    }
+  }
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return { start: 0, end: 1 };
+  if (start === end) return { start: Math.max(0, start - 1), end: end + 1 };
+  const padding = Math.max(0.5, (end - start) * 0.04);
+  return { start: Math.max(0, start - padding), end: end + padding };
+}
+
 export class StatisticsCharts {
   private readonly root: HTMLElement;
-  private readonly instances: ChartInstance[] = [];
+  private readonly callbacks: StatisticsChartCallbacks;
+  private readonly instances = new Map<StatisticsChartKey, ChartInstance>();
+  private readonly domains = new Map<StatisticsChartKey, ChartDomains>();
   private renderRevision = 0;
 
-  constructor(root: HTMLElement) {
+  constructor(root: HTMLElement, callbacks: StatisticsChartCallbacks) {
     this.root = root;
+    this.callbacks = callbacks;
   }
 
-  render(result: AnalysisResult, selectedKey: string): void {
+  render(result: AnalysisResult, viewState: StatisticsViewState): void {
     this.dispose();
     const revision = ++this.renderRevision;
-    void this.renderLoaded(revision, result, selectedKey);
+    void this.renderLoaded(revision, result, viewState);
   }
 
-  private async renderLoaded(
-    revision: number,
-    result: AnalysisResult,
-    selectedKey: string,
-  ): Promise<void> {
+  private async renderLoaded(revision: number, result: AnalysisResult, viewState: StatisticsViewState): Promise<void> {
     const runtime = await loadECharts();
     if (revision !== this.renderRevision) return;
-    const selected = result.groups.find((group) => group.key === selectedKey) ?? result.groups[0];
+    const groups = availableGroups(result);
     const histogramElement = this.root.querySelector<HTMLElement>("[data-stat-chart='histogram']");
     const rowElement = this.root.querySelector<HTMLElement>("[data-stat-chart='row']");
     const columnElement = this.root.querySelector<HTMLElement>("[data-stat-chart='column']");
     for (const element of [histogramElement, rowElement, columnElement]) {
       if (element) this.releaseUnmodifiedWheel(element);
     }
-    if (histogramElement) this.createHistogram(runtime, histogramElement, result, selected);
-    if (rowElement) this.createProfile(runtime, rowElement, selected.rowProfile, "mean");
-    if (columnElement) this.createProfile(runtime, columnElement, selected.columnProfile, "mean");
+    if (histogramElement) this.createHistogram(runtime, histogramElement, result, groups, viewState);
+    if (rowElement) this.createProfile(runtime, rowElement, "row", groups, "rowProfile", viewState);
+    if (columnElement) this.createProfile(runtime, columnElement, "column", groups, "columnProfile", viewState);
   }
 
   private releaseUnmodifiedWheel(element: HTMLElement): void {
@@ -149,38 +213,45 @@ export class StatisticsCharts {
     this.instances.forEach((instance) => instance.resize());
   }
 
-  resetZoom(): void {
-    this.instances.forEach((instance) => {
-      instance.dispatchAction({ type: "dataZoom", start: 0, end: 100 });
-    });
+  applyXRange(chartKey: StatisticsChartKey, range: StatisticsAxisRange | null): void {
+    const instance = this.instances.get(chartKey);
+    const domain = this.domains.get(chartKey)?.x;
+    if (!instance || !domain) return;
+    const normalized = normalizeStatisticsRange(range, domain.start, domain.end);
+    instance.dispatchAction(normalized
+      ? { type: "dataZoom", dataZoomId: `${chartKey}-x-slider`, startValue: normalized.start, endValue: normalized.end }
+      : { type: "dataZoom", dataZoomId: `${chartKey}-x-slider`, start: 0, end: 100 });
+    this.callbacks.onRangeChange(chartKey, "x", normalized);
+    this.updateRangeInputs(chartKey, normalized ?? domain);
+  }
+
+  resetYRange(chartKey: StatisticsChartKey): void {
+    const instance = this.instances.get(chartKey);
+    if (!instance) return;
+    instance.dispatchAction({ type: "dataZoom", dataZoomId: `${chartKey}-y-slider`, start: 0, end: 100 });
+    this.callbacks.onRangeChange(chartKey, "y", null);
   }
 
   dispose(): void {
     this.renderRevision += 1;
-    while (this.instances.length) this.instances.pop()?.dispose();
+    this.instances.forEach((instance) => instance.dispose());
+    this.instances.clear();
+    this.domains.clear();
   }
 
-  private commonOption(): ChartOption {
+  private commonOption(colors: Record<string, string>): ChartOption {
     const style = getComputedStyle(this.root);
     const text = cssValue(style, "--text", "#d7e3ea");
     const muted = cssValue(style, "--muted", "#91a5b2");
     const dim = cssValue(style, "--dim", "#6f818d");
     const border = cssValue(style, "--border", "rgba(128, 150, 164, .28)");
-    const surface = cssValue(style, "--soft-fill", "rgba(128, 150, 164, .08)");
+    const surface = cssValue(style, "--modal-surface", "#17222b");
     return {
       animationDuration: 280,
       backgroundColor: "transparent",
-      textStyle: {
-        color: text,
-        fontFamily: "system-ui, sans-serif",
-      },
-      grid: {
-        left: 62,
-        right: 28,
-        top: 48,
-        bottom: 72,
-        containLabel: false,
-      },
+      color: Object.values(colors),
+      textStyle: { color: text, fontFamily: "system-ui, sans-serif" },
+      grid: { left: 62, right: 54, top: 38, bottom: 66, containLabel: false },
       tooltip: {
         trigger: "axis",
         appendToBody: true,
@@ -195,27 +266,6 @@ export class StatisticsCharts {
           lineStyle: { color: muted, type: "dashed" },
         },
       },
-      dataZoom: [
-        {
-          type: "inside",
-          xAxisIndex: 0,
-          filterMode: "none",
-          zoomOnMouseWheel: "ctrl",
-          moveOnMouseMove: true,
-          moveOnMouseWheel: false,
-        },
-        {
-          type: "slider",
-          xAxisIndex: 0,
-          height: 18,
-          bottom: 14,
-          borderColor: border,
-          backgroundColor: surface,
-          fillerColor: GROUP_COLORS.all + "28",
-          handleStyle: { color: GROUP_COLORS.all, borderColor: GROUP_COLORS.all },
-          textStyle: { color: dim, fontSize: 10 },
-        },
-      ],
       xAxis: {
         type: "value",
         nameLocation: "end",
@@ -239,41 +289,110 @@ export class StatisticsCharts {
     };
   }
 
+  private dataZoom(
+    chartKey: StatisticsChartKey,
+    xRange: StatisticsAxisRange | null,
+    yRange: StatisticsAxisRange | null,
+    colors: Record<string, string>,
+  ): NonNullable<ChartOption["dataZoom"]> {
+    const style = getComputedStyle(this.root);
+    const border = cssValue(style, "--border", "rgba(128, 150, 164, .28)");
+    const surface = cssValue(style, "--soft-fill", "rgba(128, 150, 164, .08)");
+    const dim = cssValue(style, "--dim", "#6f818d");
+    const range = (value: StatisticsAxisRange | null) => value
+      ? { startValue: value.start, endValue: value.end }
+      : { start: 0, end: 100 };
+    return [
+      {
+        id: `${chartKey}-x-inside`, type: "inside", xAxisIndex: 0, filterMode: "none",
+        zoomOnMouseWheel: "ctrl", moveOnMouseMove: true, moveOnMouseWheel: false, ...range(xRange),
+      },
+      {
+        id: `${chartKey}-x-slider`, type: "slider", xAxisIndex: 0, filterMode: "none",
+        height: 16, bottom: 12, borderColor: border, backgroundColor: surface,
+        fillerColor: colors.all.replace("rgb(", "rgb(").replace(")", " / .16)"),
+        handleStyle: { color: colors.all, borderColor: colors.all },
+        textStyle: { color: dim, fontSize: 9 }, showDetail: false, ...range(xRange),
+      },
+      {
+        id: `${chartKey}-y-slider`, type: "slider", yAxisIndex: 0, orient: "vertical", filterMode: "none",
+        width: 14, right: 8, top: 38, bottom: 66, borderColor: border, backgroundColor: surface,
+        fillerColor: colors.all.replace("rgb(", "rgb(").replace(")", " / .12)"),
+        handleStyle: { color: colors.all, borderColor: colors.all },
+        textStyle: { color: dim, fontSize: 9 }, showDetail: false, ...range(yRange),
+      },
+    ];
+  }
+
+  private registerChart(
+    chartKey: StatisticsChartKey,
+    chart: ChartInstance,
+    domains: ChartDomains,
+  ): void {
+    this.instances.set(chartKey, chart);
+    this.domains.set(chartKey, domains);
+    chart.on("datazoom", (event: unknown) => this.handleDataZoom(chartKey, event as DataZoomEvent));
+  }
+
+  private handleDataZoom(chartKey: StatisticsChartKey, event: DataZoomEvent): void {
+    const domains = this.domains.get(chartKey);
+    if (!domains) return;
+    for (const item of event.batch ?? [event]) {
+      const axis: StatisticsAxis = item.dataZoomId?.includes("-y-") || item.dataZoomIndex === 2 ? "y" : "x";
+      if (!Number.isFinite(item.start) || !Number.isFinite(item.end)) continue;
+      const domain = domains[axis];
+      const start = domain.start + (domain.end - domain.start) * Number(item.start) / 100;
+      const end = domain.start + (domain.end - domain.start) * Number(item.end) / 100;
+      const normalized = normalizeStatisticsRange({ start, end }, domain.start, domain.end);
+      this.callbacks.onRangeChange(chartKey, axis, normalized);
+      if (axis === "x") this.updateRangeInputs(chartKey, normalized ?? domain);
+    }
+  }
+
+  private updateRangeInputs(chartKey: StatisticsChartKey, range: StatisticsAxisRange): void {
+    const start = this.root.querySelector<HTMLInputElement>(`[data-stat-range-chart="${chartKey}"][data-stat-range-edge="start"]`);
+    const end = this.root.querySelector<HTMLInputElement>(`[data-stat-range-chart="${chartKey}"][data-stat-range-edge="end"]`);
+    if (start) start.value = String(Math.round(range.start));
+    if (end) end.value = String(Math.round(range.end));
+  }
+
   private createHistogram(
     runtime: EChartsRuntime,
     element: HTMLElement,
     result: AnalysisResult,
-    selected: GroupStatistics,
+    groups: GroupStatistics[],
+    viewState: StatisticsViewState,
   ): void {
+    const chartKey: StatisticsChartKey = "histogram";
+    const colors = groupColors(this.root);
+    const maximum = 2 ** result.snapshot.bitDepth - 1;
+    const yMaximum = Math.max(1, ...groups.flatMap((group) => group.histogram));
+    const domains = { x: { start: 0, end: maximum }, y: { start: 0, end: yMaximum } };
+    const state = viewState.charts[chartKey];
+    state.xRange = normalizeStatisticsRange(state.xRange, domains.x.start, domains.x.end);
+    state.yRange = normalizeStatisticsRange(state.yRange, domains.y.start, domains.y.end);
+    const visible = new Set(state.visibleGroups ?? groups.map((group) => group.key));
+    const padding = Math.max(1, maximum * 0.006);
     const chart = runtime.init(element, undefined, { renderer: "canvas" });
-    this.instances.push(chart);
-    const comparison = selected.key === "all"
-      ? result.groups.filter((group) => ["all", "R", "Gr", "Gb", "B"].includes(group.key))
-      : [selected];
-    const option: ChartOption = {
-      ...this.commonOption(),
+    this.registerChart(chartKey, chart, domains);
+    const common = this.commonOption(colors);
+    chart.setOption({
+      ...common,
       legend: {
-        top: 8,
-        left: 62,
-        textStyle: { color: cssValue(getComputedStyle(this.root), "--muted", "#91a5b2") },
-        data: comparison.map((group) => groupLabel(group.key)),
+        show: false,
+        selected: Object.fromEntries(groups.map((group) => [groupLabel(group.key), visible.has(group.key)])),
       },
-      tooltip: {
-        ...(this.commonOption().tooltip as object),
-        formatter: histogramTooltip,
-      },
+      tooltip: { ...(common.tooltip as object), formatter: histogramTooltip },
+      dataZoom: this.dataZoom(chartKey, state.xRange, state.yRange, colors),
       xAxis: {
-        ...(this.commonOption().xAxis as object),
-        name: "DN",
-        min: 0,
-        max: 2 ** result.snapshot.bitDepth - 1,
+        ...(common.xAxis as object), name: "DN", min: -padding, max: maximum + padding,
+        axisLabel: {
+          ...((common.xAxis as { axisLabel?: object }).axisLabel ?? {}),
+          formatter: (value: number) => value < 0 || value > maximum ? "" : formatNumber(value),
+        },
       },
-      yAxis: {
-        ...(this.commonOption().yAxis as object),
-        name: t("statistics.count"),
-        min: 0,
-      },
-      series: comparison.map((group) => ({
+      yAxis: { ...(common.yAxis as object), name: t("statistics.count"), min: 0, max: yMaximum },
+      series: groups.map((group) => ({
         name: groupLabel(group.key),
         type: "line",
         data: histogramData(group.histogram),
@@ -281,56 +400,69 @@ export class StatisticsCharts {
         sampling: "lttb",
         connectNulls: false,
         lineStyle: {
-          width: group.key === "all" ? 2.2 : 1.2,
-          color: GROUP_COLORS[group.key] ?? GROUP_COLORS.all,
-          opacity: group.key === "all" ? 1 : 0.78,
+          width: group.key === "all" ? 2.4 : group.key === "G" ? 2 : 1.35,
+          type: group.key === "all" ? "solid" : group.key === "G" ? "dashed" : "solid",
+          color: colors[group.key] ?? colors.all,
+          opacity: group.key === "all" ? 1 : 0.86,
         },
-        areaStyle: group.key === "all"
-          ? { color: GROUP_COLORS.all + "18", opacity: 0.25 }
-          : undefined,
         emphasis: { focus: "series" },
       })),
-    };
-    chart.setOption(option);
+    });
+    this.updateRangeInputs(chartKey, state.xRange ?? domains.x);
   }
 
   private createProfile(
     runtime: EChartsRuntime,
     element: HTMLElement,
-    points: ProfilePoint[],
-    metric: ProfileMetric,
+    chartKey: "row" | "column",
+    groups: GroupStatistics[],
+    profile: "rowProfile" | "columnProfile",
+    viewState: StatisticsViewState,
   ): void {
+    const colors = groupColors(this.root);
+    const coordinates = groups.flatMap((group) => group[profile].map((point) => point.coordinate));
+    const xDomain = {
+      start: Math.min(...coordinates),
+      end: Math.max(...coordinates),
+    };
+    const domains = { x: xDomain, y: profileDomain(groups, profile) };
+    const state = viewState.charts[chartKey];
+    state.xRange = normalizeStatisticsRange(state.xRange, domains.x.start, domains.x.end);
+    state.yRange = normalizeStatisticsRange(state.yRange, domains.y.start, domains.y.end);
+    const visible = new Set(state.visibleGroups ?? groups.map((group) => group.key));
     const chart = runtime.init(element, undefined, { renderer: "canvas" });
-    this.instances.push(chart);
-    const option: ChartOption = {
-      ...this.commonOption(),
-      tooltip: {
-        ...(this.commonOption().tooltip as object),
-        formatter: profileTooltip,
+    this.registerChart(chartKey, chart, domains);
+    const common = this.commonOption(colors);
+    chart.setOption({
+      ...common,
+      legend: {
+        show: false,
+        selected: Object.fromEntries(groups.map((group) => [groupLabel(group.key), visible.has(group.key)])),
       },
+      tooltip: { ...(common.tooltip as object), formatter: profileTooltip },
+      dataZoom: this.dataZoom(chartKey, state.xRange, state.yRange, colors),
       xAxis: {
-        ...(this.commonOption().xAxis as object),
-        name: t("statistics.sourceCoordinate"),
-        min: "dataMin",
-        max: "dataMax",
+        ...(common.xAxis as object), name: chartKey === "row" ? "Y" : "X", min: xDomain.start, max: xDomain.end,
       },
       yAxis: {
-        ...(this.commonOption().yAxis as object),
-        name: metric === "mean" ? t("statistics.meanDn") : t("statistics.stdDevDn"),
-        scale: true,
+        ...(common.yAxis as object), name: t("statistics.meanDn"), min: domains.y.start, max: domains.y.end,
       },
-      series: [{
-        name: metric === "mean" ? t("statistics.meanDn") : t("statistics.stdDevDn"),
+      series: groups.map((group) => ({
+        name: groupLabel(group.key),
         type: "line",
-        data: profileData(points, metric),
+        data: profileData(group[profile], "mean"),
         showSymbol: false,
         sampling: "lttb",
-        connectNulls: false,
-        lineStyle: { width: 1.8, color: GROUP_COLORS.all },
-        areaStyle: { color: GROUP_COLORS.all + "10", opacity: 0.18 },
+        connectNulls: true,
+        lineStyle: {
+          width: group.key === "all" ? 2.3 : group.key === "G" ? 1.9 : 1.3,
+          type: group.key === "all" ? "solid" : group.key === "G" ? "dashed" : "solid",
+          color: colors[group.key] ?? colors.all,
+          opacity: group.key === "all" ? 1 : 0.86,
+        },
         emphasis: { focus: "series" },
-      }],
-    };
-    chart.setOption(option);
+      })),
+    });
+    this.updateRangeInputs(chartKey, state.xRange ?? domains.x);
   }
 }
