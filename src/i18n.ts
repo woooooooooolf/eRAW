@@ -35,7 +35,7 @@ const CATALOG = {
   "roi.button": message("Select ROI", "区域选择", "區域選取", "ROI 選択", "Seleccionar ROI", "Sélectionner le ROI", "ROI auswählen"),
   "roi.menuTitle": message("ROI selection", "ROI 区域选择", "ROI 區域選取", "ROI 範囲選択", "Selección de ROI", "Sélection du ROI", "ROI-Auswahl"),
   "roi.mouse": message("Draw with mouse", "使用鼠标划定区间", "使用滑鼠劃定區間", "マウスで範囲指定", "Delimitar con el ratón", "Tracer à la souris", "Mit der Maus aufziehen"),
-  "roi.mouseHint": message("Drag over the RAW intensity or CFA view", "在 RAW 强度或 CFA 视图上拖动", "在 RAW 強度或 CFA 檢視上拖曳", "RAW 強度または CFA 表示上をドラッグ", "Arrastre sobre la vista RAW o CFA", "Faites glisser sur la vue RAW ou CFA", "In der RAW- oder CFA-Ansicht ziehen"),
+  "roi.mouseHint": message("Right-drag to select; right-click for the menu", "右键拖动框选；右键单击打开菜单", "右鍵拖曳框選；右鍵按一下開啟選單", "右ドラッグで選択、右クリックでメニュー表示", "Arrastre con el botón derecho; haga clic derecho para el menú", "Glissez avec le bouton droit ; clic droit pour le menu", "Mit rechts ziehen; Rechtsklick öffnet das Menü"),
   "roi.coordinates": message("Enter coordinates…", "输入起止坐标划定区间…", "輸入起迄座標劃定區間…", "開始・終了座標を入力…", "Introducir coordenadas…", "Saisir les coordonnées…", "Koordinaten eingeben…"),
   "roi.coordinatesHint": message("Use inclusive coordinates from the top-left origin", "输入以左上角为原点的包含端点坐标", "輸入以左上角為原點且包含端點的座標", "左上原点の端点を含む座標を入力", "Use coordenadas inclusivas desde la esquina superior izquierda", "Utilisez des coordonnées inclusives depuis le coin supérieur gauche", "Inklusive Koordinaten ab der linken oberen Ecke verwenden"),
   "roi.clear": message("Clear ROI and use full frame", "清除 ROI 并恢复整帧", "清除 ROI 並恢復整個影格", "ROI を消去してフレーム全体に戻す", "Borrar ROI y usar el fotograma completo", "Effacer le ROI et utiliser l’image entière", "ROI löschen und Vollbild verwenden"),

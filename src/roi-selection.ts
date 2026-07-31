@@ -1,5 +1,7 @@
 import type { ImageRect } from "./viewport-transform";
 
+export const ROI_DRAG_THRESHOLD_PX = 4;
+
 export interface RoiCoordinateValues {
   xStart: string | number;
   xEnd: string | number;
@@ -13,6 +15,16 @@ export type RoiCoordinateErrorReason = "integer" | "xOrder" | "yOrder" | "bounds
 export type RoiCoordinateValidation =
   | { ok: true; rect: ImageRect }
   | { ok: false; field: RoiCoordinateField; reason: RoiCoordinateErrorReason };
+
+export function hasExceededRoiDragThreshold(
+  start: { x: number; y: number },
+  current: { x: number; y: number },
+  threshold = ROI_DRAG_THRESHOLD_PX,
+): boolean {
+  const deltaX = current.x - start.x;
+  const deltaY = current.y - start.y;
+  return deltaX * deltaX + deltaY * deltaY >= threshold * threshold;
+}
 
 function parseInteger(value: string | number): number | null {
   if (typeof value === "string" && !/^-?\d+$/.test(value.trim())) return null;

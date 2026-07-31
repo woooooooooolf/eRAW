@@ -16,6 +16,7 @@ import {
   type MissingPixelAppearance,
 } from "./missing-pixel-rendering";
 import { PixelValueOverlay } from "./pixel-overlay";
+import { hasExceededRoiDragThreshold } from "./roi-selection";
 import {
   DEFAULT_PROCESSING_SETTINGS,
   type DemosaicPixelValueMode,
@@ -200,6 +201,11 @@ export class RawViewport {
   private dragging = false;
   private selecting = false;
   private selectionBeforeInteraction: ImageRect | null = null;
+  private selectionPointerId: number | null = null;
+  private selectionStartClient: ImagePoint | null = null;
+  private selectionStartImage: ImagePoint | null = null;
+  private selectionContextMenuAlreadySuppressed = false;
+  private suppressContextMenuUntil = 0;
   private interactionMode: "pan" | "select" = "pan";
   private dragX = 0;
   private dragY = 0;
@@ -261,6 +267,7 @@ export class RawViewport {
     this.crosshair = container.querySelector<HTMLElement>(".canvas-crosshair")!;
     this.overlayLayer = new ViewportOverlayLayer(
       container.querySelector<SVGSVGElement>(".image-boundary")!,
+      container.querySelector<HTMLElement>(".image-selection-overlay")!,
     );
     this.initializeGl();
     this.bindEvents();
@@ -294,7 +301,7 @@ export class RawViewport {
     this.canvas.addEventListener("pointerdown", (event) => this.onPointerDown(event));
     this.canvas.addEventListener("pointermove", (event) => this.onPointerMove(event));
     this.canvas.addEventListener("pointerup", (event) => this.onPointerUp(event));
-    this.canvas.addEventListener("pointercancel", (event) => this.onPointerUp(event));
+    this.canvas.addEventListener("pointercancel", (event) => this.onPointerCancel(event));
     this.canvas.addEventListener("pointerleave", () => {
       this.hideCrosshair();
       this.updatePointerPosition(null);
@@ -354,14 +361,15 @@ export class RawViewport {
   }
 
   clearDocument(): void {
+    this.abortSelectionGesture();
     this.document = null;
     this.frame = 0;
     this.zoom = 1;
     this.cameraX = 0;
     this.cameraY = 0;
     this.fitScale = 1;
+    this.interactionMode = "pan";
     this.dragging = false;
-    this.selecting = false;
     this.canvas.classList.remove("dragging");
     this.hideCrosshair();
     this.overlayLayer.clearSelection();
@@ -501,7 +509,6 @@ export class RawViewport {
     const svg = this.container.querySelector<SVGSVGElement>(".image-boundary");
     if (svg?.classList.contains("visible")) {
       svg.querySelectorAll<SVGRectElement>("rect").forEach((rect) => {
-        if (rect.classList.contains("image-selection") && !rect.classList.contains("visible")) return;
         const style = getComputedStyle(rect);
         const x = Number(rect.getAttribute("x") ?? 0);
         const y = Number(rect.getAttribute("y") ?? 0);
@@ -523,6 +530,31 @@ export class RawViewport {
           context.setLineDash([]);
         }
       });
+    }
+
+    const selection = this.container.querySelector<HTMLElement>(".image-selection-overlay.visible");
+    if (selection) {
+      const style = getComputedStyle(selection);
+      const x = Number.parseFloat(selection.style.left);
+      const y = Number.parseFloat(selection.style.top);
+      const width = Number.parseFloat(selection.style.width);
+      const height = Number.parseFloat(selection.style.height);
+      if ([x, y, width, height].every(Number.isFinite)) {
+        context.fillStyle = style.backgroundColor;
+        context.fillRect(x, y, width, height);
+        const strokes: Array<{ color: string; width: number; dash?: number[] }> = [
+          { color: "rgba(255,255,255,.9)", width: 7 },
+          { color: "rgba(0,0,0,.92)", width: 5 },
+          { color: style.borderColor, width: 3, dash: [8, 4] },
+        ];
+        for (const stroke of strokes) {
+          context.strokeStyle = stroke.color;
+          context.lineWidth = stroke.width;
+          context.setLineDash(stroke.dash ?? []);
+          context.strokeRect(x, y, width, height);
+        }
+        context.setLineDash([]);
+      }
     }
 
     if (this.crosshair.classList.contains("visible")) {
@@ -569,11 +601,14 @@ export class RawViewport {
   }
 
   setInteractionMode(mode: "pan" | "select"): void {
-    if (this.selecting) this.cancelSelection();
+    this.abortSelectionGesture();
     this.interactionMode = mode;
     this.dragging = false;
-    this.selecting = false;
     this.canvas.classList.remove("dragging");
+  }
+
+  getInteractionMode(): "pan" | "select" {
+    return this.interactionMode;
   }
 
   getSelection(): ImageRect | null {
@@ -598,12 +633,19 @@ export class RawViewport {
   }
 
   cancelSelection(): boolean {
-    if (!this.selecting) return false;
-    this.selecting = false;
-    this.overlayLayer.setSelection(this.selectionBeforeInteraction);
-    this.selectionBeforeInteraction = null;
+    if (this.interactionMode !== "select" && this.selectionPointerId === null) return false;
+    this.abortSelectionGesture();
     this.interactionMode = "pan";
-    this.requestDraw();
+    return true;
+  }
+
+  consumeContextMenuSuppression(): boolean {
+    if (this.selecting) {
+      this.selectionContextMenuAlreadySuppressed = true;
+      return true;
+    }
+    if (performance.now() > this.suppressContextMenuUntil) return false;
+    this.suppressContextMenuUntil = 0;
     return true;
   }
 
@@ -714,20 +756,18 @@ export class RawViewport {
   }
 
   private onPointerDown(event: PointerEvent): void {
-    if (!this.document || event.button !== 0) return;
+    if (!this.document) return;
     const point = this.eventPoint(event);
-    if (this.interactionMode === "select") {
-      this.selecting = true;
+    if (this.interactionMode === "select" && event.button === 2) {
       this.selectionBeforeInteraction = this.overlayLayer.selection.rect;
-      this.overlayLayer.beginSelection(
-        this.transform.screenToImage(point),
-        this.document.descriptor.width,
-        this.document.descriptor.height,
-      );
+      this.selectionPointerId = event.pointerId;
+      this.selectionStartClient = { x: event.clientX, y: event.clientY };
+      this.selectionStartImage = this.transform.screenToImage(point);
+      this.selectionContextMenuAlreadySuppressed = false;
       this.canvas.setPointerCapture(event.pointerId);
-      this.requestDraw();
       return;
     }
+    if (event.button !== 0) return;
     this.dragging = true;
     this.updatePointerPosition(null);
     this.dragX = event.clientX;
@@ -740,7 +780,24 @@ export class RawViewport {
 
   private onPointerMove(event: PointerEvent): void {
     if (!this.document) return;
-    if (this.selecting) {
+    if (
+      this.selectionPointerId === event.pointerId
+      && this.selectionStartClient
+      && this.selectionStartImage
+    ) {
+      if (!this.selecting && hasExceededRoiDragThreshold(
+        this.selectionStartClient,
+        { x: event.clientX, y: event.clientY },
+      )) {
+        this.selecting = true;
+        this.overlayLayer.beginSelection(
+          this.selectionStartImage,
+          this.document.descriptor.width,
+          this.document.descriptor.height,
+        );
+        this.canvas.classList.add("selecting");
+      }
+      if (!this.selecting) return;
       this.overlayLayer.updateSelection(
         this.transform.screenToImage(this.eventPoint(event)),
         this.document.descriptor.width,
@@ -763,14 +820,17 @@ export class RawViewport {
   }
 
   private onPointerUp(event: PointerEvent): void {
-    if (this.selecting) {
-      this.selecting = false;
-      this.overlayLayer.endSelection();
-      this.selectionBeforeInteraction = null;
-      this.interactionMode = "pan";
-      if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
+    if (this.selectionPointerId === event.pointerId) {
+      const completedSelection = this.selecting;
+      if (completedSelection) {
+        this.overlayLayer.endSelection();
+        this.callbacks.onSelectionChange(this.overlayLayer.selection.rect);
+        if (!this.selectionContextMenuAlreadySuppressed) {
+          this.suppressContextMenuUntil = performance.now() + 750;
+        }
+      }
+      this.finishSelectionGesture(event.pointerId);
       this.updatePointerPosition(this.updateCrosshair(event));
-      this.callbacks.onSelectionChange(this.overlayLayer.selection.rect);
       this.requestDraw();
       return;
     }
@@ -779,6 +839,44 @@ export class RawViewport {
     this.canvas.classList.remove("dragging");
     if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
     this.updatePointerPosition(this.updateCrosshair(event));
+  }
+
+  private onPointerCancel(event: PointerEvent): void {
+    if (this.selectionPointerId === event.pointerId) {
+      this.abortSelectionGesture();
+      return;
+    }
+    if (!this.dragging) return;
+    this.dragging = false;
+    this.canvas.classList.remove("dragging");
+    if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
+  }
+
+  private finishSelectionGesture(pointerId: number): void {
+    this.selecting = false;
+    this.selectionBeforeInteraction = null;
+    this.selectionPointerId = null;
+    this.selectionStartClient = null;
+    this.selectionStartImage = null;
+    this.selectionContextMenuAlreadySuppressed = false;
+    this.canvas.classList.remove("selecting");
+    if (this.canvas.hasPointerCapture(pointerId)) this.canvas.releasePointerCapture(pointerId);
+  }
+
+  private abortSelectionGesture(): void {
+    const pointerId = this.selectionPointerId;
+    if (this.selecting) this.overlayLayer.setSelection(this.selectionBeforeInteraction);
+    this.selecting = false;
+    this.selectionBeforeInteraction = null;
+    this.selectionPointerId = null;
+    this.selectionStartClient = null;
+    this.selectionStartImage = null;
+    this.selectionContextMenuAlreadySuppressed = false;
+    this.canvas.classList.remove("selecting");
+    if (pointerId !== null && this.canvas.hasPointerCapture(pointerId)) {
+      this.canvas.releasePointerCapture(pointerId);
+    }
+    this.requestDraw();
   }
 
   private updateCrosshair(event: MouseEvent): ImagePoint | null {

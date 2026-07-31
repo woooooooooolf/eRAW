@@ -190,7 +190,7 @@ export class StatisticsCharts {
           type: "inside",
           xAxisIndex: 0,
           filterMode: "none",
-          zoomOnMouseWheel: true,
+          zoomOnMouseWheel: "ctrl",
           moveOnMouseMove: true,
           moveOnMouseWheel: false,
         },

@@ -3,16 +3,40 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
 
-const source = await readFile(new URL("../src/roi-selection.ts", import.meta.url), "utf8");
+const [source, transformSource] = await Promise.all([
+  readFile(new URL("../src/roi-selection.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/viewport-transform.ts", import.meta.url), "utf8"),
+]);
 const { outputText } = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
     target: ts.ScriptTarget.ES2022,
   },
 });
-const { validateRoiCoordinates } = await import(
+const { hasExceededRoiDragThreshold, validateRoiCoordinates } = await import(
   `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`
 );
+const { outputText: transformOutput } = ts.transpileModule(transformSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const { SelectionModel } = await import(
+  `data:text/javascript;base64,${Buffer.from(transformOutput).toString("base64")}`
+);
+
+test("right-button ROI gesture starts only after the drag threshold", () => {
+  assert.equal(hasExceededRoiDragThreshold({ x: 10, y: 10 }, { x: 13, y: 12 }), false);
+  assert.equal(hasExceededRoiDragThreshold({ x: 10, y: 10 }, { x: 14, y: 10 }), true);
+});
+
+test("mouse ROI coordinates clamp exterior canvas points to image edges", () => {
+  const selection = new SelectionModel();
+  selection.begin({ x: -12, y: -3 }, 20, 10);
+  selection.update({ x: 24, y: 16 }, 20, 10);
+  assert.deepEqual(selection.rect, { x: 0, y: 0, width: 20, height: 10 });
+});
 
 test("inclusive ROI coordinates produce a one-pixel minimum rectangle", () => {
   assert.deepEqual(

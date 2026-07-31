@@ -36,7 +36,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | `src/descriptor-input.ts` | 数值参数的整数化、边界限制和空值默认规则 |
 | `src/export-dialog.ts` | 冻结导出快照、范围联动、字段校验和导出反馈 |
 | `src/image-capture.ts` / `src/image-output.ts` | 当前画面合成、完整预览瓦片拼接，以及共用的 PNG/剪贴板输出 |
-| `src/roi-selection.ts` | 主窗口 ROI 包含式坐标输入校验，以及坐标到矩形的唯一转换规则 |
+| `src/roi-selection.ts` | 主窗口 ROI 包含式坐标输入校验、右键拖动阈值，以及坐标到矩形的唯一转换规则 |
 | `src/statistics-panel.ts` / `src/statistics-window.ts` | 统计纵向总览，以及停靠/独立窗口承载 |
 | `src/statistics-chart*.ts` / `src/statistics-report.ts` | 按需加载的主题自适应 ECharts 交互图表，以及暂未接入入口的中性 PNG 报告绘制能力 |
 | `src/i18n.ts` | 语言偏好、系统语言解析、七语文案目录、日期时间格式化和静态 DOM 翻译 |
@@ -45,7 +45,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | `src/missing-pixel-rendering.ts` | 缺失数据外观类型、持久值校验和 GPU 参数转换 |
 | `src/viewport.ts` | WebGL2、LOD、瓦片队列、纹理缓存、缩放和平移 |
 | `src/viewport-transform.ts` | 屏幕、图像和像素坐标的唯一变换来源；画布尺寸变化时的中心锚定；选区模型 |
-| `src/viewport-overlay.ts` | 图像边界与矩形选区 SVG 叠加 |
+| `src/viewport-overlay.ts` | 图像边界 SVG 与独立高对比矩形选区叠加 |
 | `src/pixel-overlay.ts` / `src/pixel-value-display.ts` / `src/pixel-grid-rendering.ts` | 高倍率像素网格、颜色校验，以及与当前显示模式一致的原始、单通道或 RGB 数值叠加 |
 | `src/api.ts` / `src/types.ts` | Tauri 调用封装及前后端共享数据契约 |
 | `src-tauri/src/commands.rs` | 当前文档会话、内存映射、缓存、任务快照和命令边界 |
@@ -62,7 +62,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 
 停靠区域和独立统计窗口共享唯一 Analysis State 与结构化结果，同一时间只有一个统计视图；摘出或重新停靠只改变呈现载体，不复制任务或重新扫描 RAW。统计视图默认隐藏，通过已打开图像的画布右键菜单进入，首次以底部停靠形式打开并显示 All CFA 总览；独立窗口使用系统原生标题栏，内部不重复绘制标题和关闭按钮。统计通道选择与主窗口预览模式相互独立。
 
-ROI 是主窗口级查看状态，不依赖统计视图是否打开。工具栏入口支持画布拖动和包含式起止坐标两种选择方法；新 ROI 替换旧 ROI，清除后恢复整帧。选框只在 RAW 强度与 CFA 点阵视图显示，并通过同一图像坐标变换随缩放和平移更新。统计视图打开时，ROI 变化才触发新的分析 revision。
+ROI 是主窗口级查看状态，不依赖统计视图是否打开。工具栏入口支持持续右键拖动和包含式起止坐标两种选择方法；短距离右键单击仍由画布菜单处理，拖动可从图像外的画布背景开始并把端点钳制到图像边缘。新 ROI 替换旧 ROI，清除后恢复整帧。选框只在 RAW 强度与 CFA 点阵视图显示，并通过独立 HTML 叠加层和同一图像坐标变换随缩放、平移更新。统计视图打开时，ROI 变化才触发新的分析 revision。
 
 ## 国际化与错误契约
 

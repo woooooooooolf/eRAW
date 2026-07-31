@@ -47,11 +47,16 @@ test("statistics requests use an independent revision and L0 raw analysis comman
   assert.match(rustSource, /read_pixel\(data, descriptor, layout, request\.frame, x, y\)/);
 });
 
-test("ROI selection keeps absolute coordinates and Escape restores the previous selection", () => {
+test("ROI selection keeps absolute coordinates and remains active for repeated right drags", () => {
   assert.match(rustSource, /for \(row_index, y\) in \(roi\.y\.\.roi\.y \+ roi\.height\)/);
   assert.match(rustSource, /cfa_site_with_phase\([\s\S]*?x,[\s\S]*?y,/);
+  assert.match(viewportSource, /event\.button === 2/);
+  assert.match(viewportSource, /hasExceededRoiDragThreshold/);
   assert.match(viewportSource, /selectionBeforeInteraction = this\.overlayLayer\.selection\.rect/);
   assert.match(viewportSource, /this\.overlayLayer\.setSelection\(this\.selectionBeforeInteraction\)/);
+  const pointerUp = viewportSource.match(/private onPointerUp\(event: PointerEvent\): void \{[\s\S]*?\n  \}/)?.[0] ?? "";
+  assert.doesNotMatch(pointerUp, /interactionMode = "pan"/);
+  assert.match(appSource, /consumeContextMenuSuppression/);
   assert.match(appSource, /event\.key === "Escape" && this\.viewport\.cancelSelection\(\)/);
 });
 
@@ -75,6 +80,7 @@ test("statistics view supports docking, detaching, vertical interactive charts a
   assert.match(chartRuntimeSource, /AxisPointerComponent/);
   assert.match(chartRuntimeSource, /DataZoomComponent/);
   assert.match(chartSource, /type: "slider"/);
+  assert.match(chartSource, /zoomOnMouseWheel:\s*"ctrl"/);
   assert.match(chartSource, /backgroundColor: "transparent"/);
   assert.match(reportSource, /renderStatisticsReport/);
   assert.match(reportSource, /statistics\.disclaimer/);
@@ -93,10 +99,13 @@ test("ROI is a main-window tool with inclusive coordinate entry and a high-contr
   assert.match(appSource, /validateRoiCoordinates/);
   assert.match(appSource, /const selection = this\.viewport\.getSelection\(\);[\s\S]*?return selection \?\?/);
   assert.doesNotMatch(appSource, /statisticsUseSelection/);
-  const rule = styleSource.match(/\.image-selection\s*\{[\s\S]*?\}/)?.[0] ?? "";
-  assert.match(rule, /stroke-width:\s*3px/);
-  assert.match(rule, /stroke-dasharray:\s*8 4/);
-  assert.match(rule, /drop-shadow/);
+  assert.match(appSource, /class="image-selection-overlay"/);
+  const rule = styleSource.match(/\.image-selection-overlay\s*\{[\s\S]*?\}/)?.[0] ?? "";
+  assert.match(rule, /border:\s*3px dashed/);
+  assert.match(rule, /rgb\(0 0 0/);
+  assert.match(rule, /rgb\(255 255 255/);
+  assert.match(rule, /pointer-events:\s*none/);
+  assert.match(appSource, /<strong>Apache ECharts<\/strong>[\s\S]*?<code>Apache-2\.0<\/code>/);
 });
 
 test("detached statistics window relies on the native title bar and uses explicit dock semantics", () => {

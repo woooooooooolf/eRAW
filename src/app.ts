@@ -90,7 +90,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.3.4";
+const VERSION = "0.3.5";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -436,8 +436,8 @@ export class ErawApp {
               <svg class="image-boundary" aria-hidden="true" width="100%" height="100%" preserveAspectRatio="none">
                 <rect class="image-boundary-rect image-boundary-shadow"></rect>
                 <rect class="image-boundary-rect image-boundary-line"></rect>
-                <rect class="image-selection"></rect>
               </svg>
+              <div class="image-selection-overlay" aria-hidden="true"></div>
               <div class="canvas-crosshair" aria-hidden="true"><i class="crosshair-horizontal"></i><i class="crosshair-vertical"></i></div>
               <div class="empty-state" id="empty-state">
                 <div class="empty-grid"><span></span><span></span><span></span><span></span></div>
@@ -1665,6 +1665,10 @@ export class ErawApp {
       this.setCanvasContextMenuOpen(false);
       return;
     }
+    if (this.viewport.consumeContextMenuSuppression()) {
+      this.setCanvasContextMenuOpen(false);
+      return;
+    }
     this.openCanvasContextMenu(event.clientX, event.clientY);
   }
 
@@ -1947,7 +1951,7 @@ export class ErawApp {
     }
     this.viewport.setSelectionVisible(true);
     this.viewport.setInteractionMode("select");
-    this.get("roi-button").classList.add("selecting");
+    this.updateRoiPresentation();
   }
 
   private openRoiCoordinateDialog(): void {
@@ -2041,9 +2045,13 @@ export class ErawApp {
     const selection = this.viewport.getSelection();
     const button = this.get<HTMLButtonElement>("roi-button");
     const available = Boolean(this.document?.layout.frameCount);
+    const supportsMouseSelection = ["raw", "bayer"].includes(this.displayMode);
+    if (!supportsMouseSelection && this.viewport.getInteractionMode() === "select") {
+      this.viewport.setInteractionMode("pan");
+    }
     button.disabled = !available;
     button.classList.toggle("active", Boolean(selection));
-    button.classList.remove("selecting");
+    button.classList.toggle("selecting", this.viewport.getInteractionMode() === "select");
     const clearButton = this.get<HTMLButtonElement>("roi-clear-button");
     clearButton.hidden = !selection;
     clearButton.disabled = !available;
@@ -2052,14 +2060,14 @@ export class ErawApp {
       : t("roi.button");
     button.setAttribute("title", title);
     button.setAttribute("aria-label", title);
-    const selectionVisible = Boolean(selection) && ["raw", "bayer"].includes(this.displayMode);
+    const selectionVisible = Boolean(selection) && supportsMouseSelection;
     this.viewport.setSelectionVisible(selectionVisible);
   }
 
   private onKeyDown(event: KeyboardEvent): void {
     if (event.key === "Escape" && this.viewport.cancelSelection()) {
       event.preventDefault();
-      this.updateRoiPresentation();
+      this.clearRoi();
     }
     else if (event.key === "Escape" && (!this.get("language-popover").hidden || !this.get("theme-popover").hidden || !this.get("utility-popover").hidden || !this.get("export-popover").hidden || !this.get("roi-popover").hidden || !this.get("canvas-context-menu").hidden)) {
       event.preventDefault();

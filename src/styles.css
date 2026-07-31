@@ -884,15 +884,21 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 .image-boundary rect { fill: none; vector-effect: non-scaling-stroke; }
 .image-boundary-shadow { stroke: var(--image-edge-shadow); stroke-width: 3px; }
 .image-boundary-line { stroke: var(--image-edge); stroke-width: 1px; }
-.image-selection {
+.image-selection-overlay {
+  position: absolute;
+  z-index: 5;
   opacity: 0;
-  fill: rgb(var(--accent-rgb) / .08) !important;
-  stroke: rgb(var(--accent-rgb) / 1);
-  stroke-width: 3px;
-  stroke-dasharray: 8 4;
-  filter: drop-shadow(0 0 1px rgb(0 0 0 / .96)) drop-shadow(0 0 4px rgb(var(--accent-rgb) / .72));
+  box-sizing: border-box;
+  border: 3px dashed rgb(var(--accent-rgb));
+  background: rgb(var(--accent-rgb) / .07);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / .95),
+    0 0 0 2px rgb(0 0 0 / .92),
+    0 0 0 4px rgb(255 255 255 / .9),
+    0 0 12px rgb(var(--accent-rgb) / .8);
+  pointer-events: none;
 }
-.image-selection.visible { opacity: 1; }
+.image-selection-overlay.visible { opacity: 1; }
 .canvas-crosshair { position: absolute; z-index: 6; inset: 0; opacity: 0; transition: opacity .08s ease; pointer-events: none; }
 .canvas-crosshair.visible { opacity: 1; }
 .canvas-crosshair i { position: absolute; display: block; margin: 0; background: rgb(var(--accent-rgb) / .34); box-shadow: 0 0 5px rgb(var(--accent-rgb) / .13); }

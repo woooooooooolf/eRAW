@@ -92,6 +92,7 @@ test("native context menus are suppressed globally and the canvas menu exposes o
   assert.match(appSource, /private onContextMenu\(event: MouseEvent\): void \{\s*event\.preventDefault\(\)/);
   assert.match(appSource, /target\.closest\("#viewport"\)/);
   assert.match(appSource, /!this\.document\?\.layout\.frameCount/);
+  assert.match(appSource, /this\.viewport\.consumeContextMenuSuppression\(\)/);
   const actions = [...appSource.matchAll(/data-capture-kind="(current|preview)" data-capture-destination="(save|copy)"/g)]
     .map((match) => `${match[1]}:${match[2]}`);
   assert.deepEqual(actions, ["current:save", "current:copy", "preview:save", "preview:copy"]);
