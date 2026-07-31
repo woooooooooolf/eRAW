@@ -1,6 +1,6 @@
 # eRAW 工程文档
 
-本文档集记录 eRAW V0.3.3 的当前共识与实现边界。源码是最终事实来源；设计发生变化时，应在同一迭代中更新相关文档。
+本文档集记录 eRAW V0.3.4 的当前共识与实现边界。源码是最终事实来源；设计发生变化时，应在同一迭代中更新相关文档。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -14,10 +14,10 @@
 
 ## 当前工程快照
 
-- 当前开发版本：`V0.3.3`
+- 当前开发版本：`V0.3.4`
 - 目标平台：Windows 优先；不受平台约束的部分尽量保持 Linux 兼容
 - 桌面框架：Tauri 2
-- 前端：TypeScript、WebGL2、Canvas 2D、原生 HTML/CSS
+- 前端：TypeScript、WebGL2、Canvas 2D、Apache ECharts、原生 HTML/CSS
 - 后端：Rust、只读内存映射、二进制 Tauri IPC
 - 许可证：GPL-3.0-or-later
 

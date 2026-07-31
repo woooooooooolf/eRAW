@@ -31,11 +31,6 @@ export class StatisticsWindowApp {
       {
         detached: true,
         onAction: (action) => void this.handleAction(action),
-        onError: (error) => {
-          const message = error instanceof Error ? error.message : String(error);
-          void emit("statistics:window-error", message);
-        },
-        onNotify: (message) => void emit("statistics:notify", message),
       },
     );
     if (isTauri()) void this.initialize();

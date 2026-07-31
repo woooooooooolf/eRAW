@@ -6,6 +6,9 @@ const [
   appSource,
   apiSource,
   panelSource,
+  chartSource,
+  chartRuntimeSource,
+  reportSource,
   windowSource,
   viewportSource,
   rustSource,
@@ -16,6 +19,9 @@ const [
   readFile(new URL("../src/app.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/api.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/statistics-panel.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/statistics-chart.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/statistics-chart-runtime.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/statistics-report.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/statistics-window.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/viewport.ts", import.meta.url), "utf8"),
   readFile(new URL("../src-tauri/src/analysis/mod.rs", import.meta.url), "utf8"),
@@ -54,33 +60,49 @@ test("QCFA analysis retains atomic planes while the UI consumes semantic groups"
   assert.match(rustSource, /&\["all", "R", "G", "Gr", "Gb", "B"\]/);
   assert.match(rustSource, /AtomicPlaneStatistics/);
   assert.match(panelSource, /selectedGroup = "all"/);
-  assert.match(panelSource, /\["all", "R", "Gr", "Gb", "B"\]/);
+  assert.match(chartSource, /\["all", "R", "Gr", "Gb", "B"\]/);
 });
 
-test("statistics view supports docking, detaching, charts and structured report output", () => {
+test("statistics view supports docking, detaching, vertical interactive charts and dormant report output", () => {
   assert.match(appSource, /new WebviewWindow\("statistics"/);
   assert.match(appSource, /class="statistics-dock"/);
-  assert.match(panelSource, /drawHistogram/);
-  assert.match(panelSource, /drawProfile/);
-  assert.match(panelSource, /drawReport/);
-  assert.match(panelSource, /not an EMVA 1288 compliant measurement|statistics\.disclaimer/);
-  assert.match(panelSource, /data-stat-report/);
-  assert.match(panelSource, /choosePngFile\(`\$\{baseName\}-statistics\.png`\)/);
-  assert.match(panelSource, /saveCanvasPng\(canvas, path\)/);
-  assert.doesNotMatch(panelSource, /data-stat-tab|statistics-report-preview|copyCanvasImage/);
+  assert.match(panelSource, /statistics-sections/);
+  assert.match(panelSource, /data-stat-chart="histogram"/);
+  assert.match(panelSource, /data-stat-chart="row"/);
+  assert.match(panelSource, /data-stat-chart="column"/);
+  assert.match(chartSource, /import\("\.\/statistics-chart-runtime"\)/);
+  assert.match(chartSource, /runtime\.init/);
+  assert.match(chartRuntimeSource, /AxisPointerComponent/);
+  assert.match(chartRuntimeSource, /DataZoomComponent/);
+  assert.match(chartSource, /type: "slider"/);
+  assert.match(chartSource, /backgroundColor: "transparent"/);
+  assert.match(reportSource, /renderStatisticsReport/);
+  assert.match(reportSource, /statistics\.disclaimer/);
+  assert.doesNotMatch(panelSource, /data-stat-report|saveReport|report-preview/);
+  assert.doesNotMatch(panelSource, /data-stat-tab/);
   assert.ok(capability.windows.includes("statistics"));
   assert.ok(capability.permissions.includes("core:webview:allow-create-webview-window"));
 });
 
-test("ROI selection uses a high-contrast two-pixel boundary", () => {
+test("ROI is a main-window tool with inclusive coordinate entry and a high-contrast boundary", () => {
+  assert.match(appSource, /id="roi-control"/);
+  assert.ok(appSource.indexOf('id="roi-control"') < appSource.indexOf('id="fit-button"'));
+  assert.match(appSource, /class="toolbar-separator"/);
+  assert.match(appSource, /data-roi-action="mouse"/);
+  assert.match(appSource, /data-roi-action="coordinates"/);
+  assert.match(appSource, /validateRoiCoordinates/);
+  assert.match(appSource, /const selection = this\.viewport\.getSelection\(\);[\s\S]*?return selection \?\?/);
+  assert.doesNotMatch(appSource, /statisticsUseSelection/);
   const rule = styleSource.match(/\.image-selection\s*\{[\s\S]*?\}/)?.[0] ?? "";
-  assert.match(rule, /stroke-width:\s*2px/);
+  assert.match(rule, /stroke-width:\s*3px/);
   assert.match(rule, /stroke-dasharray:\s*8 4/);
   assert.match(rule, /drop-shadow/);
 });
 
-test("detached statistics window closes itself and uses explicit dock semantics", () => {
-  assert.match(panelSource, /data-stat-action="\$\{this\.options\.detached \? "dock" : "detach"\}"/);
+test("detached statistics window relies on the native title bar and uses explicit dock semantics", () => {
+  assert.match(panelSource, /const presentationAction = this\.options\.detached \? "dock" : "detach"/);
+  assert.match(panelSource, /this\.options\.detached \? "" : `<button type="button" data-stat-action="close"/);
+  assert.doesNotMatch(panelSource, /statistics-header|statistics-title/);
   assert.match(windowSource, /await this\.emitAction\(action\)/);
   assert.match(windowSource, /action === "close" \|\| action === "dock"/);
   assert.match(windowSource, /event\.preventDefault\(\)[\s\S]*?this\.handleAction\("close"\)/);

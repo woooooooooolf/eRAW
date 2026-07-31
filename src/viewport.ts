@@ -580,6 +580,12 @@ export class RawViewport {
     return this.overlayLayer.selection.rect;
   }
 
+  setSelection(rect: ImageRect): void {
+    this.overlayLayer.setSelection(rect);
+    this.callbacks.onSelectionChange(rect);
+    this.requestDraw();
+  }
+
   clearSelection(): void {
     this.overlayLayer.clearSelection();
     this.callbacks.onSelectionChange(null);
