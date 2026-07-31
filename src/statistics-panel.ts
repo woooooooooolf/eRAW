@@ -90,6 +90,7 @@ export class StatisticsPanel {
   };
   private selectedGroup = "all";
   private active = true;
+  private savedScrollTop = 0;
 
   constructor(root: HTMLElement, options: StatisticsPanelOptions) {
     this.root = root;
@@ -118,10 +119,17 @@ export class StatisticsPanel {
 
   resetView(): void {
     this.selectedGroup = "all";
-    this.render();
+    this.savedScrollTop = 0;
+    this.render(false);
   }
 
-  private render(): void {
+  private render(preserveScroll = true): void {
+    const previousBody = this.root.querySelector<HTMLElement>(".statistics-body");
+    if (preserveScroll && previousBody && previousBody.scrollHeight > previousBody.clientHeight) {
+      this.savedScrollTop = previousBody.scrollTop;
+    } else if (!preserveScroll) {
+      this.savedScrollTop = 0;
+    }
     this.charts.dispose();
     const result = this.state.result;
     const selected = result?.groups.find((group) => group.key === this.selectedGroup) ?? result?.groups[0];
@@ -143,6 +151,13 @@ export class StatisticsPanel {
         ${this.renderBody(selected)}
       </div>`;
     this.bindEvents();
+    const body = this.root.querySelector<HTMLElement>(".statistics-body");
+    if (body) {
+      body.scrollTop = this.savedScrollTop;
+      body.addEventListener("scroll", () => {
+        if (body.scrollHeight > body.clientHeight) this.savedScrollTop = body.scrollTop;
+      }, { passive: true });
+    }
     if (this.active && result && selected) {
       window.requestAnimationFrame(() => {
         if (this.state.result === result) this.charts.render(result, selected.key);

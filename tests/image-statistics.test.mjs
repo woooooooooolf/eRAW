@@ -90,6 +90,17 @@ test("statistics view supports docking, detaching, vertical interactive charts a
   assert.ok(capability.permissions.includes("core:webview:allow-create-webview-window"));
 });
 
+test("statistics charts release plain wheel scrolling and state refreshes preserve the reading position", () => {
+  assert.match(chartSource, /zoomOnMouseWheel:\s*"ctrl"/);
+  assert.match(chartSource, /if \(event\.ctrlKey\) return;[\s\S]*?event\.stopPropagation\(\)/);
+  assert.match(chartSource, /\{ capture: true, passive: true \}/);
+  assert.match(panelSource, /private savedScrollTop = 0/);
+  assert.match(panelSource, /previousBody\.scrollHeight > previousBody\.clientHeight/);
+  assert.match(panelSource, /body\.scrollTop = this\.savedScrollTop/);
+  assert.match(panelSource, /if \(body\.scrollHeight > body\.clientHeight\) this\.savedScrollTop = body\.scrollTop/);
+  assert.match(panelSource, /resetView\(\): void \{[\s\S]*?this\.savedScrollTop = 0;[\s\S]*?this\.render\(false\)/);
+});
+
 test("ROI is a main-window tool with inclusive coordinate entry and a high-contrast boundary", () => {
   assert.match(appSource, /id="roi-control"/);
   assert.ok(appSource.indexOf('id="roi-control"') < appSource.indexOf('id="fit-button"'));

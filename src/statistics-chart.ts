@@ -130,9 +130,19 @@ export class StatisticsCharts {
     const histogramElement = this.root.querySelector<HTMLElement>("[data-stat-chart='histogram']");
     const rowElement = this.root.querySelector<HTMLElement>("[data-stat-chart='row']");
     const columnElement = this.root.querySelector<HTMLElement>("[data-stat-chart='column']");
+    for (const element of [histogramElement, rowElement, columnElement]) {
+      if (element) this.releaseUnmodifiedWheel(element);
+    }
     if (histogramElement) this.createHistogram(runtime, histogramElement, result, selected);
     if (rowElement) this.createProfile(runtime, rowElement, selected.rowProfile, "mean");
     if (columnElement) this.createProfile(runtime, columnElement, selected.columnProfile, "mean");
+  }
+
+  private releaseUnmodifiedWheel(element: HTMLElement): void {
+    element.addEventListener("wheel", (event) => {
+      if (event.ctrlKey) return;
+      event.stopPropagation();
+    }, { capture: true, passive: true });
   }
 
   resize(): void {
