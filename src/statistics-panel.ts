@@ -10,12 +10,18 @@ import type {
 
 export type StatisticsPanelAction =
   | "close"
-  | "toggleDetached"
+  | "detach"
+  | "dock"
   | "selectRoi"
   | "clearRoi"
   | "useFullFrame"
   | "useSelection"
   | "cancelAnalysis";
+
+export interface StatisticsWindowActionMessage {
+  action: StatisticsPanelAction;
+  source: "detached";
+}
 
 export interface StatisticsPanelState {
   result: AnalysisResult | null;
@@ -304,7 +310,7 @@ export class StatisticsPanel {
         <div class="statistics-title"><strong>${t("statistics.title")}</strong><span>${this.state.documentName ? escapeHtml(this.state.documentName) : t("statistics.noFile")}</span></div>
         <div class="statistics-header-actions">
           <button type="button" data-stat-action="reset">${t("statistics.resetView")}</button>
-          <button type="button" data-stat-action="toggleDetached">${this.options.detached ? t("statistics.dock") : t("statistics.detach")}</button>
+          <button type="button" data-stat-action="${this.options.detached ? "dock" : "detach"}">${this.options.detached ? t("statistics.dock") : t("statistics.detach")}</button>
           <button type="button" data-stat-action="close" title="${t("common.close")}">×</button>
         </div>
       </header>

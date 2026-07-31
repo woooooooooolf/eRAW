@@ -62,6 +62,7 @@ import {
   StatisticsPanel,
   type StatisticsPanelAction,
   type StatisticsPanelState,
+  type StatisticsWindowActionMessage,
 } from "./statistics-panel";
 import type {
   AnalysisResult,
@@ -84,7 +85,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.3.0";
+const VERSION = "0.3.1";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -1374,8 +1375,8 @@ export class ErawApp {
   }
 
   private async bindStatisticsWindowEvents(): Promise<void> {
-    await listen<StatisticsPanelAction>("statistics:action", (event) => {
-      this.onStatisticsAction(event.payload);
+    await listen<StatisticsWindowActionMessage>("statistics:action", (event) => {
+      this.onStatisticsAction(event.payload.action, event.payload.source);
     });
     await listen("statistics:ready", () => {
       void this.emitStatisticsState();
@@ -1531,7 +1532,10 @@ export class ErawApp {
     void this.requestStatistics();
   }
 
-  private onStatisticsAction(action: StatisticsPanelAction): void {
+  private onStatisticsAction(
+    action: StatisticsPanelAction,
+    source: "main" | "detached" = "main",
+  ): void {
     if (action === "close") {
       this.statisticsOpen = false;
       this.statisticsRevision += 1;
@@ -1540,22 +1544,26 @@ export class ErawApp {
       this.viewport.setInteractionMode("pan");
       this.viewport.setSelectionVisible(false);
       this.updateStatisticsDock();
-      void WebviewWindow.getByLabel("statistics").then((window) => window?.close());
+      if (source === "main") {
+        void WebviewWindow.getByLabel("statistics").then((window) => window?.close());
+      }
       return;
     }
-    if (action === "toggleDetached") {
-      this.statisticsDetached = !this.statisticsDetached;
+    if (action === "detach") {
+      this.statisticsDetached = true;
       localStorage.setItem(
         STATISTICS_PRESENTATION_KEY,
-        this.statisticsDetached ? "detached" : "docked",
+        "detached",
       );
-      if (this.statisticsDetached) {
-        this.updateStatisticsDock();
-        void this.openDetachedStatisticsWindow();
-      } else {
-        void WebviewWindow.getByLabel("statistics").then((window) => window?.close());
-        this.updateStatisticsDock();
-      }
+      this.updateStatisticsDock();
+      void this.openDetachedStatisticsWindow();
+      this.syncStatisticsState();
+      return;
+    }
+    if (action === "dock") {
+      this.statisticsDetached = false;
+      localStorage.setItem(STATISTICS_PRESENTATION_KEY, "docked");
+      this.updateStatisticsDock();
       this.syncStatisticsState();
       return;
     }

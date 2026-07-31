@@ -1,5 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { emitTo, listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   setLanguagePreference,
@@ -10,6 +10,7 @@ import {
   StatisticsPanel,
   type StatisticsPanelAction,
   type StatisticsPanelState,
+  type StatisticsWindowActionMessage,
 } from "./statistics-panel";
 import type { AppTheme } from "./theme-catalog";
 
@@ -21,6 +22,8 @@ interface StatisticsWindowPayload {
 
 export class StatisticsWindowApp {
   private readonly panel: StatisticsPanel;
+  private readonly appWindow = getCurrentWindow();
+  private closingLocally = false;
 
   constructor(root: HTMLElement) {
     root.innerHTML = '<main id="statistics-window-panel" class="statistics-panel statistics-window-panel detached"></main>';
@@ -28,12 +31,12 @@ export class StatisticsWindowApp {
       root.querySelector<HTMLElement>("#statistics-window-panel")!,
       {
         detached: true,
-        onAction: (action) => void emitTo("main", "statistics:action", action),
+        onAction: (action) => void this.handleAction(action),
         onError: (error) => {
           const message = error instanceof Error ? error.message : String(error);
-          void emitTo("main", "statistics:window-error", message);
+          void emit("statistics:window-error", message);
         },
-        onNotify: (message) => void emitTo("main", "statistics:notify", message),
+        onNotify: (message) => void emit("statistics:notify", message),
       },
     );
     if (isTauri()) void this.initialize();
@@ -48,9 +51,30 @@ export class StatisticsWindowApp {
         ? `${event.payload.state.documentName} — ${t("statistics.title")}`
         : t("statistics.title");
     });
-    await getCurrentWindow().onCloseRequested(() => {
-      void emitTo("main", "statistics:action", "close" satisfies StatisticsPanelAction);
+    await this.appWindow.onCloseRequested((event) => {
+      if (this.closingLocally) return;
+      event.preventDefault();
+      void this.handleAction("close");
     });
-    await emitTo("main", "statistics:ready");
+    await emit("statistics:ready");
+  }
+
+  private emitAction(action: StatisticsPanelAction): Promise<void> {
+    const message: StatisticsWindowActionMessage = { action, source: "detached" };
+    return emit("statistics:action", message);
+  }
+
+  private async handleAction(action: StatisticsPanelAction): Promise<void> {
+    try {
+      await this.emitAction(action);
+      if (action === "close" || action === "dock") {
+        this.closingLocally = true;
+        await this.appWindow.close();
+      }
+    } catch (error) {
+      this.closingLocally = false;
+      const message = error instanceof Error ? error.message : String(error);
+      await emit("statistics:window-error", message);
+    }
   }
 }
