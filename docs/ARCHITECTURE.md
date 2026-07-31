@@ -4,11 +4,12 @@
 
 ```mermaid
 flowchart LR
-    UI["应用编排与界面<br/>app.ts / export-dialog.ts / i18n.ts"]
+    UI["应用编排与界面<br/>app.ts / export-dialog.ts / statistics-*.ts / i18n.ts"]
     VP["视口与叠加层<br/>viewport*.ts / pixel-overlay.ts"]
     API["类型化 IPC 适配<br/>api.ts / types.ts"]
     CMD["Tauri 命令与会话<br/>commands.rs"]
     RAW["RAW 领域引擎<br/>raw/mod.rs"]
+    ANA["图像统计领域<br/>analysis/mod.rs"]
     FILE["只读内存映射 / 输出文件"]
 
     UI --> VP
@@ -16,13 +17,14 @@ flowchart LR
     VP --> API
     API --> CMD
     CMD --> RAW
+    CMD --> ANA
     CMD --> FILE
     RAW --> FILE
 ```
 
 前端负责交互、可见瓦片调度和 GPU 合成；Rust 负责文件会话、格式计算、像素读取、处理算法和确定性导出。IPC 只传递结构化请求、文档信息和二进制结果，不传递整幅 RAW 副本。
 
-Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予原生全屏、文件对话框和写入图像剪贴板所需权限；F11 直接调用窗口 API，不通过 CSS 模拟或新增 Rust 命令。
+Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予原生全屏、统计 WebviewWindow、文件对话框和写入图像剪贴板所需权限；F11 直接调用窗口 API，不通过 CSS 模拟或新增 Rust 命令。
 
 ## 模块职责
 
@@ -34,6 +36,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | `src/descriptor-input.ts` | 数值参数的整数化、边界限制和空值默认规则 |
 | `src/export-dialog.ts` | 冻结导出快照、范围联动、字段校验和导出反馈 |
 | `src/image-capture.ts` / `src/image-output.ts` | 当前画面合成、完整预览瓦片拼接，以及共用的 PNG/剪贴板输出 |
+| `src/statistics-panel.ts` / `src/statistics-window.ts` | 统计视图、Canvas 图表、组合报告，以及停靠/独立窗口承载 |
 | `src/i18n.ts` | 语言偏好、系统语言解析、七语文案目录、日期时间格式化和静态 DOM 翻译 |
 | `src/backend-error.ts` | 解析后端结构化错误码，并在当前语言下生成用户消息 |
 | `src/channel-rendering.ts` | 将显示模式与通道渲染偏好映射为纯 GPU 着色参数 |
@@ -45,16 +48,17 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | `src/api.ts` / `src/types.ts` | Tauri 调用封装及前后端共享数据契约 |
 | `src-tauri/src/commands.rs` | 当前文档会话、内存映射、缓存、任务快照和命令边界 |
 | `src-tauri/src/raw/mod.rs` | 布局、packing、CFA、预览、Remosaic、Demosaic、检查、RAW 导出与原子输出写入 |
+| `src-tauri/src/analysis/mod.rs` | L0 CFA DN 摘要、精确 Histogram、Row/Column Profile 和 QCFA 原子平面 |
 
 `raw/mod.rs` 是无 UI 的领域核心。新格式和算法应优先在这里形成可测试的纯逻辑；`app.ts` 不应承担像素语义。
 
-## 规划中的图像统计边界
+## 图像统计边界
 
-[图像统计设计](IMAGE_STATISTICS.md)已经确认以当前文档、当前帧和 L0 原始 CFA DN 为唯一数据源。实现时新增独立 Rust `analysis` 领域模块，通过内存映射扫描整帧或矩形 ROI；`app.ts` 和 `viewport.ts` 只负责任务编排、选区和结果呈现。
+[图像统计设计](IMAGE_STATISTICS.md)以当前文档、当前帧和 L0 原始 CFA DN 为唯一数据源。独立 Rust `analysis` 领域模块通过内存映射扫描整帧或矩形 ROI；`app.ts` 和 `viewport.ts` 只负责任务编排、选区和结果呈现。
 
 统计任务使用独立 revision，不复用预览 `renderRevision`；IPC 只传递摘要、精确 Histogram、Profile 和溯源元数据，不传递整幅 DN。QCFA 以 4×4 周期内的 16 个原子平面为最小累加单元，R/Gr/Gb/B 是结果层的可验证合并。
 
-停靠区域和独立统计窗口共享唯一 Analysis State 与结果缓存，同一时间只有一个统计视图实例；摘出或重新停靠只改变呈现载体，不复制任务或重新扫描 RAW。统计视图默认隐藏，通过已打开图像的画布右键菜单进入，首次以底部停靠形式打开并显示 All CFA 总览；统计通道选择与主窗口预览模式相互独立。
+停靠区域和独立统计窗口共享唯一 Analysis State 与结构化结果，同一时间只有一个统计视图；摘出或重新停靠只改变呈现载体，不复制任务或重新扫描 RAW。统计视图默认隐藏，通过已打开图像的画布右键菜单进入，首次以底部停靠形式打开并显示 All CFA 总览；统计通道选择与主窗口预览模式相互独立。
 
 ## 国际化与错误契约
 
@@ -84,6 +88,7 @@ RawDocument
 - 前端 `inFlight` 记录 revision，旧任务结束时不会误删同键的新任务。
 - 导出同时校验来源路径和 `sourceGeneration`，防止对过期配置写文件。
 - 完整预览抓拍同时携带文档世代与渲染 revision；帧、显示或处理状态变化后，旧瓦片结果不会被拼入输出。
+- 图像统计另有 `analysisRevision`；文件、描述符、frame、ROI 或显式取消发生变化后，旧扫描协作退出并返回 `stale_analysis`。
 
 ## 缓存与数据传递
 
