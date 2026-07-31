@@ -1,3 +1,4 @@
+use crate::analysis::{AnalysisRequest, AnalysisResult, analyze_image};
 use crate::raw::{
     ExportRequest, ExportResult, PixelInspectionRequest, PixelSample, RawDescriptor, RawLayout,
     RawWarning, TileRequest, calculate_layout, cfa_name_at, export_raw, inspect_pixels, read_pixel,
@@ -46,6 +47,9 @@ impl From<String> for CommandError {
         let code = match cause.as_str() {
             "stale_generation" => "stale_generation",
             "stale_render" => "stale_render",
+            "stale_analysis" => "stale_analysis",
+            "analysis_invalid_roi" => "analysis_invalid_roi",
+            "analysis_invalid_frame" => "analysis_invalid_frame",
             "裁剪宽度和高度必须大于 0" => "export_invalid_crop",
             "裁剪区域超出有效图像范围" => "export_crop_outside",
             "输出位深必须在 8 到 16 bit 之间" => "export_invalid_depth",
@@ -119,6 +123,7 @@ pub struct AppState {
     document: Mutex<Option<RawDocument>>,
     generation_clock: Arc<AtomicU64>,
     preview_revision: Arc<AtomicU64>,
+    analysis_revision: Arc<AtomicU64>,
     preview_cache: Arc<Mutex<PreviewCache>>,
 }
 
@@ -128,6 +133,7 @@ impl Default for AppState {
             document: Mutex::new(None),
             generation_clock: Arc::new(AtomicU64::new(0)),
             preview_revision: Arc::new(AtomicU64::new(0)),
+            analysis_revision: Arc::new(AtomicU64::new(0)),
             preview_cache: Arc::new(Mutex::new(PreviewCache::default())),
         }
     }
@@ -367,6 +373,56 @@ pub async fn inspect_raw_pixels(
     })
     .await
     .map_err(|error| CommandError::new("pixel_task_failed").with_cause(error))?
+}
+
+#[tauri::command]
+pub async fn analyze_raw_image(
+    request: AnalysisRequest,
+    state: State<'_, AppState>,
+) -> Result<AnalysisResult, CommandError> {
+    let previous_revision = state
+        .analysis_revision
+        .fetch_max(request.analysis_revision, Ordering::AcqRel);
+    if previous_revision > request.analysis_revision {
+        return Err(CommandError::new("stale_analysis"));
+    }
+    let (map, descriptor, layout, generation) = {
+        let guard = lock_document(&state)?;
+        let document = guard
+            .as_ref()
+            .ok_or_else(|| CommandError::new("document_not_open"))?;
+        (
+            document.map.clone(),
+            document.descriptor.clone(),
+            document.layout,
+            document.generation,
+        )
+    };
+    if request.generation != generation {
+        return Err(CommandError::new("stale_generation"));
+    }
+    let generation_clock = state.generation_clock.clone();
+    let analysis_revision = state.analysis_revision.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes: &[u8] = match map.as_ref() {
+            Some(value) => value.as_ref(),
+            None => &[],
+        };
+        let result = analyze_image(bytes, &descriptor, &layout, &request, || {
+            generation_clock.load(Ordering::Acquire) == request.generation
+                && analysis_revision.load(Ordering::Acquire) == request.analysis_revision
+        })
+        .map_err(CommandError::from)?;
+        if generation_clock.load(Ordering::Acquire) != request.generation {
+            return Err(CommandError::new("stale_generation"));
+        }
+        if analysis_revision.load(Ordering::Acquire) != request.analysis_revision {
+            return Err(CommandError::new("stale_analysis"));
+        }
+        Ok(result)
+    })
+    .await
+    .map_err(|error| CommandError::new("analysis_task_failed").with_cause(error))?
 }
 
 #[tauri::command]

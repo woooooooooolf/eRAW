@@ -478,7 +478,7 @@ enum CfaChannel {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CfaSite {
+pub(crate) enum CfaSite {
     Mono,
     Red,
     GreenBlue,
@@ -583,7 +583,13 @@ fn cfa_channel_with_phase(
     }
 }
 
-fn cfa_site_with_phase(pattern: CfaPattern, phase_x: u8, phase_y: u8, x: u32, y: u32) -> CfaSite {
+pub(crate) fn cfa_site_with_phase(
+    pattern: CfaPattern,
+    phase_x: u8,
+    phase_y: u8,
+    x: u32,
+    y: u32,
+) -> CfaSite {
     if is_quad_cfa(pattern) {
         let macro_x = ((x + u32::from(phase_x % 4)) % 4) / 2;
         let macro_y = ((y + u32::from(phase_y % 4)) % 4) / 2;
@@ -591,6 +597,24 @@ fn cfa_site_with_phase(pattern: CfaPattern, phase_x: u8, phase_y: u8, x: u32, y:
     } else {
         bayer_site(pattern, x, y)
     }
+}
+
+pub(crate) fn cfa_period(pattern: CfaPattern) -> u32 {
+    if is_quad_cfa(pattern) {
+        4
+    } else if pattern == CfaPattern::Mono {
+        1
+    } else {
+        2
+    }
+}
+
+pub(crate) fn cfa_atomic_position(d: &RawDescriptor, x: u32, y: u32) -> (u8, u8) {
+    let period = cfa_period(d.cfa);
+    (
+        ((x + u32::from(d.cfa_phase_x)) % period) as u8,
+        ((y + u32::from(d.cfa_phase_y)) % period) as u8,
+    )
 }
 
 fn cfa_channel(d: &RawDescriptor, x: u32, y: u32) -> CfaChannel {
@@ -2069,7 +2093,10 @@ mod tests {
         let missing = 40 * 4;
         assert_eq!(&tile[missing..missing + 4], &[0, 0, 0, 254]);
         let missing_later_row = (63 * 64 + 63) * 4;
-        assert_eq!(&tile[missing_later_row..missing_later_row + 4], &[0, 0, 0, 254]);
+        assert_eq!(
+            &tile[missing_later_row..missing_later_row + 4],
+            &[0, 0, 0, 254]
+        );
         assert_eq!(tile.len(), 64 * 64 * 4);
 
         let smaller = RawDescriptor {
