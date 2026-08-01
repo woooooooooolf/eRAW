@@ -69,6 +69,7 @@ import {
   type StatisticsPanelState,
   type StatisticsWindowActionMessage,
 } from "./statistics-panel";
+import type { StatisticsLayout } from "./statistics-view-state";
 import type {
   AnalysisResult,
   BitAlignment,
@@ -90,7 +91,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.4.0";
+const VERSION = "0.4.1";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -115,11 +116,22 @@ interface RuntimeDiagnostic {
 }
 
 const MAX_IMAGE_DIMENSION = 100_000;
+const IMAGE_FORMAT_DESCRIPTOR_FIELDS: ReadonlyArray<keyof RawDescriptor> = [
+  "width",
+  "height",
+  "packing",
+  "bitDepth",
+  "endianness",
+  "bitAlignment",
+  "cfa",
+  "cfaPhaseX",
+  "cfaPhaseY",
+];
 
 function loadStatisticsPresentation(): StatisticsPresentationSettings {
   const fallback: StatisticsPresentationSettings = {
     mode: "docked",
-    dock: "bottom",
+    dock: "side",
     bottomHeight: 330,
     sideWidth: 440,
   };
@@ -133,7 +145,7 @@ function loadStatisticsPresentation(): StatisticsPresentationSettings {
       mode: value.mode === "detached" ? "detached" : "docked",
       dock: value.dock === "side" ? "side" : "bottom",
       bottomHeight: Number.isFinite(value.bottomHeight) ? Math.max(210, Math.min(720, Number(value.bottomHeight))) : 330,
-      sideWidth: Number.isFinite(value.sideWidth) ? Math.max(320, Math.min(620, Number(value.sideWidth))) : 440,
+      sideWidth: Number.isFinite(value.sideWidth) ? Math.max(320, Math.round(Number(value.sideWidth))) : 440,
     };
   } catch {
     return fallback;
@@ -180,6 +192,10 @@ function escapeHtml(value: string): string {
 
 function descriptorsEqual(left: RawDescriptor, right: RawDescriptor): boolean {
   return (Object.keys(DEFAULT_DESCRIPTOR) as Array<keyof RawDescriptor>).every((key) => left[key] === right[key]);
+}
+
+function imageFormatDescriptorsEqual(left: RawDescriptor, right: RawDescriptor): boolean {
+  return IMAGE_FORMAT_DESCRIPTOR_FIELDS.every((key) => left[key] === right[key]);
 }
 
 function clampImageDimension(value: number): number {
@@ -258,6 +274,8 @@ export class ErawApp {
   private statisticsDetached = this.statisticsPresentation.mode === "detached";
   private statisticsDockPlacement: StatisticsDockPlacement = this.statisticsPresentation.dock;
   private statisticsRevision = 0;
+  private statisticsViewResetRevision = 0;
+  private statisticsViewResetLayout: StatisticsLayout = "side";
   private statisticsResult: AnalysisResult | null = null;
   private statisticsLoading = false;
   private statisticsError: string | null = null;
@@ -1126,22 +1144,50 @@ export class ErawApp {
         const revision = this.commitRevision;
         const descriptor = this.readDescriptor();
         const localChanged = !descriptorsEqual(descriptor, this.descriptor);
-        this.descriptor = descriptor;
-        if (localChanged && this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(descriptor));
-        if (this.document && !descriptorsEqual(descriptor, this.document.descriptor)) {
+        if (!this.document) {
+          this.descriptor = descriptor;
+          if (localChanged && this.settings.rememberDescriptor) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(descriptor));
+          }
+        } else if (!descriptorsEqual(descriptor, this.document.descriptor)) {
+          const previousDescriptor = this.document.descriptor;
           try {
             const info = await updateDescriptor(descriptor);
+            const resetStatisticsView = !imageFormatDescriptorsEqual(previousDescriptor, info.descriptor);
             this.document = info;
             this.descriptor = info.descriptor;
+            if (this.settings.rememberDescriptor) {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(info.descriptor));
+            }
+            if (revision === this.commitRevision) this.writeDescriptor(info.descriptor);
             this.frame = Math.min(this.frame, Math.max(0, info.layout.frameCount - 1));
             this.viewport.setDocument(info, true);
             this.statisticsResult = null;
+            if (resetStatisticsView) {
+              this.statisticsViewResetRevision += 1;
+              this.statisticsViewResetLayout = this.statisticsDetached
+                ? "detached"
+                : this.statisticsDockPlacement;
+            }
+            this.updatePackingDependentUi();
             this.updateCfaDependentUi();
             this.updateDocumentUi();
             this.syncStatisticsState();
             if (this.statisticsOpen) void this.requestStatistics();
           } catch (error) {
+            if (revision === this.commitRevision && this.document) {
+              this.descriptor = this.document.descriptor;
+              this.writeDescriptor(this.descriptor);
+              this.updatePackingDependentUi();
+              this.updateCfaDependentUi();
+              this.updateDocumentUi();
+            }
             this.reportRuntimeError(error);
+          }
+        } else {
+          this.descriptor = this.document.descriptor;
+          if (localChanged && this.settings.rememberDescriptor) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(this.descriptor));
           }
         }
         if (revision === this.commitRevision) break;
@@ -1492,6 +1538,8 @@ export class ErawApp {
       imageWidth: this.document?.descriptor.width ?? 0,
       imageHeight: this.document?.descriptor.height ?? 0,
       sideDockAvailable: this.canUseSideStatisticsDock(),
+      viewResetRevision: this.statisticsViewResetRevision,
+      viewResetLayout: this.statisticsViewResetLayout,
     };
   }
 
@@ -1504,7 +1552,11 @@ export class ErawApp {
   private clampStatisticsDockWidth(width: number): number {
     const shell = this.root.querySelector<HTMLElement>(".app-shell");
     const sidebarWidth = shell?.classList.contains("panel-hidden") ? 0 : this.sidebarWidth;
-    const maximum = Math.max(320, Math.min(620, window.innerWidth - sidebarWidth - 320));
+    const availableWidth = Math.max(0, window.innerWidth - sidebarWidth);
+    const maximum = Math.max(320, Math.min(
+      Math.floor(availableWidth * 2 / 3),
+      availableWidth - 320,
+    ));
     return Math.max(320, Math.min(maximum, Math.round(width)));
   }
 
@@ -1558,14 +1610,17 @@ export class ErawApp {
     if (this.statisticsDockPlacement === "side" && !this.canUseSideStatisticsDock()) {
       this.statisticsDockPlacement = "bottom";
     }
+    if (this.statisticsDockPlacement === "side") {
+      this.statisticsDockWidth = this.clampStatisticsDockWidth(this.statisticsDockWidth);
+    }
     dock.toggleAttribute("hidden", !visible);
     this.statisticsPanel.setActive(visible);
     this.statisticsPanel.setLayout(this.statisticsDockPlacement);
     dock.style.setProperty("--statistics-height", `${Math.round(this.statisticsDockHeight)}px`);
-    dock.style.setProperty("--statistics-width", `${Math.round(this.clampStatisticsDockWidth(this.statisticsDockWidth))}px`);
+    dock.style.setProperty("--statistics-width", `${Math.round(this.statisticsDockWidth)}px`);
     const shell = this.root.querySelector<HTMLElement>(".app-shell");
     shell?.style.setProperty("--statistics-height", `${Math.round(this.statisticsDockHeight)}px`);
-    shell?.style.setProperty("--statistics-width", `${Math.round(this.clampStatisticsDockWidth(this.statisticsDockWidth))}px`);
+    shell?.style.setProperty("--statistics-width", `${Math.round(this.statisticsDockWidth)}px`);
     shell?.classList.toggle("statistics-docked", visible);
     shell?.classList.toggle("statistics-dock-side", visible && this.statisticsDockPlacement === "side");
   }

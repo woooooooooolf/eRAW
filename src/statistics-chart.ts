@@ -204,7 +204,7 @@ export class StatisticsCharts {
 
   private releaseUnmodifiedWheel(element: HTMLElement): void {
     element.addEventListener("wheel", (event) => {
-      if (event.ctrlKey) return;
+      if (event.ctrlKey || event.shiftKey) return;
       event.stopPropagation();
     }, { capture: true, passive: true });
   }
@@ -230,6 +230,15 @@ export class StatisticsCharts {
     if (!instance) return;
     instance.dispatchAction({ type: "dataZoom", dataZoomId: `${chartKey}-y-slider`, start: 0, end: 100 });
     this.callbacks.onRangeChange(chartKey, "y", null);
+  }
+
+  setGroupVisible(chartKey: StatisticsChartKey, groupKey: string, visible: boolean): void {
+    const instance = this.instances.get(chartKey);
+    if (!instance) return;
+    instance.dispatchAction({
+      type: visible ? "legendSelect" : "legendUnSelect",
+      name: groupLabel(groupKey),
+    });
   }
 
   dispose(): void {
@@ -315,6 +324,10 @@ export class StatisticsCharts {
         textStyle: { color: dim, fontSize: 9 }, showDetail: false, ...range(xRange),
       },
       {
+        id: `${chartKey}-y-inside`, type: "inside", yAxisIndex: 0, filterMode: "none",
+        zoomOnMouseWheel: "shift", moveOnMouseMove: false, moveOnMouseWheel: false, ...range(yRange),
+      },
+      {
         id: `${chartKey}-y-slider`, type: "slider", yAxisIndex: 0, orient: "vertical", filterMode: "none",
         width: 14, right: 8, top: 38, bottom: 66, borderColor: border, backgroundColor: surface,
         fillerColor: colors.all.replace("rgb(", "rgb(").replace(")", " / .12)"),
@@ -338,7 +351,11 @@ export class StatisticsCharts {
     const domains = this.domains.get(chartKey);
     if (!domains) return;
     for (const item of event.batch ?? [event]) {
-      const axis: StatisticsAxis = item.dataZoomId?.includes("-y-") || item.dataZoomIndex === 2 ? "y" : "x";
+      const axis: StatisticsAxis = item.dataZoomId?.includes("-y-")
+        || item.dataZoomIndex === 2
+        || item.dataZoomIndex === 3
+        ? "y"
+        : "x";
       if (!Number.isFinite(item.start) || !Number.isFinite(item.end)) continue;
       const domain = domains[axis];
       const start = domain.start + (domain.end - domain.start) * Number(item.start) / 100;
@@ -392,21 +409,26 @@ export class StatisticsCharts {
         },
       },
       yAxis: { ...(common.yAxis as object), name: t("statistics.count"), min: 0, max: yMaximum },
-      series: groups.map((group) => ({
-        name: groupLabel(group.key),
-        type: "line",
-        data: histogramData(group.histogram),
-        showSymbol: false,
-        sampling: "lttb",
-        connectNulls: false,
-        lineStyle: {
-          width: group.key === "all" ? 2.4 : group.key === "G" ? 2 : 1.35,
-          type: group.key === "all" ? "solid" : group.key === "G" ? "dashed" : "solid",
-          color: colors[group.key] ?? colors.all,
-          opacity: group.key === "all" ? 1 : 0.86,
-        },
-        emphasis: { focus: "series" },
-      })),
+      series: groups.map((group) => {
+        const width = group.key === "all" ? 2.4 : group.key === "G" ? 2 : 1.35;
+        const opacity = group.key === "all" ? 1 : 0.86;
+        return {
+          name: groupLabel(group.key),
+          type: "line",
+          data: histogramData(group.histogram),
+          showSymbol: false,
+          sampling: "lttb",
+          connectNulls: false,
+          lineStyle: {
+            width,
+            type: group.key === "all" ? "solid" : group.key === "G" ? "dashed" : "solid",
+            color: colors[group.key] ?? colors.all,
+            opacity,
+          },
+          emphasis: { lineStyle: { width: width + 0.7, opacity: 1 } },
+          blur: { lineStyle: { opacity } },
+        };
+      }),
     });
     this.updateRangeInputs(chartKey, state.xRange ?? domains.x);
   }
@@ -447,21 +469,26 @@ export class StatisticsCharts {
       yAxis: {
         ...(common.yAxis as object), name: t("statistics.meanDn"), min: domains.y.start, max: domains.y.end,
       },
-      series: groups.map((group) => ({
-        name: groupLabel(group.key),
-        type: "line",
-        data: profileData(group[profile], "mean"),
-        showSymbol: false,
-        sampling: "lttb",
-        connectNulls: true,
-        lineStyle: {
-          width: group.key === "all" ? 2.3 : group.key === "G" ? 1.9 : 1.3,
-          type: group.key === "all" ? "solid" : group.key === "G" ? "dashed" : "solid",
-          color: colors[group.key] ?? colors.all,
-          opacity: group.key === "all" ? 1 : 0.86,
-        },
-        emphasis: { focus: "series" },
-      })),
+      series: groups.map((group) => {
+        const width = group.key === "all" ? 2.3 : group.key === "G" ? 1.9 : 1.3;
+        const opacity = group.key === "all" ? 1 : 0.86;
+        return {
+          name: groupLabel(group.key),
+          type: "line",
+          data: profileData(group[profile], "mean"),
+          showSymbol: false,
+          sampling: "lttb",
+          connectNulls: true,
+          lineStyle: {
+            width,
+            type: group.key === "all" ? "solid" : group.key === "G" ? "dashed" : "solid",
+            color: colors[group.key] ?? colors.all,
+            opacity,
+          },
+          emphasis: { lineStyle: { width: width + 0.7, opacity: 1 } },
+          blur: { lineStyle: { opacity } },
+        };
+      }),
     });
     this.updateRangeInputs(chartKey, state.xRange ?? domains.x);
   }

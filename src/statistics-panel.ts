@@ -41,6 +41,8 @@ export interface StatisticsPanelState {
   imageWidth: number;
   imageHeight: number;
   sideDockAvailable: boolean;
+  viewResetRevision: number;
+  viewResetLayout: StatisticsLayout;
 }
 
 interface StatisticsPanelOptions {
@@ -100,6 +102,8 @@ export class StatisticsPanel {
     imageWidth: 0,
     imageHeight: 0,
     sideDockAvailable: true,
+    viewResetRevision: 0,
+    viewResetLayout: "bottom",
   };
   private viewState: StatisticsViewState = loadStatisticsViewState();
   private layout: StatisticsLayout;
@@ -109,6 +113,7 @@ export class StatisticsPanel {
   private resizePointerId: number | null = null;
   private resizeStartY = 0;
   private resizeStartHeight = 0;
+  private appliedViewResetRevision = 0;
 
   constructor(root: HTMLElement, options: StatisticsPanelOptions) {
     this.root = root;
@@ -127,9 +132,17 @@ export class StatisticsPanel {
   }
 
   setState(state: StatisticsPanelState): void {
+    const shouldReset = state.viewResetRevision > this.appliedViewResetRevision
+      && state.viewResetLayout === this.layout;
+    this.appliedViewResetRevision = Math.max(this.appliedViewResetRevision, state.viewResetRevision);
     this.state = state;
+    if (shouldReset) {
+      resetStatisticsViewState(this.viewState, this.layout);
+      saveStatisticsViewState(this.viewState);
+      this.savedScrollTop = 0;
+    }
     this.sanitizeViewState();
-    this.render();
+    this.render(!shouldReset);
   }
 
   setLayout(layout: StatisticsLayout): void {
@@ -315,7 +328,10 @@ export class StatisticsPanel {
         if (current.has(group)) current.delete(group); else current.add(group);
         this.viewState.charts[key].visibleGroups = [...current];
         saveStatisticsViewState(this.viewState);
-        this.render();
+        const visible = current.has(group);
+        button.classList.toggle("active", visible);
+        button.setAttribute("aria-pressed", String(visible));
+        this.charts.setGroupVisible(key, group, visible);
       });
     });
     this.root.querySelectorAll<HTMLButtonElement>("[data-stat-y-reset]").forEach((button) => {

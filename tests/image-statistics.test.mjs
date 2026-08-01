@@ -90,6 +90,7 @@ test("statistics view supports three presentations, independent curves, two-axis
   assert.match(chartRuntimeSource, /DataZoomComponent/);
   assert.match(chartSource, /type: "slider"/);
   assert.match(chartSource, /zoomOnMouseWheel:\s*"ctrl"/);
+  assert.match(chartSource, /id: `\$\{chartKey\}-y-inside`[\s\S]*?zoomOnMouseWheel:\s*"shift"/);
   assert.match(chartSource, /orient: "vertical"/);
   assert.match(chartSource, /backgroundColor: "transparent"/);
   assert.match(panelSource, /data-stat-group-chart=/);
@@ -107,13 +108,45 @@ test("statistics view supports three presentations, independent curves, two-axis
 
 test("statistics charts release plain wheel scrolling and state refreshes preserve the reading position", () => {
   assert.match(chartSource, /zoomOnMouseWheel:\s*"ctrl"/);
-  assert.match(chartSource, /if \(event\.ctrlKey\) return;[\s\S]*?event\.stopPropagation\(\)/);
+  assert.match(chartSource, /zoomOnMouseWheel:\s*"shift"/);
+  assert.match(chartSource, /if \(event\.ctrlKey \|\| event\.shiftKey\) return;[\s\S]*?event\.stopPropagation\(\)/);
   assert.match(chartSource, /\{ capture: true, passive: true \}/);
   assert.match(panelSource, /private savedScrollTop = 0/);
   assert.match(panelSource, /previousBody\.scrollHeight > previousBody\.clientHeight/);
   assert.match(panelSource, /body\.scrollTop = this\.savedScrollTop/);
   assert.match(panelSource, /if \(body\.scrollHeight > body\.clientHeight\) this\.savedScrollTop = body\.scrollTop/);
   assert.match(panelSource, /resetView\(\): void \{[\s\S]*?this\.savedScrollTop = 0;[\s\S]*?this\.render\(false\)/);
+});
+
+test("statistics default to side docking and use two thirds of the available workspace", () => {
+  const presentation = appSource.match(/function loadStatisticsPresentation\(\)[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(presentation, /mode: "docked"/);
+  assert.match(presentation, /dock: "side"/);
+  const clamp = appSource.match(/private clampStatisticsDockWidth\(width: number\)[\s\S]*?\n  \}/)?.[0] ?? "";
+  assert.match(clamp, /Math\.floor\(availableWidth \* 2 \/ 3\)/);
+  assert.match(clamp, /availableWidth - 320/);
+  assert.doesNotMatch(clamp, /620/);
+});
+
+test("curve toggles update only their chart and hover keeps peer curves visible", () => {
+  const groupToggle = panelSource.match(/this\.root\.querySelectorAll<HTMLButtonElement>\("\[data-stat-group-chart\]"\)[\s\S]*?\n    \}\);/)?.[0] ?? "";
+  assert.match(groupToggle, /this\.charts\.setGroupVisible\(key, group, visible\)/);
+  assert.doesNotMatch(groupToggle, /this\.render\(\)/);
+  assert.match(chartSource, /type: visible \? "legendSelect" : "legendUnSelect"/);
+  assert.doesNotMatch(chartSource, /focus:\s*"series"/);
+  assert.match(chartSource, /emphasis:\s*\{ lineStyle:\s*\{ width: width \+ 0\.7, opacity: 1 \} \}/);
+});
+
+test("successful image-format updates reset both docked and detached statistics views transactionally", () => {
+  assert.match(appSource, /IMAGE_FORMAT_DESCRIPTOR_FIELDS[\s\S]*?"width"[\s\S]*?"bitDepth"[\s\S]*?"cfaPhaseY"/);
+  const commit = appSource.match(/private async commitDescriptor\(\): Promise<void> \{[\s\S]*?\n  \}/)?.[0] ?? "";
+  assert.ok(commit.indexOf("await updateDescriptor(descriptor)") < commit.indexOf("localStorage.setItem(STORAGE_KEY, JSON.stringify(info.descriptor))"));
+  assert.match(commit, /resetStatisticsView = !imageFormatDescriptorsEqual/);
+  assert.match(commit, /this\.statisticsViewResetRevision \+= 1/);
+  assert.match(commit, /this\.descriptor = this\.document\.descriptor;[\s\S]*?this\.writeDescriptor\(this\.descriptor\)/);
+  assert.match(panelSource, /state\.viewResetRevision > this\.appliedViewResetRevision/);
+  assert.match(panelSource, /state\.viewResetLayout === this\.layout/);
+  assert.match(panelSource, /resetStatisticsViewState\(this\.viewState, this\.layout\)/);
 });
 
 test("ROI is a main-window tool with inclusive coordinate entry and a high-contrast boundary", () => {
