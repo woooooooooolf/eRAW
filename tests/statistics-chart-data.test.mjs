@@ -65,3 +65,10 @@ test("zoomed profile ranges recover every visible source point when below the re
   assert.deepEqual(data[0], [12_000, 12_000]);
   assert.deepEqual(data.at(-1), [12_500, 12_500]);
 });
+
+test("profile range equality ignores resize noise but detects a real zoom", () => {
+  const current = { start: 0, end: 24_999 };
+  assert.equal(chartData.statisticsAxisRangesEqual(current, { start: 0, end: 24_999.000001 }), true);
+  assert.equal(chartData.statisticsAxisRangesEqual(current, { start: 1, end: 24_999 }), false);
+  assert.equal(chartData.statisticsAxisRangesEqual(undefined, current), false);
+});

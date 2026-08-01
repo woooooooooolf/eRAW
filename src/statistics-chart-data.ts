@@ -5,6 +5,17 @@ export const MAX_PROFILE_RENDER_POINTS = 4_096;
 
 type ProfileMetric = "mean" | "standardDeviation";
 
+export function statisticsAxisRangesEqual(
+  left: StatisticsAxisRange | undefined,
+  right: StatisticsAxisRange,
+): boolean {
+  if (!left) return false;
+  const scale = Math.max(1, Math.abs(left.start), Math.abs(left.end), Math.abs(right.start), Math.abs(right.end));
+  const tolerance = scale * 1e-9;
+  return Math.abs(left.start - right.start) <= tolerance
+    && Math.abs(left.end - right.end) <= tolerance;
+}
+
 export interface HistogramDatum {
   value: [number, number];
   dnStart: number;

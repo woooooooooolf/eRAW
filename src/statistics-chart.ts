@@ -8,6 +8,7 @@ import {
   maximumHistogramDisplayCount,
   profileSeriesData,
   profileValueDomain,
+  statisticsAxisRangesEqual,
   type HistogramDatum,
 } from "./statistics-chart-data";
 import {
@@ -151,6 +152,7 @@ export class StatisticsCharts {
   private readonly domains = new Map<StatisticsChartKey, ChartDomains>();
   private readonly profileContexts = new Map<"row" | "column", ProfileRenderContext>();
   private readonly pendingProfileRanges = new Map<"row" | "column", StatisticsAxisRange>();
+  private readonly renderedProfileRanges = new Map<"row" | "column", StatisticsAxisRange>();
   private profileRefreshFrame = 0;
   private renderRevision = 0;
 
@@ -267,6 +269,7 @@ export class StatisticsCharts {
     this.profileRefreshFrame = 0;
     this.pendingProfileRanges.clear();
     this.profileContexts.clear();
+    this.renderedProfileRanges.clear();
     this.instances.forEach((instance) => instance.dispose());
     this.instances.clear();
     this.domains.clear();
@@ -407,13 +410,14 @@ export class StatisticsCharts {
 
   private refreshProfileSeries(chartKey: "row" | "column", range: StatisticsAxisRange): void {
     const context = this.profileContexts.get(chartKey);
-    if (!context) return;
+    if (!context || statisticsAxisRangesEqual(this.renderedProfileRanges.get(chartKey), range)) return;
     context.chart.setOption({
       series: context.groups.map((group) => ({
         id: `${chartKey}-${group.key}`,
         data: profileSeriesData(group[context.profile], "mean", range),
       })),
     });
+    this.renderedProfileRanges.set(chartKey, range);
   }
 
   private updateRangeInputs(chartKey: StatisticsChartKey, range: StatisticsAxisRange): void {
@@ -508,6 +512,8 @@ export class StatisticsCharts {
     const chart = runtime.init(element, undefined, { renderer: "canvas" });
     this.registerChart(chartKey, chart, domains);
     this.profileContexts.set(chartKey, { chart, groups, profile });
+    const renderedRange = state.xRange ?? domains.x;
+    this.renderedProfileRanges.set(chartKey, renderedRange);
     const common = this.commonOption(colors);
     chart.setOption({
       ...common,
@@ -532,7 +538,7 @@ export class StatisticsCharts {
           id: `${chartKey}-${group.key}`,
           name: groupLabel(group.key),
           type: "line",
-          data: profileSeriesData(group[profile], "mean", state.xRange ?? domains.x),
+          data: profileSeriesData(group[profile], "mean", renderedRange),
           showSymbol: false,
           sampling: "lttb",
           connectNulls: true,

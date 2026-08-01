@@ -118,6 +118,7 @@ test("statistics charts release plain wheel scrolling and state refreshes preser
   assert.match(panelSource, /body\.scrollTop = this\.savedScrollTop/);
   assert.match(panelSource, /if \(body\.scrollHeight > body\.clientHeight\) this\.savedScrollTop = body\.scrollTop/);
   assert.match(panelSource, /resetView\(\): void \{[\s\S]*?this\.savedScrollTop = 0;[\s\S]*?this\.render\(false\)/);
+  assert.match(chartSource, /statisticsAxisRangesEqual\(this\.renderedProfileRanges\.get\(chartKey\), range\)/);
 });
 
 test("statistics default to side docking and use two thirds of the available workspace", () => {
