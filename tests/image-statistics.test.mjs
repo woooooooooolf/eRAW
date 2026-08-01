@@ -15,6 +15,7 @@ const [
   commandSource,
   capabilitySource,
   styleSource,
+  tauriConfigSource,
 ] = await Promise.all([
   readFile(new URL("../src/app.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/api.ts", import.meta.url), "utf8"),
@@ -28,8 +29,10 @@ const [
   readFile(new URL("../src-tauri/src/commands.rs", import.meta.url), "utf8"),
   readFile(new URL("../src-tauri/capabilities/default.json", import.meta.url), "utf8"),
   readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
+  readFile(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8"),
 ]);
 const capability = JSON.parse(capabilitySource);
+const tauriConfig = JSON.parse(tauriConfigSource);
 
 test("canvas context menu exposes one statistics entry before the four capture actions", () => {
   const menu = appSource.match(/<div id="canvas-context-menu"[\s\S]*?<\/div>/)?.[0] ?? "";
@@ -207,6 +210,9 @@ test("ROI, pixel, zoom, statistics and capture actions expose the agreed shortcu
 });
 
 test("detached statistics window relies on the native title bar and uses explicit dock semantics", () => {
+  assert.equal(tauriConfig.app.windows[0].title, "eRAW");
+  assert.match(appSource, /document\.title = "eRAW"/);
+  assert.match(appSource, /title: `eRAW - \$\{t\("statistics\.title"\)\}`/);
   assert.match(panelSource, /const presentationAction = this\.options\.detached \? "dock" : "detach"/);
   assert.match(panelSource, /this\.options\.detached \? "" : `<button type="button" data-stat-action="close"/);
   assert.doesNotMatch(panelSource, /statistics-header|statistics-title/);

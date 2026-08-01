@@ -1533,7 +1533,7 @@ export class ErawApp {
     const fileStatus = this.get("file-status");
     fileStatus.textContent = info?.path ?? t("diagnostics.noFile");
     fileStatus.title = info?.path ?? "";
-    document.title = info ? `${info.name} — eRAW V${VERSION}` : `eRAW V${VERSION}`;
+    document.title = "eRAW";
     const layout = info?.layout;
     const count = layout?.frameCount ?? 0;
     this.get("frame-total").textContent = String(count);
@@ -1965,7 +1965,7 @@ export class ErawApp {
     }
     const statisticsWindow = new WebviewWindow("statistics", {
       url: "index.html?statistics=1",
-      title: t("statistics.title"),
+      title: `eRAW - ${t("statistics.title")}`,
       width: 1180,
       height: 760,
       minWidth: 760,
