@@ -412,6 +412,8 @@ export class StatisticsCharts {
       series: groups.map((group) => {
         const width = group.key === "all" ? 2.4 : group.key === "G" ? 2 : 1.35;
         const opacity = group.key === "all" ? 1 : 0.86;
+        const type = group.key === "G" ? "dashed" : "solid";
+        const color = colors[group.key] ?? colors.all;
         return {
           name: groupLabel(group.key),
           type: "line",
@@ -421,12 +423,12 @@ export class StatisticsCharts {
           connectNulls: false,
           lineStyle: {
             width,
-            type: group.key === "all" ? "solid" : group.key === "G" ? "dashed" : "solid",
-            color: colors[group.key] ?? colors.all,
+            type,
+            color,
             opacity,
           },
-          emphasis: { lineStyle: { width: width + 0.7, opacity: 1 } },
-          blur: { lineStyle: { opacity } },
+          emphasis: { disabled: true, lineStyle: { width, type, color, opacity } },
+          blur: { lineStyle: { width, type, color, opacity } },
         };
       }),
     });
@@ -472,6 +474,8 @@ export class StatisticsCharts {
       series: groups.map((group) => {
         const width = group.key === "all" ? 2.3 : group.key === "G" ? 1.9 : 1.3;
         const opacity = group.key === "all" ? 1 : 0.86;
+        const type = group.key === "G" ? "dashed" : "solid";
+        const color = colors[group.key] ?? colors.all;
         return {
           name: groupLabel(group.key),
           type: "line",
@@ -481,12 +485,12 @@ export class StatisticsCharts {
           connectNulls: true,
           lineStyle: {
             width,
-            type: group.key === "all" ? "solid" : group.key === "G" ? "dashed" : "solid",
-            color: colors[group.key] ?? colors.all,
+            type,
+            color,
             opacity,
           },
-          emphasis: { lineStyle: { width: width + 0.7, opacity: 1 } },
-          blur: { lineStyle: { opacity } },
+          emphasis: { disabled: true, lineStyle: { width, type, color, opacity } },
+          blur: { lineStyle: { width, type, color, opacity } },
         };
       }),
     });

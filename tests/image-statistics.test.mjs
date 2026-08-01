@@ -128,13 +128,21 @@ test("statistics default to side docking and use two thirds of the available wor
   assert.doesNotMatch(clamp, /620/);
 });
 
-test("curve toggles update only their chart and hover keeps peer curves visible", () => {
+test("curve toggles update only their chart and hover does not restyle curves", () => {
   const groupToggle = panelSource.match(/this\.root\.querySelectorAll<HTMLButtonElement>\("\[data-stat-group-chart\]"\)[\s\S]*?\n    \}\);/)?.[0] ?? "";
   assert.match(groupToggle, /this\.charts\.setGroupVisible\(key, group, visible\)/);
   assert.doesNotMatch(groupToggle, /this\.render\(\)/);
   assert.match(chartSource, /type: visible \? "legendSelect" : "legendUnSelect"/);
   assert.doesNotMatch(chartSource, /focus:\s*"series"/);
-  assert.match(chartSource, /emphasis:\s*\{ lineStyle:\s*\{ width: width \+ 0\.7, opacity: 1 \} \}/);
+  assert.doesNotMatch(chartSource, /width: width \+ 0\.7/);
+  assert.equal(
+    [...chartSource.matchAll(/emphasis:\s*\{ disabled: true, lineStyle:\s*\{ width, type, color, opacity \} \}/g)].length,
+    2,
+  );
+  assert.equal(
+    [...chartSource.matchAll(/blur:\s*\{ lineStyle:\s*\{ width, type, color, opacity \} \}/g)].length,
+    2,
+  );
 });
 
 test("successful image-format updates reset both docked and detached statistics views transactionally", () => {
