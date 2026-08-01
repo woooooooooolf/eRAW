@@ -19,6 +19,7 @@ export class HelpWindowApp {
   private activeSection = HELP_SECTIONS[0]?.id ?? "";
 
   constructor(private readonly root: HTMLElement) {
+    root.addEventListener("contextmenu", (event) => event.preventDefault());
     root.innerHTML = this.template();
     this.bindNavigation();
     if (isTauri()) void this.initialize();
@@ -39,7 +40,7 @@ export class HelpWindowApp {
         <footer><button type="button" data-help-top><span>↑</span><span data-i18n="helpWindow.backToTop">返回顶部</span></button></footer>
       </aside>
       <article class="help-document">
-        <header class="help-hero"><div><small>eRAW USER MANUAL</small><h1 data-i18n="helpWindow.title">使用手册</h1><p>面向传感器 RAW 查看、诊断与确定性格式转换的使用参考。</p></div><span>V0.4</span></header>
+        <header class="help-hero"><div><small>eRAW USER MANUAL</small><h1 data-i18n="helpWindow.title">使用手册</h1><p>面向传感器 RAW 查看、诊断与确定性格式转换的使用参考。</p></div><span>V0.5</span></header>
         <aside class="help-language-notice" hidden><strong>i</strong><p data-i18n="helpWindow.chineseReview">当前为审核中的中文手册，其它语言版本将在确认后提供。</p></aside>
         ${sections}
       </article>

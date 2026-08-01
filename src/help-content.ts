@@ -22,6 +22,20 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
       <aside class="help-callout"><strong>先查看，后导出</strong><p>预览会尽力显示可读取的内容并提示异常；导出则会严格检查参数，不能以预览效果代替导出校验。</p></aside>`,
   },
   {
+    id: "document",
+    kicker: "文件会话",
+    title: "打开文件、帧与诊断",
+    summary: "一个文档会话对应一个当前 RAW 文件；更换文件或提交图像格式后，旧预览和旧统计不会继续混用。",
+    body: `
+      <div class="help-card-grid">
+        <article><h3>重新打开与关闭</h3><p><kbd>Ctrl</kbd><kbd>O</kbd> 可随时选择另一文件。<kbd>Ctrl</kbd><kbd>W</kbd> 会关闭当前文件、清空文件相关显示并释放只读映射，以便重命名、覆盖或删除源文件。</p></article>
+        <article><h3>多帧浏览</h3><p>帧数由有效文件字节数和 frameStride 推导。最后一帧不足完整尺寸时仍可尝试查看，界面会给出数据不完整的诊断提示。</p></article>
+        <article><h3>提交参数</h3><p>数值参数在回车、Tab 或失焦时提交。输入会被整数化并限制到合法范围；成功时应用新描述符，失败时恢复最后一次有效配置。</p></article>
+        <article><h3>实时诊断</h3><p>诊断面板只反映当前状态，不是历史日志。修正参数、恢复渲染或重新打开文件后，已经失效的运行时错误会自动清除。</p></article>
+      </div>
+      <aside class="help-note"><strong>帧与参数的关系</strong><p>切换到同尺寸帧会保留当前观察方式；改变图像尺寸时，依赖尺寸的选区会被清除，避免将旧坐标套用到新图像。</p></aside>`,
+  },
+  {
     id: "interface",
     kicker: "日常操作",
     title: "界面、画布与快捷键",
@@ -49,6 +63,20 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
         <tr><td>偏移、行/帧步长</td><td>跳过头部和 padding，并定位下一行/帧</td><td>显式步长为 0 时自动按最小有效字节数和对齐值计算。</td></tr>
       </tbody></table></div>
       <aside class="help-callout"><strong>不完整文件并不一定无法查看</strong><p>最后一帧不足完整尺寸时，eRAW 会将其视为可尝试的部分帧，并把不可读取的像素作为缺失数据呈现。请结合诊断信息判断结果。</p></aside>`,
+  },
+  {
+    id: "presentation",
+    kicker: "查看细节",
+    title: "画面呈现与像素检查",
+    summary: "“画面呈现”只影响屏幕显示，不会修改源 RAW、重建 DN 或确定性导出内容。",
+    body: `
+      <div class="help-card-grid">
+        <article><h3>通道着色</h3><p>R/G/B 通道默认按红、绿、蓝显示重建强度，也可切换为灰度（仅强度）。此选项只由 GPU 最后着色，不会重新计算瓦片。</p></article>
+        <article><h3>高倍率像素值</h3><p>关闭像素值会停止额外 DN 读取并隐藏文字，但像素网格仍保留，便于精确定位。网格颜色可即时修改并自动保存。</p></article>
+        <article><h3>Demosaic 数值</h3><p>Demosaic 视图可按设置显示原始 DN，或显示三行插值得到的 RGB 分量；它们不是屏幕上的 8-bit 着色值。</p></article>
+        <article><h3>缺失数据外观</h3><p>可选择深色棋盘、浅色棋盘或纯色。棋盘相位基于全局图像坐标，因此跨瓦片、缩放和拖动时保持连续。</p></article>
+      </div>
+      <aside class="help-callout"><strong>区分两类透明</strong><p>文件范围内无法读取的像素使用所选缺失数据外观；图像边界外仍保持透明。两者不会被混为同一种数据状态。</p></aside>`,
   },
   {
     id: "processing",
@@ -92,6 +120,37 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
         <article><h3>PNG 抓拍</h3><p>“当前画面”保留视野、底色和叠加层；“完整预览图”输出完整图像，不包含画布 UI，并自动选择合适的 LOD。</p></article>
       </div>
       <aside class="help-note"><strong>安全写入</strong><p>导出不能覆盖当前打开的源文件。写入会先创建同目录临时文件；取消或失败时不会替换已有目标文件。</p></aside>`,
+  },
+  {
+    id: "settings",
+    kicker: "个性化工作区",
+    title: "主题、语言与界面设置",
+    summary: "应用设置会自动保存；它们改善查看体验，但不会更改文件数据、RAW 描述符或导出结果。",
+    body: `
+      <div class="help-card-grid">
+        <article><h3>九套主题</h3><p>主题同时控制界面和画布背景。主题按钮只是菜单入口；在宽窗口中以双列显示，在窄窗口中自动收敛为单列。</p></article>
+        <article><h3>界面语言</h3><p>可选择跟随系统、English、简体中文、繁體中文、日本語、Español、Français 或 Deutsch。切换立即生效并自动保存。</p></article>
+        <article><h3>参数栏与字体</h3><p>参数栏可调整宽度并放到左侧或右侧；可在设置中调整界面字号。窗口过窄时请优先收窄参数栏或使用全屏。</p></article>
+        <article><h3>性能与动态效果</h3><p>设置可调整纹理缓存档位、滚轮速度、默认打开视图和减少动态效果。它们只影响界面行为和资源使用，不改变 RAW 语义。</p></article>
+      </div>
+      <aside class="help-note"><strong>手册语言</strong><p>当前手册正文处于中文审核阶段。其它界面语言下仍会显示中文正文，并在顶部明确提示翻译状态。</p></aside>`,
+  },
+  {
+    id: "shortcuts",
+    kicker: "快速操作",
+    title: "快捷键速查",
+    summary: "快捷键在未打开模态对话框时生效；F1 始终用于打开或聚焦使用手册。",
+    body: `
+      <div class="help-table-wrap"><table><thead><tr><th>类别</th><th>操作</th><th>快捷键</th></tr></thead><tbody>
+        <tr><td>帮助</td><td>打开或聚焦使用手册</td><td><kbd>F1</kbd></td></tr>
+        <tr><td>文件</td><td>打开 / 关闭 RAW 文件</td><td><kbd>Ctrl</kbd><kbd>O</kbd> / <kbd>Ctrl</kbd><kbd>W</kbd></td></tr>
+        <tr><td>视图</td><td>适应窗口 / 100% 实际像素 / 全屏</td><td><kbd>Ctrl</kbd><kbd>0</kbd> / <kbd>Ctrl</kbd><kbd>1</kbd> / <kbd>F11</kbd></td></tr>
+        <tr><td>检查</td><td>鼠标 ROI / 坐标 ROI / 定位像素 / 输入缩放</td><td><kbd>R</kbd> / <kbd>Shift</kbd><kbd>R</kbd> / <kbd>P</kbd> / <kbd>Z</kbd></td></tr>
+        <tr><td>统计与导出</td><td>图像统计 / 导出当前帧</td><td><kbd>Ctrl</kbd><kbd>I</kbd> / <kbd>Ctrl</kbd><kbd>E</kbd></td></tr>
+        <tr><td>抓拍</td><td>保存 / 复制当前画面；保存 / 复制完整预览</td><td><kbd>Ctrl</kbd><kbd>S</kbd> / <kbd>Ctrl</kbd><kbd>C</kbd>；<kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>S</kbd> / <kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>C</kbd></td></tr>
+        <tr><td>取消</td><td>取消正在框选、关闭菜单或诊断面板</td><td><kbd>Esc</kbd></td></tr>
+      </tbody></table></div>
+      <aside class="help-note"><strong>右键的范围</strong><p>主窗口画布右键保留“图像统计”和抓拍菜单；独立图像统计窗口与本使用手册不提供右键操作。</p></aside>`,
   },
   {
     id: "troubleshooting",

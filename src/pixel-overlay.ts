@@ -168,7 +168,7 @@ export class PixelValueOverlay {
     const fontSize = Math.min(12, Math.max(10, view.transform.zoom * 0.19));
     const lineHeight = fontSize + 2;
     const maxValue = this.maxValue(view);
-    this.context.font = `600 ${fontSize}px "Cascadia Mono", Consolas, monospace`;
+    this.context.font = `600 ${fontSize}px ui-monospace, monospace`;
     const widestText = widestPixelValueText(valueDisplay, maxValue);
     const requiredWidth = this.context.measureText(widestText).width + 10;
     const requiredHeight = (rgbRows ? lineHeight * 3 : lineHeight) + 10;
@@ -242,7 +242,7 @@ export class PixelValueOverlay {
   ): void {
     const cache = this.cache!;
     this.drawGrid(view, rect);
-    this.context.font = `600 ${layout.fontSize}px "Cascadia Mono", Consolas, monospace`;
+    this.context.font = `600 ${layout.fontSize}px ui-monospace, monospace`;
     this.context.textAlign = "center";
     this.context.textBaseline = "middle";
     this.context.lineJoin = "round";

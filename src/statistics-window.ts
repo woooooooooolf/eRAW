@@ -25,6 +25,7 @@ export class StatisticsWindowApp {
   private readonly appWindow = getCurrentWindow();
 
   constructor(root: HTMLElement) {
+    root.addEventListener("contextmenu", (event) => event.preventDefault());
     root.innerHTML = '<main id="statistics-window-panel" class="statistics-panel statistics-window-panel detached"></main>';
     this.panel = new StatisticsPanel(
       root.querySelector<HTMLElement>("#statistics-window-panel")!,

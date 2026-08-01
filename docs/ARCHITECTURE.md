@@ -26,6 +26,8 @@ flowchart LR
 
 Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予原生全屏、统计 WebviewWindow、文件对话框和写入图像剪贴板所需权限；F11 直接调用窗口 API，不通过 CSS 模拟或新增 Rust 命令。
 
+界面样式不打包或下载字体文件；正文和等宽内容分别使用 CSS 通用系统字体族，具体字形由用户系统与 WebView2 回退机制提供。
+
 ## 模块职责
 
 | 模块 | 主要职责 |
