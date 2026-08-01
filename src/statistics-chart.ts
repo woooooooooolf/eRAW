@@ -8,6 +8,7 @@ import {
   maximumHistogramDisplayCount,
   profileSeriesData,
   profileValueDomain,
+  shouldShowProfileMarkers,
   statisticsAxisRangesEqual,
   type HistogramDatum,
 } from "./statistics-chart-data";
@@ -39,6 +40,8 @@ interface ProfileRenderContext {
   chart: ChartInstance;
   groups: GroupStatistics[];
   profile: "rowProfile" | "columnProfile";
+  colors: Record<string, string>;
+  markerFill: string;
 }
 
 interface DataZoomEventItem {
@@ -143,6 +146,21 @@ function availableGroups(result: AnalysisResult): GroupStatistics[] {
     return [result.groups.find((group) => group.key === "Y") ?? result.groups[0]];
   }
   return result.groups;
+}
+
+function profileMarkerOption(
+  data: readonly (readonly [number, number])[],
+  range: StatisticsAxisRange,
+  plotWidth: number,
+  color: string,
+  fill: string,
+): object {
+  return {
+    showSymbol: shouldShowProfileMarkers(data, range, plotWidth),
+    symbol: "circle",
+    symbolSize: 4,
+    itemStyle: { color: fill, borderColor: color, borderWidth: 1.4 },
+  };
 }
 
 export class StatisticsCharts {
@@ -411,11 +429,17 @@ export class StatisticsCharts {
   private refreshProfileSeries(chartKey: "row" | "column", range: StatisticsAxisRange): void {
     const context = this.profileContexts.get(chartKey);
     if (!context || statisticsAxisRangesEqual(this.renderedProfileRanges.get(chartKey), range)) return;
+    const plotWidth = Math.max(1, context.chart.getWidth() - 116);
     context.chart.setOption({
-      series: context.groups.map((group) => ({
-        id: `${chartKey}-${group.key}`,
-        data: profileSeriesData(group[context.profile], "mean", range),
-      })),
+      series: context.groups.map((group) => {
+        const data = profileSeriesData(group[context.profile], "mean", range);
+        const color = context.colors[group.key] ?? context.colors.all;
+        return {
+          id: `${chartKey}-${group.key}`,
+          data,
+          ...profileMarkerOption(data, range, plotWidth, color, context.markerFill),
+        };
+      }),
     });
     this.renderedProfileRanges.set(chartKey, range);
   }
@@ -511,9 +535,11 @@ export class StatisticsCharts {
     const visible = new Set(state.visibleGroups ?? groups.map((group) => group.key));
     const chart = runtime.init(element, undefined, { renderer: "canvas" });
     this.registerChart(chartKey, chart, domains);
-    this.profileContexts.set(chartKey, { chart, groups, profile });
+    const markerFill = cssValue(getComputedStyle(this.root), "--modal-surface", "#17222b");
+    this.profileContexts.set(chartKey, { chart, groups, profile, colors, markerFill });
     const renderedRange = state.xRange ?? domains.x;
     this.renderedProfileRanges.set(chartKey, renderedRange);
+    const plotWidth = Math.max(1, chart.getWidth() - 116);
     const common = this.commonOption(colors);
     chart.setOption({
       ...common,
@@ -534,12 +560,13 @@ export class StatisticsCharts {
         const opacity = group.key === "all" ? 1 : 0.86;
         const type = group.key === "G" ? "dashed" : "solid";
         const color = colors[group.key] ?? colors.all;
+        const data = profileSeriesData(group[profile], "mean", renderedRange);
         return {
           id: `${chartKey}-${group.key}`,
           name: groupLabel(group.key),
           type: "line",
-          data: profileSeriesData(group[profile], "mean", renderedRange),
-          showSymbol: false,
+          data,
+          ...profileMarkerOption(data, renderedRange, plotWidth, color, markerFill),
           sampling: "lttb",
           connectNulls: true,
           lineStyle: {

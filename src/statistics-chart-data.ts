@@ -2,6 +2,8 @@ import type { GroupStatistics, ProfilePoint } from "./types";
 import type { StatisticsAxisRange } from "./statistics-view-state";
 
 export const MAX_PROFILE_RENDER_POINTS = 4_096;
+export const MAX_PROFILE_MARKER_POINTS = 512;
+export const MIN_PROFILE_MARKER_SPACING_PX = 5;
 
 type ProfileMetric = "mean" | "standardDeviation";
 
@@ -14,6 +16,19 @@ export function statisticsAxisRangesEqual(
   const tolerance = scale * 1e-9;
   return Math.abs(left.start - right.start) <= tolerance
     && Math.abs(left.end - right.end) <= tolerance;
+}
+
+export function shouldShowProfileMarkers(
+  data: readonly (readonly [number, number])[],
+  range: StatisticsAxisRange,
+  plotWidth: number,
+): boolean {
+  if (!data.length || data.length > MAX_PROFILE_MARKER_POINTS || plotWidth <= 0) return false;
+  if (data.length === 1) return true;
+  const coordinateSpan = data[data.length - 1][0] - data[0][0];
+  const visibleSpan = Math.max(1, range.end - range.start);
+  const averageSpacing = coordinateSpan / (data.length - 1);
+  return averageSpacing * plotWidth / visibleSpan >= MIN_PROFILE_MARKER_SPACING_PX;
 }
 
 export interface HistogramDatum {

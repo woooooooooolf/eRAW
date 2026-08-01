@@ -308,7 +308,7 @@ export class StatisticsPanel {
     const range = normalizeStatisticsRange(this.viewState.charts[key].xRange, domain.start, domain.end) ?? domain;
     return `<section class="statistics-section" data-stat-section="${key}" style="--statistics-chart-height:${Math.round(height)}px">
       <header>
-        <div class="statistics-section-heading"><h2>${chartTitle(key)}</h2><p>${t("statistics.chartInteraction")}</p></div>
+        <div class="statistics-section-heading"><h2>${chartTitle(key)}</h2><p>${t("statistics.chartInteraction")}${key === "histogram" ? "" : ` ${t("statistics.profileSamplingHint")}`}</p></div>
         <div class="statistics-curve-switches" aria-label="${t("statistics.curves")}">${groups.map((group) => `
           <button type="button" data-stat-group-chart="${key}" data-stat-group="${group.key}" aria-pressed="${visible.has(group.key)}" class="${visible.has(group.key) ? "active" : ""}">${groupLabel(group.key)}</button>`).join("")}</div>
         <button type="button" class="statistics-y-reset" data-stat-y-reset="${key}" title="${t("statistics.resetYAxis")}">Y↕</button>

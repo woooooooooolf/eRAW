@@ -138,6 +138,9 @@ test("curve toggles update only their chart and hover does not restyle curves", 
   assert.match(chartSource, /type: visible \? "legendSelect" : "legendUnSelect"/);
   assert.doesNotMatch(chartSource, /Math\.(?:min|max)\([^)]*\.\.\./);
   assert.match(chartSource, /profileSeriesData/);
+  assert.match(chartSource, /shouldShowProfileMarkers/);
+  assert.match(chartSource, /symbol:\s*"circle"/);
+  assert.match(chartSource, /itemStyle:\s*\{ color: fill, borderColor: color/);
   assert.doesNotMatch(chartSource, /focus:\s*"series"/);
   assert.doesNotMatch(chartSource, /width: width \+ 0\.7/);
   assert.equal(

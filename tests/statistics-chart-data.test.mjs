@@ -72,3 +72,15 @@ test("profile range equality ignores resize noise but detects a real zoom", () =
   assert.equal(chartData.statisticsAxisRangesEqual(current, { start: 1, end: 24_999 }), false);
   assert.equal(chartData.statisticsAxisRangesEqual(undefined, current), false);
 });
+
+test("profile markers appear only when real samples are sparse enough on screen", () => {
+  const dense = Array.from({ length: 501 }, (_, index) => [index * 2, index]);
+  assert.equal(chartData.shouldShowProfileMarkers(dense, { start: 0, end: 1000 }, 800), false);
+  const tooMany = Array.from({ length: 513 }, (_, index) => [index * 2, index]);
+  assert.equal(chartData.shouldShowProfileMarkers(tooMany, { start: 0, end: 1024 }, 3200), false);
+
+  const zoomed = Array.from({ length: 201 }, (_, index) => [index * 2, index]);
+  assert.equal(chartData.shouldShowProfileMarkers(zoomed, { start: 0, end: 400 }, 1100), true);
+  assert.equal(chartData.shouldShowProfileMarkers([[120, 10]], { start: 100, end: 140 }, 800), true);
+  assert.equal(chartData.shouldShowProfileMarkers([], { start: 0, end: 400 }, 800), false);
+});
