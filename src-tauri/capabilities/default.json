@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "eRAW 主窗口与图像统计窗口权限",
-  "windows": ["main", "statistics"],
+  "description": "eRAW 主窗口、图像统计和使用手册窗口权限",
+  "windows": ["main", "statistics", "help"],
   "permissions": [
     "core:default",
     "core:window:allow-create",

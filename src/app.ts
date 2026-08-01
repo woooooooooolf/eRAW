@@ -96,7 +96,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.4.5";
+const VERSION = "0.5.0";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -322,7 +322,10 @@ export class ErawApp {
     this.applySettings();
     this.setLanguage(this.settings.language);
     this.bindEvents();
-    if (isTauri()) void this.bindStatisticsWindowEvents();
+    if (isTauri()) {
+      void this.bindStatisticsWindowEvents();
+      void this.bindHelpWindowEvents();
+    }
     this.updateCfaDependentUi(false);
     this.updateDisplay();
     this.updateDocumentUi();
@@ -400,7 +403,7 @@ export class ErawApp {
             <div id="utility-control" class="utility-control">
               <button id="about-button" class="icon-button" title="帮助与关于" aria-label="帮助与关于" aria-haspopup="menu" aria-expanded="false">${icons.about}</button>
               <div id="utility-popover" class="utility-popover" role="menu" aria-label="帮助与关于" hidden>
-                <button type="button" role="menuitem" disabled><i>?</i><span><strong>帮助</strong><small>帮助中心将在后续版本提供</small></span><em>规划中</em></button>
+                <button id="help-menu-item" type="button" role="menuitem"><i>?</i><span><strong>帮助</strong><small>打开软件使用手册</small></span><b>›</b></button>
                 <button id="shortcuts-menu-item" type="button" role="menuitem"><i>⌨</i><span><strong>快捷键</strong><small>查看键盘与画布操作速查</small></span><b>›</b></button>
                 <button id="about-menu-item" type="button" role="menuitem"><i>i</i><span><strong>关于</strong><small>版本、实现者与开源组件</small></span><b>›</b></button>
               </div>
@@ -702,7 +705,6 @@ export class ErawApp {
     attribute("#theme-popover", "aria-label", "toolbar.themeSelect");
     texts("#utility-popover > button strong", ["toolbar.help", "toolbar.shortcuts", "toolbar.about"]);
     texts("#utility-popover > button small", ["toolbar.helpHint", "toolbar.shortcutsHint", "toolbar.aboutHint"]);
-    text("#utility-popover > button:first-child em", "common.planned");
 
     texts(".sidebar .section-title span", ["sidebar.imageFormat", "sidebar.processing", "sidebar.presentation", "sidebar.layout"]);
     field("descriptor-width", "sidebar.dimensions");
@@ -1100,6 +1102,10 @@ export class ErawApp {
     this.get("about-button").addEventListener("click", (event) => {
       event.stopPropagation();
       this.setUtilityMenuOpen(this.get("utility-popover").hidden);
+    });
+    this.get("help-menu-item").addEventListener("click", () => {
+      this.setUtilityMenuOpen(false);
+      void this.openHelpWindow();
     });
     this.get("shortcuts-menu-item").addEventListener("click", () => {
       this.setUtilityMenuOpen(false);
@@ -1715,6 +1721,7 @@ export class ErawApp {
     this.updateDocumentUi();
     this.updateZoomStatus(this.viewport.getZoom());
     this.syncStatisticsState();
+    void this.emitHelpState();
     this.setLanguageMenuOpen(false);
   }
 
@@ -1734,6 +1741,7 @@ export class ErawApp {
     this.persistSettings();
     this.applyTheme();
     this.syncStatisticsState();
+    void this.emitHelpState();
     this.setThemeMenuOpen(false);
   }
 
@@ -1891,6 +1899,51 @@ export class ErawApp {
     });
     await listen<string>("statistics:notify", (event) => {
       this.showToast(event.payload, "success");
+    });
+  }
+
+  private async bindHelpWindowEvents(): Promise<void> {
+    await listen("help:ready", () => {
+      void this.emitHelpState();
+    });
+  }
+
+  private async emitHelpState(): Promise<void> {
+    if (!isTauri()) return;
+    try {
+      await emitTo("help", "help:state", {
+        language: this.settings.language,
+        theme: this.settings.theme,
+      });
+    } catch {
+      // 帮助窗口可能尚未创建或尚未完成初始化；help:ready 会再次同步。
+    }
+  }
+
+  private async openHelpWindow(): Promise<void> {
+    if (!isTauri()) return;
+    const existing = await WebviewWindow.getByLabel("help");
+    if (existing) {
+      await existing.show();
+      await existing.setFocus();
+      await this.emitHelpState();
+      return;
+    }
+    const helpWindow = new WebviewWindow("help", {
+      url: "index.html?help=1",
+      title: `eRAW - ${t("helpWindow.title")}`,
+      width: 1120,
+      height: 780,
+      minWidth: 780,
+      minHeight: 560,
+      center: true,
+      resizable: true,
+    });
+    helpWindow.once("tauri://created", () => {
+      void this.emitHelpState();
+    });
+    helpWindow.once("tauri://error", (event) => {
+      this.reportRuntimeError(event.payload, undefined, 5000, "help-window");
     });
   }
 
@@ -2544,6 +2597,10 @@ export class ErawApp {
       this.setCanvasContextMenuOpen(false);
     }
     else if (event.key === "Escape" && this.root.querySelector(".app-shell")!.classList.contains("diagnostics-open")) { event.preventDefault(); this.setDiagnosticsOpen(false); }
+    else if (!event.ctrlKey && !event.altKey && !event.shiftKey && event.key === "F1") {
+      event.preventDefault();
+      void this.openHelpWindow();
+    }
     else if (this.shortcutTargetIsEditable(event) || this.root.querySelector("dialog[open]")) return;
     else if (!event.ctrlKey && !event.altKey && event.shiftKey && event.key.toLowerCase() === "r" && this.document?.layout.frameCount) {
       event.preventDefault();

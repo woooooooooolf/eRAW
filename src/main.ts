@@ -1,13 +1,17 @@
 import "./styles.css";
 import { ErawApp } from "./app";
 import { t } from "./i18n";
+import { HelpWindowApp } from "./help-window";
 import { StatisticsWindowApp } from "./statistics-window";
 
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error(t("error.rootMissing"));
 
 try {
-  if (new URLSearchParams(window.location.search).get("statistics") === "1") {
+  const page = new URLSearchParams(window.location.search);
+  if (page.get("help") === "1") {
+    new HelpWindowApp(root);
+  } else if (page.get("statistics") === "1") {
     new StatisticsWindowApp(root);
   } else {
     new ErawApp(root);
