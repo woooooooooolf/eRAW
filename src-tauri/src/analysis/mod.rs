@@ -3,7 +3,6 @@ use crate::raw::{
     cfa_site_with_phase, read_pixel,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -229,16 +228,13 @@ fn group_keys(cfa: CfaPattern) -> &'static [&'static str] {
     }
 }
 
-fn belongs_to_group(group: &str, site: CfaSite) -> bool {
-    match group {
-        "all" => true,
-        "Y" => site == CfaSite::Mono,
-        "R" => site == CfaSite::Red,
-        "G" => matches!(site, CfaSite::GreenRed | CfaSite::GreenBlue),
-        "Gr" => site == CfaSite::GreenRed,
-        "Gb" => site == CfaSite::GreenBlue,
-        "B" => site == CfaSite::Blue,
-        _ => false,
+fn group_indices(site: CfaSite) -> &'static [usize] {
+    match site {
+        CfaSite::Mono => &[0, 1],
+        CfaSite::Red => &[0, 1],
+        CfaSite::GreenRed => &[0, 2, 3],
+        CfaSite::GreenBlue => &[0, 2, 4],
+        CfaSite::Blue => &[0, 5],
     }
 }
 
@@ -292,23 +288,21 @@ pub fn analyze_image(
     let keys = group_keys(descriptor.cfa);
     let mut groups = keys
         .iter()
-        .map(|key| (*key, Accumulator::new(bin_count)))
-        .collect::<BTreeMap<_, _>>();
+        .map(|_| Accumulator::new(bin_count))
+        .collect::<Vec<_>>();
     let mut row_profiles = keys
         .iter()
-        .map(|key| (*key, vec![RunningMoments::default(); roi.height as usize]))
-        .collect::<BTreeMap<_, _>>();
+        .map(|_| vec![RunningMoments::default(); roi.height as usize])
+        .collect::<Vec<_>>();
     let mut column_profiles = keys
         .iter()
-        .map(|key| (*key, vec![RunningMoments::default(); roi.width as usize]))
-        .collect::<BTreeMap<_, _>>();
+        .map(|_| vec![RunningMoments::default(); roi.width as usize])
+        .collect::<Vec<_>>();
     let period = cfa_period(descriptor.cfa);
-    let mut atoms = (0..period)
-        .flat_map(|phase_y| {
-            (0..period)
-                .map(move |phase_x| ((phase_x as u8, phase_y as u8), Accumulator::new(bin_count)))
-        })
-        .collect::<BTreeMap<_, _>>();
+    let period_usize = period as usize;
+    let mut atoms = (0..period_usize * period_usize)
+        .map(|_| Accumulator::new(bin_count))
+        .collect::<Vec<_>>();
 
     for (row_index, y) in (roi.y..roi.y + roi.height).enumerate() {
         if row_index % 32 == 0 && !should_continue() {
@@ -324,15 +318,10 @@ pub fn analyze_image(
             );
             let atomic_position = cfa_atomic_position(descriptor, x, y);
             let value = read_pixel(data, descriptor, layout, request.frame, x, y);
-            for key in keys
-                .iter()
-                .copied()
-                .filter(|key| belongs_to_group(key, site))
-            {
-                let group = groups.get_mut(key).expect("known statistics group");
-                let row = &mut row_profiles.get_mut(key).expect("known row group")[row_index];
-                let column =
-                    &mut column_profiles.get_mut(key).expect("known column group")[column_index];
+            for &group_index in group_indices(site) {
+                let group = &mut groups[group_index];
+                let row = &mut row_profiles[group_index][row_index];
+                let column = &mut column_profiles[group_index][column_index];
                 group.expect();
                 row.expect();
                 column.expect();
@@ -342,9 +331,9 @@ pub fn analyze_image(
                     column.push(value);
                 }
             }
-            let atom = atoms
-                .get_mut(&atomic_position)
-                .expect("CFA atomic position is in the declared period");
+            let atom_index =
+                usize::from(atomic_position.0) * period_usize + usize::from(atomic_position.1);
+            let atom = &mut atoms[atom_index];
             atom.expect();
             if let Some(value) = value {
                 atom.push(value);
@@ -357,30 +346,32 @@ pub fn analyze_image(
 
     let group_results = keys
         .iter()
-        .map(|key| {
-            let accumulator = groups.remove(key).expect("known statistics group");
-            let rows = row_profiles.remove(key).expect("known row group");
-            let columns = column_profiles.remove(key).expect("known column group");
-            GroupStatistics {
-                key,
-                summary: accumulator.summary(),
-                histogram: accumulator.histogram,
-                row_profile: rows
-                    .iter()
-                    .enumerate()
-                    .map(|(index, moments)| profile_point(roi.y + index as u32, moments))
-                    .collect(),
-                column_profile: columns
-                    .iter()
-                    .enumerate()
-                    .map(|(index, moments)| profile_point(roi.x + index as u32, moments))
-                    .collect(),
-            }
+        .copied()
+        .zip(groups)
+        .zip(row_profiles)
+        .zip(column_profiles)
+        .map(|(((key, accumulator), rows), columns)| GroupStatistics {
+            key,
+            summary: accumulator.summary(),
+            histogram: accumulator.histogram,
+            row_profile: rows
+                .iter()
+                .enumerate()
+                .map(|(index, moments)| profile_point(roi.y + index as u32, moments))
+                .collect(),
+            column_profile: columns
+                .iter()
+                .enumerate()
+                .map(|(index, moments)| profile_point(roi.x + index as u32, moments))
+                .collect(),
         })
         .collect();
     let atomic_planes = atoms
         .into_iter()
-        .map(|((phase_x, phase_y), accumulator)| {
+        .enumerate()
+        .map(|(index, accumulator)| {
+            let phase_x = (index / period_usize) as u8;
+            let phase_y = (index % period_usize) as u8;
             let site = cfa_site_with_phase(
                 descriptor.cfa,
                 descriptor.cfa_phase_x,

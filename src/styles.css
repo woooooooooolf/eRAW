@@ -1255,6 +1255,7 @@ html[data-reduce-motion="true"] .empty-grid span::before { content: none; animat
 .statistics-curve-switches button.active { color: var(--cyan-bright); border-color: rgb(var(--accent-rgb) / .42); background: rgb(var(--accent-rgb) / .13); }
 .statistics-y-reset { flex: 0 0 auto; }
 .statistics-chart {
+  position: relative;
   display: block;
   width: 100%;
   height: var(--statistics-chart-height, 280px);
@@ -1264,6 +1265,8 @@ html[data-reduce-motion="true"] .empty-grid span::before { content: none; animat
   border-radius: 8px;
   background: color-mix(in srgb, var(--soft-fill) 44%, transparent);
 }
+.statistics-chart-placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: var(--dim); font-size: var(--font-xs); }
+.statistics-chart.failed { display: grid; place-items: center; padding: 18px; color: rgb(var(--danger-rgb)); font-size: var(--font-xs); line-height: 1.6; text-align: center; }
 .statistics-axis-range { display: grid; grid-template-columns: 76px minmax(24px, 1fr) 76px; align-items: center; gap: 8px; margin-top: 7px; padding: 0 3px; }
 .statistics-axis-range input { width: 76px; height: 25px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 5px; color: var(--text); background: var(--control-surface); font: 550 10px "Cascadia Mono", Consolas, monospace; }
 .statistics-axis-range span { height: 1px; background: linear-gradient(90deg, transparent, var(--border-strong) 12%, var(--border-strong) 88%, transparent); }

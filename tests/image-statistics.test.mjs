@@ -64,7 +64,9 @@ test("ROI selection keeps absolute coordinates and remains active for repeated r
 });
 
 test("QCFA analysis retains atomic planes while the UI consumes semantic groups", () => {
-  assert.match(rustSource, /let mut atoms = \(0\.\.period\)/);
+  assert.match(rustSource, /let mut atoms = \(0\.\.period_usize \* period_usize\)/);
+  assert.match(rustSource, /for &group_index in group_indices\(site\)/);
+  assert.match(rustSource, /usize::from\(atomic_position\.0\) \* period_usize/);
   assert.match(rustSource, /&\["all", "R", "G", "Gr", "Gb", "B"\]/);
   assert.match(rustSource, /AtomicPlaneStatistics/);
   assert.match(panelSource, /private availableGroups\(\): GroupStatistics\[\]/);
@@ -133,6 +135,8 @@ test("curve toggles update only their chart and hover does not restyle curves", 
   assert.match(groupToggle, /this\.charts\.setGroupVisible\(key, group, visible\)/);
   assert.doesNotMatch(groupToggle, /this\.render\(\)/);
   assert.match(chartSource, /type: visible \? "legendSelect" : "legendUnSelect"/);
+  assert.doesNotMatch(chartSource, /Math\.(?:min|max)\([^)]*\.\.\./);
+  assert.match(chartSource, /profileSeriesData/);
   assert.doesNotMatch(chartSource, /focus:\s*"series"/);
   assert.doesNotMatch(chartSource, /width: width \+ 0\.7/);
   assert.equal(

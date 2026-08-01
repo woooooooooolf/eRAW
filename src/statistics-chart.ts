@@ -2,8 +2,14 @@ import { t } from "./i18n";
 import type {
   AnalysisResult,
   GroupStatistics,
-  ProfilePoint,
 } from "./types";
+import {
+  histogramSeriesData,
+  maximumHistogramDisplayCount,
+  profileSeriesData,
+  profileValueDomain,
+  type HistogramDatum,
+} from "./statistics-chart-data";
 import {
   normalizeStatisticsRange,
   type StatisticsAxisRange,
@@ -14,14 +20,7 @@ import {
 type EChartsRuntime = typeof import("./statistics-chart-runtime")["echarts"];
 type ChartInstance = ReturnType<EChartsRuntime["init"]>;
 type ChartOption = Parameters<ChartInstance["setOption"]>[0];
-type ProfileMetric = "mean" | "standardDeviation";
 type StatisticsAxis = "x" | "y";
-
-interface HistogramDatum {
-  value: [number, number];
-  dnStart: number;
-  dnEnd: number;
-}
 
 interface TooltipSeriesParameter {
   marker?: string;
@@ -33,6 +32,12 @@ interface TooltipSeriesParameter {
 interface ChartDomains {
   x: StatisticsAxisRange;
   y: StatisticsAxisRange;
+}
+
+interface ProfileRenderContext {
+  chart: ChartInstance;
+  groups: GroupStatistics[];
+  profile: "rowProfile" | "columnProfile";
 }
 
 interface DataZoomEventItem {
@@ -48,6 +53,9 @@ interface DataZoomEvent extends DataZoomEventItem {
 
 interface StatisticsChartCallbacks {
   onRangeChange(chart: StatisticsChartKey, axis: StatisticsAxis, range: StatisticsAxisRange | null): void;
+  onRenderStart(): void;
+  onRenderError(chart: StatisticsChartKey, error: unknown): void;
+  onRenderRecovery(chart: StatisticsChartKey): void;
 }
 
 let runtimePromise: Promise<EChartsRuntime> | null = null;
@@ -98,19 +106,6 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 }).format(value);
 }
 
-function histogramData(histogram: number[], maximumPoints = 4096): HistogramDatum[] {
-  if (!histogram.length) return [];
-  const bucketSize = Math.max(1, Math.ceil(histogram.length / maximumPoints));
-  const data: HistogramDatum[] = [];
-  for (let start = 0; start < histogram.length; start += bucketSize) {
-    const end = Math.min(histogram.length - 1, start + bucketSize - 1);
-    let count = 0;
-    for (let index = start; index <= end; index += 1) count += histogram[index];
-    data.push({ value: [(start + end) / 2, count], dnStart: start, dnEnd: end });
-  }
-  return data;
-}
-
 function tooltipParameters(value: unknown): TooltipSeriesParameter[] {
   if (Array.isArray(value)) return value as TooltipSeriesParameter[];
   return value && typeof value === "object" ? [value as TooltipSeriesParameter] : [];
@@ -128,10 +123,6 @@ function histogramTooltip(parameters: unknown): string {
     return `${item.marker ?? ""}${item.seriesName ?? ""}: ${formatNumber(Number(value ?? 0))}`;
   });
   return [range, ...rows].join("<br/>");
-}
-
-function profileData(points: ProfilePoint[], metric: ProfileMetric): Array<[number, number | null]> {
-  return points.map((point) => [point.coordinate, point[metric]]);
 }
 
 function profileTooltip(parameters: unknown): string {
@@ -153,27 +144,14 @@ function availableGroups(result: AnalysisResult): GroupStatistics[] {
   return result.groups;
 }
 
-function profileDomain(groups: GroupStatistics[], axis: "rowProfile" | "columnProfile"): StatisticsAxisRange {
-  let start = Number.POSITIVE_INFINITY;
-  let end = Number.NEGATIVE_INFINITY;
-  for (const group of groups) {
-    for (const point of group[axis]) {
-      if (point.mean === null) continue;
-      start = Math.min(start, point.mean);
-      end = Math.max(end, point.mean);
-    }
-  }
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return { start: 0, end: 1 };
-  if (start === end) return { start: Math.max(0, start - 1), end: end + 1 };
-  const padding = Math.max(0.5, (end - start) * 0.04);
-  return { start: Math.max(0, start - padding), end: end + padding };
-}
-
 export class StatisticsCharts {
   private readonly root: HTMLElement;
   private readonly callbacks: StatisticsChartCallbacks;
   private readonly instances = new Map<StatisticsChartKey, ChartInstance>();
   private readonly domains = new Map<StatisticsChartKey, ChartDomains>();
+  private readonly profileContexts = new Map<"row" | "column", ProfileRenderContext>();
+  private readonly pendingProfileRanges = new Map<"row" | "column", StatisticsAxisRange>();
+  private profileRefreshFrame = 0;
   private renderRevision = 0;
 
   constructor(root: HTMLElement, callbacks: StatisticsChartCallbacks) {
@@ -184,11 +162,18 @@ export class StatisticsCharts {
   render(result: AnalysisResult, viewState: StatisticsViewState): void {
     this.dispose();
     const revision = ++this.renderRevision;
+    this.callbacks.onRenderStart();
     void this.renderLoaded(revision, result, viewState);
   }
 
   private async renderLoaded(revision: number, result: AnalysisResult, viewState: StatisticsViewState): Promise<void> {
-    const runtime = await loadECharts();
+    let runtime: EChartsRuntime;
+    try {
+      runtime = await loadECharts();
+    } catch (error) {
+      if (revision === this.renderRevision) this.renderAllFailures(error);
+      return;
+    }
     if (revision !== this.renderRevision) return;
     const groups = availableGroups(result);
     const histogramElement = this.root.querySelector<HTMLElement>("[data-stat-chart='histogram']");
@@ -197,9 +182,43 @@ export class StatisticsCharts {
     for (const element of [histogramElement, rowElement, columnElement]) {
       if (element) this.releaseUnmodifiedWheel(element);
     }
-    if (histogramElement) this.createHistogram(runtime, histogramElement, result, groups, viewState);
-    if (rowElement) this.createProfile(runtime, rowElement, "row", groups, "rowProfile", viewState);
-    if (columnElement) this.createProfile(runtime, columnElement, "column", groups, "columnProfile", viewState);
+    const charts: Array<[StatisticsChartKey, HTMLElement | null, () => void]> = [
+      ["histogram", histogramElement, () => histogramElement && this.createHistogram(runtime, histogramElement, result, groups, viewState)],
+      ["row", rowElement, () => rowElement && this.createProfile(runtime, rowElement, "row", groups, "rowProfile", viewState, result.snapshot.roi)],
+      ["column", columnElement, () => columnElement && this.createProfile(runtime, columnElement, "column", groups, "columnProfile", viewState, result.snapshot.roi)],
+    ];
+    for (const [index, [chartKey, element, create]] of charts.entries()) {
+      if (revision !== this.renderRevision) return;
+      if (element) this.renderChartSafely(chartKey, element, create);
+      if (index < charts.length - 1) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
+    }
+  }
+
+  private renderChartSafely(chartKey: StatisticsChartKey, element: HTMLElement, create: () => void): void {
+    element.classList.remove("failed");
+    element.textContent = "";
+    try {
+      create();
+      this.callbacks.onRenderRecovery(chartKey);
+    } catch (error) {
+      this.instances.get(chartKey)?.dispose();
+      this.instances.delete(chartKey);
+      this.domains.delete(chartKey);
+      if (chartKey !== "histogram") this.profileContexts.delete(chartKey);
+      element.classList.add("failed");
+      const detail = error instanceof Error ? error.message : String(error);
+      element.textContent = t("statistics.chartRenderFailed", { detail });
+      this.callbacks.onRenderError(chartKey, error);
+    }
+  }
+
+  private renderAllFailures(error: unknown): void {
+    for (const chartKey of ["histogram", "row", "column"] as const) {
+      const element = this.root.querySelector<HTMLElement>(`[data-stat-chart="${chartKey}"]`);
+      if (element) this.renderChartSafely(chartKey, element, () => { throw error; });
+    }
   }
 
   private releaseUnmodifiedWheel(element: HTMLElement): void {
@@ -223,6 +242,7 @@ export class StatisticsCharts {
       : { type: "dataZoom", dataZoomId: `${chartKey}-x-slider`, start: 0, end: 100 });
     this.callbacks.onRangeChange(chartKey, "x", normalized);
     this.updateRangeInputs(chartKey, normalized ?? domain);
+    if (chartKey !== "histogram") this.scheduleProfileRefresh(chartKey, normalized ?? domain);
   }
 
   resetYRange(chartKey: StatisticsChartKey): void {
@@ -243,6 +263,10 @@ export class StatisticsCharts {
 
   dispose(): void {
     this.renderRevision += 1;
+    if (this.profileRefreshFrame) cancelAnimationFrame(this.profileRefreshFrame);
+    this.profileRefreshFrame = 0;
+    this.pendingProfileRanges.clear();
+    this.profileContexts.clear();
     this.instances.forEach((instance) => instance.dispose());
     this.instances.clear();
     this.domains.clear();
@@ -362,8 +386,34 @@ export class StatisticsCharts {
       const end = domain.start + (domain.end - domain.start) * Number(item.end) / 100;
       const normalized = normalizeStatisticsRange({ start, end }, domain.start, domain.end);
       this.callbacks.onRangeChange(chartKey, axis, normalized);
-      if (axis === "x") this.updateRangeInputs(chartKey, normalized ?? domain);
+      if (axis === "x") {
+        this.updateRangeInputs(chartKey, normalized ?? domain);
+        if (chartKey !== "histogram") this.scheduleProfileRefresh(chartKey, normalized ?? domain);
+      }
     }
+  }
+
+  private scheduleProfileRefresh(chartKey: "row" | "column", range: StatisticsAxisRange): void {
+    this.pendingProfileRanges.set(chartKey, range);
+    if (this.profileRefreshFrame) return;
+    this.profileRefreshFrame = requestAnimationFrame(() => {
+      this.profileRefreshFrame = 0;
+      for (const [key, pendingRange] of this.pendingProfileRanges) {
+        this.refreshProfileSeries(key, pendingRange);
+      }
+      this.pendingProfileRanges.clear();
+    });
+  }
+
+  private refreshProfileSeries(chartKey: "row" | "column", range: StatisticsAxisRange): void {
+    const context = this.profileContexts.get(chartKey);
+    if (!context) return;
+    context.chart.setOption({
+      series: context.groups.map((group) => ({
+        id: `${chartKey}-${group.key}`,
+        data: profileSeriesData(group[context.profile], "mean", range),
+      })),
+    });
   }
 
   private updateRangeInputs(chartKey: StatisticsChartKey, range: StatisticsAxisRange): void {
@@ -383,7 +433,8 @@ export class StatisticsCharts {
     const chartKey: StatisticsChartKey = "histogram";
     const colors = groupColors(this.root);
     const maximum = 2 ** result.snapshot.bitDepth - 1;
-    const yMaximum = Math.max(1, ...groups.flatMap((group) => group.histogram));
+    const renderedGroups = groups.map((group) => histogramSeriesData(group.histogram));
+    const yMaximum = maximumHistogramDisplayCount(renderedGroups);
     const domains = { x: { start: 0, end: maximum }, y: { start: 0, end: yMaximum } };
     const state = viewState.charts[chartKey];
     state.xRange = normalizeStatisticsRange(state.xRange, domains.x.start, domains.x.end);
@@ -409,15 +460,16 @@ export class StatisticsCharts {
         },
       },
       yAxis: { ...(common.yAxis as object), name: t("statistics.count"), min: 0, max: yMaximum },
-      series: groups.map((group) => {
+      series: groups.map((group, index) => {
         const width = group.key === "all" ? 2.4 : group.key === "G" ? 2 : 1.35;
         const opacity = group.key === "all" ? 1 : 0.86;
         const type = group.key === "G" ? "dashed" : "solid";
         const color = colors[group.key] ?? colors.all;
         return {
+          id: `${chartKey}-${group.key}`,
           name: groupLabel(group.key),
           type: "line",
-          data: histogramData(group.histogram),
+          data: renderedGroups[index],
           showSymbol: false,
           sampling: "lttb",
           connectNulls: false,
@@ -442,20 +494,20 @@ export class StatisticsCharts {
     groups: GroupStatistics[],
     profile: "rowProfile" | "columnProfile",
     viewState: StatisticsViewState,
+    roi: AnalysisResult["snapshot"]["roi"],
   ): void {
     const colors = groupColors(this.root);
-    const coordinates = groups.flatMap((group) => group[profile].map((point) => point.coordinate));
-    const xDomain = {
-      start: Math.min(...coordinates),
-      end: Math.max(...coordinates),
-    };
-    const domains = { x: xDomain, y: profileDomain(groups, profile) };
+    const xDomain = chartKey === "row"
+      ? { start: roi.y, end: roi.y + roi.height - 1 }
+      : { start: roi.x, end: roi.x + roi.width - 1 };
+    const domains = { x: xDomain, y: profileValueDomain(groups, profile) };
     const state = viewState.charts[chartKey];
     state.xRange = normalizeStatisticsRange(state.xRange, domains.x.start, domains.x.end);
     state.yRange = normalizeStatisticsRange(state.yRange, domains.y.start, domains.y.end);
     const visible = new Set(state.visibleGroups ?? groups.map((group) => group.key));
     const chart = runtime.init(element, undefined, { renderer: "canvas" });
     this.registerChart(chartKey, chart, domains);
+    this.profileContexts.set(chartKey, { chart, groups, profile });
     const common = this.commonOption(colors);
     chart.setOption({
       ...common,
@@ -477,9 +529,10 @@ export class StatisticsCharts {
         const type = group.key === "G" ? "dashed" : "solid";
         const color = colors[group.key] ?? colors.all;
         return {
+          id: `${chartKey}-${group.key}`,
           name: groupLabel(group.key),
           type: "line",
-          data: profileData(group[profile], "mean"),
+          data: profileSeriesData(group[profile], "mean", state.xRange ?? domains.x),
           showSymbol: false,
           sampling: "lttb",
           connectNulls: true,

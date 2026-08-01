@@ -61,6 +61,8 @@ const CATALOG = {
   "statistics.noData": message("No statistics available", "暂无统计结果", "暫無統計結果", "統計結果はありません", "No hay estadísticas", "Aucune statistique", "Keine Statistik verfügbar"),
   "statistics.openFileHint": message("Open a RAW image to view L0 CFA DN statistics", "打开 RAW 图像后可查看 L0 CFA DN 统计", "開啟 RAW 影像後可檢視 L0 CFA DN 統計", "RAW 画像を開くと L0 CFA DN 統計を表示できます", "Abra una imagen RAW para ver las estadísticas DN CFA L0", "Ouvrez une image RAW pour afficher les statistiques DN CFA L0", "Öffnen Sie ein RAW-Bild für L0-CFA-DN-Statistiken"),
   "statistics.calculating": message("Calculating L0 CFA DN statistics…", "正在计算 L0 CFA DN 统计…", "正在計算 L0 CFA DN 統計…", "L0 CFA DN 統計を計算中…", "Calculando estadísticas DN CFA L0…", "Calcul des statistiques DN CFA L0…", "L0-CFA-DN-Statistik wird berechnet…"),
+  "statistics.preparingChart": message("Preparing chart…", "正在准备图表…", "正在準備圖表…", "グラフを準備中…", "Preparando gráfico…", "Préparation du graphique…", "Diagramm wird vorbereitet…"),
+  "statistics.chartRenderFailed": message("Unable to render chart: {detail}", "无法绘制图表：{detail}", "無法繪製圖表：{detail}", "グラフを描画できません：{detail}", "No se puede representar el gráfico: {detail}", "Impossible d’afficher le graphique : {detail}", "Diagramm kann nicht dargestellt werden: {detail}"),
   "statistics.canvasUnavailable": message("Canvas 2D is unavailable", "Canvas 2D 不可用", "Canvas 2D 無法使用", "Canvas 2D を利用できません", "Canvas 2D no está disponible", "Canvas 2D n’est pas disponible", "Canvas 2D ist nicht verfügbar"),
   "statistics.resetView": message("Reset view", "重置视图", "重設檢視", "表示をリセット", "Restablecer vista", "Réinitialiser la vue", "Ansicht zurücksetzen"),
   "statistics.detach": message("Detach", "摘出", "分離", "別ウィンドウへ", "Separar", "Détacher", "Abkoppeln"),

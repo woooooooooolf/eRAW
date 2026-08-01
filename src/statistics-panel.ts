@@ -49,6 +49,8 @@ interface StatisticsPanelOptions {
   detached: boolean;
   layout?: StatisticsLayout;
   onAction(action: StatisticsPanelAction): void;
+  onChartError?(error: unknown): void;
+  onChartRecovery?(): void;
 }
 
 function escapeHtml(value: string): string {
@@ -114,6 +116,7 @@ export class StatisticsPanel {
   private resizeStartY = 0;
   private resizeStartHeight = 0;
   private appliedViewResetRevision = 0;
+  private readonly chartFailures = new Set<StatisticsChartKey>();
 
   constructor(root: HTMLElement, options: StatisticsPanelOptions) {
     this.root = root;
@@ -124,6 +127,18 @@ export class StatisticsPanel {
       onRangeChange: (chart, axis, range) => {
         this.viewState.charts[chart][axis === "x" ? "xRange" : "yRange"] = range;
         saveStatisticsViewState(this.viewState);
+      },
+      onRenderStart: () => {
+        this.chartFailures.clear();
+        this.options.onChartRecovery?.();
+      },
+      onRenderError: (chart, error) => {
+        this.chartFailures.add(chart);
+        this.options.onChartError?.(error);
+      },
+      onRenderRecovery: (chart) => {
+        this.chartFailures.delete(chart);
+        if (!this.chartFailures.size) this.options.onChartRecovery?.();
       },
     });
     this.resizeObserver = new ResizeObserver(() => this.charts.resize());
@@ -298,7 +313,7 @@ export class StatisticsPanel {
           <button type="button" data-stat-group-chart="${key}" data-stat-group="${group.key}" aria-pressed="${visible.has(group.key)}" class="${visible.has(group.key) ? "active" : ""}">${groupLabel(group.key)}</button>`).join("")}</div>
         <button type="button" class="statistics-y-reset" data-stat-y-reset="${key}" title="${t("statistics.resetYAxis")}">Y↕</button>
       </header>
-      <div class="statistics-chart" data-stat-chart="${key}" role="img" aria-label="${chartTitle(key)}"></div>
+      <div class="statistics-chart" data-stat-chart="${key}" role="img" aria-label="${chartTitle(key)}"><span class="statistics-chart-placeholder">${t("statistics.preparingChart")}</span></div>
       <div class="statistics-axis-range" aria-label="${t("statistics.visibleRange")}">
         <input type="number" step="1" data-stat-range-chart="${key}" data-stat-range-edge="start" value="${Math.round(range.start)}" aria-label="${t("statistics.rangeStart")}"/>
         <span aria-hidden="true"></span>

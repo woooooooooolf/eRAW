@@ -96,7 +96,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.4.3";
+const VERSION = "0.4.4";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -313,6 +313,8 @@ export class ErawApp {
       detached: false,
       layout: this.statisticsDockPlacement,
       onAction: (action) => this.onStatisticsAction(action),
+      onChartError: (error) => this.reportRuntimeError(error, "statistics.chartRenderFailed", 5000, "statistics-chart"),
+      onChartRecovery: () => this.clearRuntimeDiagnostic("statistics-chart"),
     });
     this.statisticsPanel.setActive(false);
     this.get<HTMLInputElement>("processing-same-color-reconstruction").checked =
