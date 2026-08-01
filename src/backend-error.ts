@@ -20,6 +20,7 @@ const ERROR_MESSAGES: Record<string, MessageKey> = {
   analysis_invalid_roi: "backend.analysisInvalidRoi",
   analysis_invalid_frame: "backend.analysisInvalidFrame",
   export_task_failed: "backend.exportTaskFailed",
+  export_cancelled: "backend.exportCancelled",
   backend_operation_failed: "backend.operationFailed",
   export_snapshot_stale: "backend.exportSnapshotStale",
   export_overwrites_source: "backend.exportOverwritesSource",

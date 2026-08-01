@@ -4,6 +4,7 @@ import test from "node:test";
 import ts from "typescript";
 
 const source = await readFile(new URL("../src/i18n.ts", import.meta.url), "utf8");
+const appSource = await readFile(new URL("../src/app.ts", import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -80,4 +81,20 @@ test("statistics terminology follows each interface language", () => {
       expected,
     );
   }
+});
+
+test("static interface localization uses explicit message keys", () => {
+  assert.doesNotMatch(source, /keyByLocalizedText|translatedTextKey/);
+  assert.match(source, /data-i18n-aria-label/);
+  assert.match(appSource, /bindStaticLocalizationKeys\(\)/);
+  assert.match(appSource, /dataset\.i18n = key/);
+  assert.match(appSource, /attribute\("#render-status", "help", "runtime\.renderInitialHelp"\)/);
+});
+
+test("menus and parameter help expose keyboard navigation", () => {
+  assert.match(appSource, /bindMenuKeyboard\("language-popover"/);
+  assert.match(appSource, /event\.key === "ArrowDown"/);
+  assert.match(appSource, /event\.key === "Home"/);
+  assert.match(appSource, /trigger\?\.focus/);
+  assert.match(appSource, /target\.addEventListener\("focus", showAtTarget\)/);
 });

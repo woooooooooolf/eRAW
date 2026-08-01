@@ -471,6 +471,7 @@ button {
 }
 
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px solid var(--cyan); outline-offset: 1px; }
+.field-label[tabindex]:focus-visible { outline: 1px solid var(--cyan); outline-offset: 3px; border-radius: 3px; }
 button:disabled { cursor: default; opacity: .36; }
 
 .tool-button {
@@ -1362,6 +1363,9 @@ html[data-reduce-motion="true"] .empty-grid span::before { content: none; animat
 .export-message { margin: 15px 0 0; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 7px; color: var(--text); background: var(--soft-hover); font-size: var(--font-sm); line-height: 1.5; }
 .export-message.error { border-color: rgba(221, 83, 104, .3); color: #ef9aa7; background: rgba(144, 30, 52, .1); }
 .export-message.warning { border-color: rgba(221, 162, 71, .28); color: #ddb36e; background: rgba(135, 87, 22, .09); }
+.export-progress { display: block; width: 100%; height: 6px; margin: 8px 0 0; border: 0; border-radius: 999px; overflow: hidden; accent-color: var(--cyan); }
+.export-progress::-webkit-progress-bar { background: var(--control-bg); }
+.export-progress::-webkit-progress-value { background: linear-gradient(90deg, var(--cyan), var(--cyan-bright)); }
 .export-source { margin-top: 15px; padding: 10px 12px; border: 1px solid rgba(94, 151, 181, .13); border-radius: 7px; background: rgba(47, 94, 119, .045); }
 .export-source > div { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
 .export-source span { color: var(--dim); font-size: var(--font-xs); }

@@ -161,6 +161,9 @@ test("ROI is a main-window tool with inclusive coordinate entry and a high-contr
   assert.match(appSource, /id="roi-mouse-button"/);
   assert.match(appSource, /id="roi-coordinates-button"/);
   assert.ok(appSource.indexOf('id="roi-mouse-button"') < appSource.indexOf('id="fit-button"'));
+  assert.match(appSource, /attribute\("#roi-mouse-button", "aria-label", "roi\.mouse"\)/);
+  assert.match(appSource, /attribute\("#roi-coordinates-button", "aria-label", "roi\.coordinates"\)/);
+  assert.match(appSource, /attribute\("#statistics-resizer", "aria-label", "statistics\.resizePanel"\)/);
   assert.match(appSource, /class="toolbar-separator"/);
   assert.match(appSource, /private roiSource: "mouse" \| "coordinates" \| null/);
   assert.match(appSource, /if \(this\.roiSource === "mouse"\) this\.clearRoi\(\)/);

@@ -42,3 +42,11 @@ test("closing a document clears viewport-owned resources", () => {
   assert.match(body, /this\.clearTextures\(\)/);
   assert.match(body, /this\.callbacks\.onRenderStats\("L0", 0, 0/);
 });
+
+test("the viewport restores WebGL resources after context loss", () => {
+  assert.match(viewportSource, /"webglcontextlost"/);
+  assert.match(viewportSource, /event\.preventDefault\(\)/);
+  assert.match(viewportSource, /"webglcontextrestored"/);
+  assert.match(viewportSource, /this\.initializeGl\(\)/);
+  assert.match(viewportSource, /onDiagnosticClear\("webgl"\)/);
+});

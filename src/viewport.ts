@@ -74,8 +74,11 @@ export interface ViewportCallbacks {
   onSampleChange(sample: ImagePoint | null): void;
   onRenderStats(levelLabel: string, loaded: number, pending: number, timing: TileTimingStats): void;
   onSelectionChange(selection: ImageRect | null): void;
-  onError(error: unknown, messageKey: MessageKey): void;
+  onError(error: unknown, messageKey: MessageKey, scope: ViewportDiagnosticScope): void;
+  onDiagnosticClear(scope: ViewportDiagnosticScope): void;
 }
+
+export type ViewportDiagnosticScope = "render" | "pixel" | "webgl";
 
 const vertexShaderSource = `#version 300 es
 in vec2 a_position;
@@ -166,15 +169,15 @@ export class RawViewport {
   private readonly pixelValueOverlay: PixelValueOverlay;
   private readonly gl: WebGL2RenderingContext;
   private readonly callbacks: ViewportCallbacks;
-  private readonly program: WebGLProgram;
-  private readonly rectLocation: WebGLUniformLocation;
-  private readonly viewportLocation: WebGLUniformLocation;
-  private readonly cameraLocation: WebGLUniformLocation;
-  private readonly zoomLocation: WebGLUniformLocation;
-  private readonly opacityLocation: WebGLUniformLocation;
-  private readonly channelTintLocation: WebGLUniformLocation;
-  private readonly missingPatternLocation: WebGLUniformLocation;
-  private readonly missingColorLocation: WebGLUniformLocation;
+  private program!: WebGLProgram;
+  private rectLocation!: WebGLUniformLocation;
+  private viewportLocation!: WebGLUniformLocation;
+  private cameraLocation!: WebGLUniformLocation;
+  private zoomLocation!: WebGLUniformLocation;
+  private opacityLocation!: WebGLUniformLocation;
+  private channelTintLocation!: WebGLUniformLocation;
+  private missingPatternLocation!: WebGLUniformLocation;
+  private missingColorLocation!: WebGLUniformLocation;
   private readonly horizontalScrollbar: HTMLElement;
   private readonly horizontalThumb: HTMLElement;
   private readonly verticalScrollbar: HTMLElement;
@@ -219,6 +222,7 @@ export class RawViewport {
     color: "#808080",
   };
   private animationFrame = 0;
+  private contextLost = false;
   private lastSampleKey = "";
   private renderCounter = 0;
   private renderRevision = 1;
@@ -244,22 +248,14 @@ export class RawViewport {
     this.pixelValueOverlay = new PixelValueOverlay(
       this.pixelCanvas,
       {
-        onError: (error, messageKey) => this.callbacks.onError(error, messageKey),
+        onError: (error, messageKey) => this.callbacks.onError(error, messageKey, "pixel"),
+        onRecovery: () => this.callbacks.onDiagnosticClear("pixel"),
         requestDraw: () => this.requestDraw(),
       },
     );
     const gl = this.canvas.getContext("webgl2", { alpha: true, antialias: false, premultipliedAlpha: false });
     if (!gl) throw new Error(t("error.webglUnsupported"));
     this.gl = gl;
-    this.program = createProgram(gl);
-    this.rectLocation = this.requireUniform("u_rect");
-    this.viewportLocation = this.requireUniform("u_viewport");
-    this.cameraLocation = this.requireUniform("u_camera");
-    this.zoomLocation = this.requireUniform("u_zoom");
-    this.opacityLocation = this.requireUniform("u_opacity");
-    this.channelTintLocation = this.requireUniform("u_channel_tint");
-    this.missingPatternLocation = this.requireUniform("u_missing_pattern");
-    this.missingColorLocation = this.requireUniform("u_missing_color");
     this.horizontalScrollbar = container.querySelector<HTMLElement>(".image-scrollbar.horizontal")!;
     this.horizontalThumb = this.horizontalScrollbar.querySelector<HTMLElement>(".scroll-thumb")!;
     this.verticalScrollbar = container.querySelector<HTMLElement>(".image-scrollbar.vertical")!;
@@ -276,15 +272,25 @@ export class RawViewport {
     this.resize();
   }
 
-  private requireUniform(name: string): WebGLUniformLocation {
-    const location = this.gl.getUniformLocation(this.program, name);
+  private requireUniform(program: WebGLProgram, name: string): WebGLUniformLocation {
+    const location = this.gl.getUniformLocation(program, name);
     if (!location) throw new Error(t("error.uniformUnavailable", { name }));
     return location;
   }
 
   private initializeGl(): void {
     const { gl } = this;
+    this.program = createProgram(gl);
+    this.rectLocation = this.requireUniform(this.program, "u_rect");
+    this.viewportLocation = this.requireUniform(this.program, "u_viewport");
+    this.cameraLocation = this.requireUniform(this.program, "u_camera");
+    this.zoomLocation = this.requireUniform(this.program, "u_zoom");
+    this.opacityLocation = this.requireUniform(this.program, "u_opacity");
+    this.channelTintLocation = this.requireUniform(this.program, "u_channel_tint");
+    this.missingPatternLocation = this.requireUniform(this.program, "u_missing_pattern");
+    this.missingColorLocation = this.requireUniform(this.program, "u_missing_color");
     const buffer = gl.createBuffer();
+    if (!buffer) throw new Error(t("error.bufferAllocation"));
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
     const location = gl.getAttribLocation(this.program, "a_position");
@@ -297,6 +303,8 @@ export class RawViewport {
   }
 
   private bindEvents(): void {
+    this.canvas.addEventListener("webglcontextlost", (event) => this.onContextLost(event as WebGLContextEvent));
+    this.canvas.addEventListener("webglcontextrestored", () => this.onContextRestored());
     this.canvas.addEventListener("wheel", (event) => this.onWheel(event), { passive: false });
     this.canvas.addEventListener("pointerdown", (event) => this.onPointerDown(event));
     this.canvas.addEventListener("pointermove", (event) => this.onPointerMove(event));
@@ -605,6 +613,33 @@ export class RawViewport {
     this.interactionMode = mode;
     this.dragging = false;
     this.canvas.classList.remove("dragging");
+  }
+
+  private onContextLost(event: WebGLContextEvent): void {
+    event.preventDefault();
+    this.contextLost = true;
+    if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
+    this.animationFrame = 0;
+    this.textures.clear();
+    this.inFlight.clear();
+    this.failedTiles.clear();
+    this.failureReported = false;
+    this.advanceRenderRevision();
+    this.pixelValueOverlay.invalidate();
+    this.callbacks.onDiagnosticClear("render");
+    this.callbacks.onError(new Error(t("runtime.webglContextLost")), "runtime.webglContextLost", "webgl");
+  }
+
+  private onContextRestored(): void {
+    try {
+      this.initializeGl();
+      this.contextLost = false;
+      this.callbacks.onDiagnosticClear("webgl");
+      this.resize();
+      this.requestDraw();
+    } catch (error) {
+      this.callbacks.onError(error, "runtime.webglRestoreFailed", "webgl");
+    }
   }
 
   getInteractionMode(): "pan" | "select" {
@@ -953,7 +988,7 @@ export class RawViewport {
   }
 
   private requestDraw(): void {
-    if (this.animationFrame) return;
+    if (this.contextLost || this.animationFrame) return;
     this.animationFrame = requestAnimationFrame(() => {
       this.animationFrame = 0;
       this.draw();
@@ -1037,6 +1072,7 @@ export class RawViewport {
   }
 
   private draw(): void {
+    if (this.contextLost) return;
     const { gl } = this;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clearColor(0, 0, 0, 0);
@@ -1173,7 +1209,7 @@ export class RawViewport {
         this.failedTiles.add(key);
         if (!this.failureReported) {
           this.failureReported = true;
-          this.callbacks.onError(error, "runtime.renderFailed");
+          this.callbacks.onError(error, "runtime.renderFailed", "render");
         }
       }
     }).finally(() => {
@@ -1220,13 +1256,16 @@ export class RawViewport {
   }
 
   private clearTextures(): void {
-    for (const entry of this.textures.values()) this.gl.deleteTexture(entry.texture);
+    if (!this.contextLost) {
+      for (const entry of this.textures.values()) this.gl.deleteTexture(entry.texture);
+    }
     this.textures.clear();
     this.advanceRenderRevision();
     this.lodPlanKey = "";
     this.structuralLodLevel = null;
     this.failedTiles.clear();
     this.failureReported = false;
+    this.callbacks.onDiagnosticClear("render");
     this.pixelValueOverlay.invalidate();
   }
 

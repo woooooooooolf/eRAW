@@ -55,6 +55,7 @@ export class PixelValueOverlay {
   private readonly canvas: HTMLCanvasElement;
   private readonly context: CanvasRenderingContext2D;
   private readonly onError: (error: unknown, messageKey: MessageKey) => void;
+  private readonly onRecovery: () => void;
   private readonly requestDraw: () => void;
   private enabled = true;
   private gridColor = DEFAULT_PIXEL_GRID_COLOR;
@@ -68,13 +69,18 @@ export class PixelValueOverlay {
 
   constructor(
     canvas: HTMLCanvasElement,
-    callbacks: { onError(error: unknown, messageKey: MessageKey): void; requestDraw(): void },
+    callbacks: {
+      onError(error: unknown, messageKey: MessageKey): void;
+      onRecovery?(): void;
+      requestDraw(): void;
+    },
   ) {
     this.canvas = canvas;
     const context = canvas.getContext("2d");
     if (!context) throw new Error(t("error.pixelCanvas"));
     this.context = context;
     this.onError = callbacks.onError;
+    this.onRecovery = callbacks.onRecovery ?? (() => {});
     this.requestDraw = callbacks.requestDraw;
   }
 
@@ -117,6 +123,7 @@ export class PixelValueOverlay {
     this.inFlight = "";
     this.failedKey = "";
     this.currentView = null;
+    this.onRecovery();
     if (resetVisibility) this.visible = false;
     this.clear();
   }
@@ -327,6 +334,7 @@ export class PixelValueOverlay {
       }
       this.cache = { key: baseKey, ...requestRect, bytes };
       this.failedKey = "";
+      this.onRecovery();
     }).catch((error: unknown) => {
       const code = backendErrorCode(error);
       if (code !== "stale_generation" && revision === this.revision) {

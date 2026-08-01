@@ -7,12 +7,14 @@ function dataUrl(source) {
   return `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
 }
 
-const [captureSource, appSource, apiSource, outputSource, capabilitySource] = await Promise.all([
+const [captureSource, appSource, apiSource, outputSource, capabilitySource, exportDialogSource, commandsSource] = await Promise.all([
   readFile(new URL("../src/image-capture.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/app.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/api.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/image-output.ts", import.meta.url), "utf8"),
   readFile(new URL("../src-tauri/capabilities/default.json", import.meta.url), "utf8"),
+  readFile(new URL("../src/export-dialog.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src-tauri/src/commands.rs", import.meta.url), "utf8"),
 ]);
 const { outputText } = ts.transpileModule(captureSource, {
   compilerOptions: {
@@ -107,4 +109,14 @@ test("save and clipboard actions consume the same captured canvas", () => {
   assert.match(outputSource, /canvasToPngBlob\(canvas\)/);
   assert.match(outputSource, /Image\.new\(canvasRgba\(canvas\), canvas\.width, canvas\.height\)/);
   assert.ok(JSON.parse(capabilitySource).permissions.includes("clipboard-manager:allow-write-image"));
+});
+
+test("RAW export reports progress and supports cooperative cancellation", () => {
+  assert.match(apiSource, /new Channel<ExportProgress>\(\)/);
+  assert.match(apiSource, /invoke\("cancel_raw_export", \{ exportRevision \}\)/);
+  assert.match(exportDialogSource, /id="export-progress"/);
+  assert.match(exportDialogSource, /cancelRawExport\(this\.exportRevision\)/);
+  assert.match(exportDialogSource, /progressElement\.value = percent/);
+  assert.match(commandsSource, /Channel<ExportProgress>/);
+  assert.match(commandsSource, /export_raw_cancellable/);
 });

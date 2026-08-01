@@ -46,7 +46,7 @@
 
 ## 导出与抓拍
 
-- 转换并导出原始 CFA 数据，可处理裁剪、padding、packed/unpacked 与字节序。
+- 转换并导出原始 CFA 数据，可处理裁剪、padding、packed/unpacked 与字节序；长时间写入显示进度并支持安全取消。
 - 导出当前帧的 Remosaic Bayer 或 RGB48 Interleaved 数据。
 - 将画布窗口或完整预览图保存为 PNG，或复制到剪贴板。
 

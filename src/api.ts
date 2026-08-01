@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { t } from "./i18n";
 import type {
@@ -6,6 +6,7 @@ import type {
   AnalysisResult,
   DocumentInfo,
   ExportRequest,
+  ExportProgress,
   ExportResult,
   PixelInspectionRequest,
   PixelSample,
@@ -79,8 +80,18 @@ export function cancelRawAnalysis(analysisRevision: number): Promise<void> {
   return invoke("cancel_raw_analysis", { analysisRevision });
 }
 
-export function exportDocument(request: ExportRequest): Promise<ExportResult> {
-  return invoke("export_document", { request });
+export function exportDocument(
+  request: ExportRequest,
+  exportRevision: number,
+  onProgress: (progress: ExportProgress) => void,
+): Promise<ExportResult> {
+  const progressChannel = new Channel<ExportProgress>();
+  progressChannel.onmessage = onProgress;
+  return invoke("export_document", { request, exportRevision, onProgress: progressChannel });
+}
+
+export function cancelRawExport(exportRevision: number): Promise<void> {
+  return invoke("cancel_raw_export", { exportRevision });
 }
 
 export function savePng(path: string, png: Uint8Array): Promise<void> {

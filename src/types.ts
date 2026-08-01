@@ -230,6 +230,11 @@ export interface ExportResult {
   outputBitDepth: number;
 }
 
+export interface ExportProgress {
+  completedRows: number;
+  totalRows: number;
+}
+
 export const DEFAULT_DESCRIPTOR: RawDescriptor = {
   width: 1920,
   height: 1080,

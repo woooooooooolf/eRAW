@@ -1,5 +1,5 @@
-import { chooseExportFile, exportDocument } from "./api";
-import { localizeBackendError } from "./backend-error";
+import { cancelRawExport, chooseExportFile, exportDocument } from "./api";
+import { backendErrorCode, localizeBackendError } from "./backend-error";
 import { t } from "./i18n";
 import type {
   BitAlignment,
@@ -74,6 +74,7 @@ export function exportDialogTemplate(): string {
       </header>
       <div class="dialog-body">
         <div id="export-message" class="export-message" role="alert" hidden></div>
+        <progress id="export-progress" class="export-progress" max="100" value="0" aria-label="导出进度" hidden></progress>
         <div class="export-source">
           <div><span>来源快照</span><strong id="export-source-name">—</strong></div>
           <p id="export-source-summary">—</p>
@@ -100,7 +101,7 @@ export function exportDialogTemplate(): string {
             </div>
           </div>
           <div class="phase-note">
-            输出 CFA：<strong id="export-cfa">—</strong>
+            <span id="export-cfa-label">输出 CFA：</span><strong id="export-cfa">—</strong>
             <span id="export-range-summary">—</span>
           </div>
         </section>
@@ -155,6 +156,9 @@ export class ExportDialog {
   private snapshot: ExportSnapshot | null = null;
   private rangeMode: RangeMode = "size";
   private busy = false;
+  private cancelRequested = false;
+  private exportRevision = 0;
+  private activeExportRevision = 0;
 
   constructor(root: HTMLElement, callbacks: ExportDialogCallbacks) {
     this.root = root;
@@ -233,7 +237,9 @@ export class ExportDialog {
 
   private bindEvents(): void {
     this.get("close-export").addEventListener("click", () => this.close());
-    this.get("cancel-export").addEventListener("click", () => this.close());
+    this.get("cancel-export").addEventListener("click", () => {
+      if (this.busy) void this.cancelExport(); else this.close();
+    });
     this.get<HTMLFormElement>("export-form").addEventListener("submit", (event) => {
       event.preventDefault();
       void this.performExport();
@@ -296,11 +302,30 @@ export class ExportDialog {
   }
 
   private setBusy(busy: boolean): void {
+    const wasBusy = this.busy;
     this.busy = busy;
+    if (!busy) this.cancelRequested = false;
     this.get<HTMLButtonElement>("confirm-export").disabled = busy;
-    this.get<HTMLButtonElement>("cancel-export").disabled = busy;
+    this.get<HTMLButtonElement>("cancel-export").disabled = busy && this.cancelRequested;
     this.get<HTMLButtonElement>("close-export").disabled = busy;
     this.get<HTMLButtonElement>("confirm-export").textContent = busy ? t("export.exporting") : t("export.choose");
+    this.get<HTMLButtonElement>("cancel-export").textContent = busy ? t("export.cancelExport") : t("common.cancel");
+    const progress = this.get<HTMLProgressElement>("export-progress");
+    progress.hidden = !busy;
+    if (busy && !wasBusy) progress.value = 0;
+  }
+
+  private async cancelExport(): Promise<void> {
+    if (!this.busy || this.cancelRequested) return;
+    this.cancelRequested = true;
+    this.setBusy(true);
+    this.showMessage(t("export.cancelling"), "info");
+    this.exportRevision += 1;
+    try {
+      await cancelRawExport(this.exportRevision);
+    } catch (error) {
+      this.showMessage(localizeBackendError(error).message, "error");
+    }
   }
 
   private setRangeMode(mode: RangeMode): void {
@@ -575,16 +600,37 @@ export class ExportDialog {
     try {
       const path = await chooseExportFile(defaultPath);
       if (!path) return;
+      const revision = ++this.exportRevision;
+      this.activeExportRevision = revision;
       this.setBusy(true);
       this.showMessage(t("export.writing"), "info");
-      const result = await exportDocument(this.buildRequest(path));
+      const result = await exportDocument(this.buildRequest(path), revision, (progress) => {
+        if (this.activeExportRevision !== revision || this.cancelRequested) return;
+        const percent = progress.totalRows > 0
+          ? Math.min(100, Math.round(progress.completedRows * 100 / progress.totalRows))
+          : 0;
+        const progressElement = this.get<HTMLProgressElement>("export-progress");
+        progressElement.value = percent;
+        progressElement.setAttribute("aria-valuetext", `${percent}%`);
+        this.showMessage(t("export.progress", {
+          percent,
+          completed: progress.completedRows,
+          total: progress.totalRows,
+        }), "info");
+      });
+      if (this.activeExportRevision !== revision) return;
       this.get<HTMLDialogElement>("export-dialog").close();
       this.callbacks.onSuccess(this.successMessage(result));
     } catch (error) {
+      if (backendErrorCode(error) === "export_cancelled") {
+        this.showMessage(t("export.cancelled"), "warning");
+        return;
+      }
       const normalized = this.normalizeError(error);
       if (normalized.field) this.setFieldError(this.fieldId(normalized.field), normalized.message);
       this.showMessage(normalized.message, "error");
     } finally {
+      this.activeExportRevision = 0;
       this.setBusy(false);
     }
   }

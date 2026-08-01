@@ -27,7 +27,12 @@ import {
 } from "./app-settings";
 import { backendErrorCode, localizeBackendError } from "./backend-error";
 import type { ChannelRenderingMode } from "./channel-rendering";
-import { normalizeIntegerInput } from "./descriptor-input";
+import {
+  MAX_IMAGE_HEIGHT,
+  MAX_IMAGE_WIDTH,
+  normalizeIntegerInput,
+  parseRawDescriptor,
+} from "./descriptor-input";
 import { ExportDialog, exportDialogTemplate } from "./export-dialog";
 import { packingControlState } from "./packing-controls";
 import {
@@ -91,7 +96,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.4.2";
+const VERSION = "0.4.3";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -108,14 +113,12 @@ interface StatisticsPresentationSettings {
 }
 
 interface RuntimeDiagnostic {
+  scope: string;
   source: unknown;
   messageKey?: MessageKey;
-  fingerprint: string;
-  count: number;
   timestamp: Date;
 }
 
-const MAX_IMAGE_DIMENSION = 100_000;
 const IMAGE_FORMAT_DESCRIPTOR_FIELDS: ReadonlyArray<keyof RawDescriptor> = [
   "width",
   "height",
@@ -198,10 +201,6 @@ function imageFormatDescriptorsEqual(left: RawDescriptor, right: RawDescriptor):
   return IMAGE_FORMAT_DESCRIPTOR_FIELDS.every((key) => left[key] === right[key]);
 }
 
-function clampImageDimension(value: number): number {
-  return Math.max(1, Math.min(MAX_IMAGE_DIMENSION, Number.isFinite(value) ? Math.trunc(value) : 1));
-}
-
 function loadSettings(): AppSettings {
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
@@ -215,10 +214,7 @@ function loadDescriptor(remember: boolean): RawDescriptor {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      const descriptor = { ...DEFAULT_DESCRIPTOR, ...JSON.parse(saved) as Partial<RawDescriptor> };
-      descriptor.width = clampImageDimension(descriptor.width);
-      descriptor.height = clampImageDimension(descriptor.height);
-      return descriptor;
+      return parseRawDescriptor(JSON.parse(saved), DEFAULT_DESCRIPTOR);
     }
   } catch { /* 使用安全默认值 */ }
   return { ...DEFAULT_DESCRIPTOR };
@@ -289,6 +285,7 @@ export class ErawApp {
     this.root = root;
     setLanguagePreference(this.settings.language);
     root.innerHTML = this.template();
+    this.bindStaticLocalizationKeys();
     localizeTree(root);
     this.writeDescriptor(this.descriptor);
     this.updatePackingDependentUi();
@@ -309,7 +306,8 @@ export class ErawApp {
         this.updateRenderStatus(levelLabel, loaded, pending, timing);
       },
       onSelectionChange: (selection) => this.onRoiSelectionChange(selection),
-      onError: (error, messageKey) => this.reportRuntimeError(error, messageKey),
+      onError: (error, messageKey, scope) => this.reportRuntimeError(error, messageKey, 5000, scope),
+      onDiagnosticClear: (scope) => this.clearRuntimeDiagnostic(scope),
     });
     this.statisticsPanel = new StatisticsPanel(this.get("statistics-panel"), {
       detached: false,
@@ -498,7 +496,7 @@ export class ErawApp {
                 <div class="empty-grid"><span></span><span></span><span></span><span></span></div>
                 <h1>查看传感器的真实输出</h1>
                 <p>打开 RAW 文件，配置尺寸、packing、CFA 和对齐参数</p>
-                <button id="empty-open-button">${icons.open} 打开 RAW 图像</button>
+                <button id="empty-open-button">${icons.open}<span>打开 RAW 图像</span></button>
                 <small>滚轮缩放 · 左键拖动 · 双击切换适应窗口/100%</small>
               </div>
               <div class="image-scrollbar horizontal"><div class="scroll-thumb"></div></div>
@@ -542,7 +540,7 @@ export class ErawApp {
           <i></i><button id="zoom-status" class="status-zoom" title="输入画布缩放比例" aria-haspopup="dialog" disabled>100.00%</button>
         </footer>
         <div class="toast" id="toast" role="status"></div>
-        <div class="parameter-tooltip" id="parameter-tooltip" role="tooltip"></div>
+        <div class="parameter-tooltip" id="parameter-tooltip" role="tooltip" aria-hidden="true"></div>
 
         ${exportDialogTemplate()}
         ${this.pixelLocatorDialogTemplate()}
@@ -556,9 +554,9 @@ export class ErawApp {
 
   private dimensionField(): string {
     return `<div class="parameter-row dimension-row"><span class="field-label" data-help="${this.parameterHelp("dimensions")}">有效分辨率</span><div class="dimension-control">
-      <div class="number-input"><input id="descriptor-width" data-field="width" type="number" min="1" max="${MAX_IMAGE_DIMENSION}" step="1" aria-label="有效宽度"/></div>
+      <div class="number-input"><input id="descriptor-width" data-field="width" type="number" min="1" max="${MAX_IMAGE_WIDTH}" step="1" aria-label="有效宽度"/></div>
       <i>×</i>
-      <div class="number-input"><input id="descriptor-height" data-field="height" type="number" min="1" max="${MAX_IMAGE_DIMENSION}" step="1" aria-label="有效高度"/></div>
+      <div class="number-input"><input id="descriptor-height" data-field="height" type="number" min="1" max="${MAX_IMAGE_HEIGHT}" step="1" aria-label="有效高度"/></div>
     </div></div>`;
   }
 
@@ -606,7 +604,7 @@ export class ErawApp {
       frameStride: "help.frameStride",
     };
     const key = descriptions[field];
-    return key ? escapeHtml(t(key, { max: MAX_IMAGE_DIMENSION })) : "";
+    return key ? escapeHtml(t(key, { maxWidth: MAX_IMAGE_WIDTH, maxHeight: MAX_IMAGE_HEIGHT })) : "";
   }
 
   private pixelLocatorDialogTemplate(): string {
@@ -637,6 +635,245 @@ export class ErawApp {
         <footer><p id="zoom-range">—</p><div><button id="cancel-zoom-dialog" type="button" class="secondary-button">取消</button><button type="submit" class="primary-button">应用缩放</button></div></footer>
       </form>
     </dialog>`;
+  }
+
+  private bindStaticLocalizationKeys(): void {
+    const text = (selector: string, key: MessageKey): void => {
+      const element = this.root.querySelector<HTMLElement>(selector);
+      if (element) element.dataset.i18n = key;
+    };
+    const texts = (selector: string, keys: readonly MessageKey[]): void => {
+      this.root.querySelectorAll<HTMLElement>(selector).forEach((element, index) => {
+        const key = keys[index];
+        if (key) element.dataset.i18n = key;
+      });
+    };
+    const attribute = (
+      selector: string,
+      attributeName: "title" | "aria-label" | "placeholder" | "help",
+      key: MessageKey,
+    ): void => {
+      const element = this.root.querySelector<HTMLElement>(selector);
+      if (element) element.dataset[`i18n${attributeName === "aria-label" ? "AriaLabel" : attributeName[0].toUpperCase() + attributeName.slice(1)}`] = key;
+    };
+    const field = (id: string, labelKey: MessageKey, helpKey?: MessageKey): void => {
+      const control = this.root.querySelector<HTMLElement>(`#${id}`);
+      const label = control?.closest(".parameter-row")?.querySelector<HTMLElement>(".field-label");
+      if (!label) return;
+      label.dataset.i18n = labelKey;
+      if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement) {
+        control.dataset.i18nAriaLabel = labelKey;
+      }
+      if (helpKey) label.dataset.i18nHelp = helpKey;
+    };
+
+    text("#open-button span", "toolbar.open");
+    text("#export-button span", "toolbar.export");
+    text("#export-popover > header strong", "toolbar.exportCurrent");
+    text("#export-popover > header span", "toolbar.exportSnapshot");
+    text('[data-export-target="originalCfa"] strong', "toolbar.originalCfa");
+    text('[data-export-target="originalCfa"] small', "toolbar.originalCfaHint");
+    text('[data-export-target="remosaic"] small', "toolbar.remosaicHint");
+    text('[data-export-target="demosaic"] small', "toolbar.demosaicHint");
+    text('[data-mode="raw"]', "toolbar.rawIntensity");
+    text('#cfa-mode', "toolbar.cfaMosaic");
+    attribute("#export-popover", "aria-label", "toolbar.exportSelect");
+    attribute(".display-modes", "aria-label", "toolbar.displayModes");
+    attribute("#demosaic-group", "aria-label", "toolbar.demosaicChannels");
+    attribute('[data-mode="red"]', "title", "toolbar.redPlane");
+    attribute('[data-mode="red"]', "aria-label", "toolbar.redPlane");
+    attribute('[data-mode="green"]', "title", "toolbar.greenPlane");
+    attribute('[data-mode="green"]', "aria-label", "toolbar.greenPlane");
+    attribute('[data-mode="blue"]', "title", "toolbar.bluePlane");
+    attribute('[data-mode="blue"]', "aria-label", "toolbar.bluePlane");
+    attribute("#roi-mouse-button", "aria-label", "roi.mouse");
+    attribute("#roi-coordinates-button", "aria-label", "roi.coordinates");
+    attribute("#fit-button", "title", "toolbar.fit");
+    attribute("#actual-button", "title", "toolbar.actual");
+    attribute("#panel-button", "title", "toolbar.panel");
+    attribute("#settings-button", "title", "toolbar.settings");
+    attribute("#about-button", "title", "toolbar.helpAbout");
+    attribute("#about-button", "aria-label", "toolbar.helpAbout");
+    attribute("#utility-popover", "aria-label", "toolbar.helpAbout");
+    text("#theme-popover > header strong", "toolbar.themeTitle");
+    text("#theme-popover > header span", "toolbar.themeHint");
+    attribute("#theme-popover", "aria-label", "toolbar.themeSelect");
+    texts("#utility-popover > button strong", ["toolbar.help", "toolbar.shortcuts", "toolbar.about"]);
+    texts("#utility-popover > button small", ["toolbar.helpHint", "toolbar.shortcutsHint", "toolbar.aboutHint"]);
+    text("#utility-popover > button:first-child em", "common.planned");
+
+    texts(".sidebar .section-title span", ["sidebar.imageFormat", "sidebar.processing", "sidebar.presentation", "sidebar.layout"]);
+    field("descriptor-width", "sidebar.dimensions");
+    attribute("#descriptor-width", "aria-label", "sidebar.validWidth");
+    attribute("#descriptor-height", "aria-label", "sidebar.validHeight");
+    field("descriptor-packing", "sidebar.storage", "help.packing");
+    field("descriptor-bitDepth", "sidebar.bitDepth", "help.bitDepth");
+    field("endianness-row", "sidebar.endianness", "help.endianness");
+    field("bitAlignment-row", "sidebar.bitAlignment", "help.bitAlignment");
+    field("descriptor-cfa", "sidebar.cfaPattern", "help.cfa");
+    text('[data-field="bitAlignment"] [data-value="lsb"]', "sidebar.lowBits");
+    text('[data-field="bitAlignment"] [data-value="msb"]', "sidebar.highBits");
+    const standardBayerGroup = this.root.querySelector<HTMLOptGroupElement>("#descriptor-cfa optgroup[label]:first-of-type");
+    if (standardBayerGroup) standardBayerGroup.dataset.i18nLabel = "sidebar.standardBayer";
+    text("#demosaic-processing-row .field-label", "sidebar.demosaicAlgorithm");
+    text("#demosaic-processing-row .processing-value", "common.bilinear");
+    text("#remosaic-processing-row .field-label", "sidebar.sameColor");
+    attribute("#demosaic-processing-row .field-label", "help", "runtime.demosaicHelp");
+    attribute("#remosaic-processing-row .field-label", "help", "runtime.sameColorHelp");
+    field("presentation-channel-rendering", "settings.channelRendering", "settings.channelRenderingHint");
+    field("presentation-pixel-values", "settings.showPixelValues", "settings.showPixelValuesHint");
+    field("presentation-pixel-grid-color", "presentation.pixelGridColor", "presentation.pixelGridColorHint");
+    field("presentation-demosaic-pixel-values", "settings.demosaicValues", "settings.demosaicValuesHint");
+    field("presentation-missing-pixel-pattern", "presentation.missingAppearance", "presentation.missingAppearanceHint");
+    field("presentation-missing-pixel-color", "presentation.solidColor");
+    text('#presentation-channel-rendering option[value="color"]', "settings.channelColor");
+    text('#presentation-channel-rendering option[value="grayscale"]', "settings.channelGrayscale");
+    text('#presentation-demosaic-pixel-values option[value="rawDn"]', "settings.rawDn");
+    text('#presentation-demosaic-pixel-values option[value="rgb"]', "settings.interpolatedRgb");
+    text('#presentation-missing-pixel-pattern option[value="darkCheckerboard"]', "presentation.darkCheckerboard");
+    text('#presentation-missing-pixel-pattern option[value="lightCheckerboard"]', "presentation.lightCheckerboard");
+    text('#presentation-missing-pixel-pattern option[value="solid"]', "presentation.solid");
+    field("descriptor-headerOffset", "sidebar.headerOffset", "help.headerOffset");
+    field("descriptor-rowAlignment", "sidebar.rowAlignment", "help.rowAlignment");
+    field("descriptor-rowStride", "sidebar.rowStride", "help.rowStride");
+    field("descriptor-frameAlignment", "sidebar.frameAlignment", "help.frameAlignment");
+    field("descriptor-frameStride", "sidebar.frameStride", "help.frameStride");
+    attribute("#descriptor-rowStride", "placeholder", "common.auto");
+    attribute("#descriptor-frameStride", "placeholder", "common.auto");
+    attribute("#sidebar-resizer", "aria-label", "sidebar.resize");
+
+    text("#empty-state h1", "empty.title");
+    text("#empty-state p", "empty.description");
+    text("#empty-open-button span", "empty.open");
+    text("#empty-state small", "empty.controls");
+    attribute("#canvas-context-menu", "aria-label", "capture.menuLabel");
+    texts("#canvas-context-menu button span", ["statistics.title", "capture.saveCurrent", "capture.copyCurrent", "capture.savePreview", "capture.copyPreview"]);
+    attribute("#first-frame", "title", "frame.first");
+    attribute("#previous-frame", "title", "frame.previous");
+    attribute("#next-frame", "title", "frame.next");
+    attribute("#last-frame", "title", "frame.last");
+    text("#diagnostics-drawer header strong", "diagnostics.title");
+    text("#diagnostics-summary", "diagnostics.waiting");
+    text("#diagnostics-list .no-warning", "diagnostics.openHint");
+    text("#status-warning span", "diagnostics.button");
+    text("#file-status", "diagnostics.noFile");
+    attribute("#close-diagnostics", "title", "diagnostics.close");
+    attribute("#close-diagnostics", "aria-label", "diagnostics.close");
+    attribute("#pixel-status", "title", "diagnostics.locate");
+    attribute("#zoom-status", "title", "diagnostics.zoom");
+    attribute("#render-status", "help", "runtime.renderInitialHelp");
+    attribute("#statistics-resizer", "aria-label", "statistics.resizePanel");
+
+    texts("#pixel-locator-dialog header small, #pixel-locator-dialog header h2", ["dialog.pixelEyebrow", "dialog.pixelTitle"]);
+    text("#pixel-locator-dialog .pixel-locator-body > p", "dialog.pixelDescription");
+    texts("#pixel-locator-dialog .pixel-coordinate-grid label > span", ["dialog.xCoordinate", "dialog.yCoordinate"]);
+    text("#cancel-pixel-locator", "common.cancel");
+    text('#pixel-locator-form button[type="submit"]', "dialog.locateZoom");
+    texts("#zoom-dialog header small, #zoom-dialog header h2", ["dialog.zoomEyebrow", "dialog.zoomTitle"]);
+    text("#zoom-dialog .zoom-body > p:first-child", "dialog.zoomDescription");
+    text("#zoom-dialog label > span", "dialog.zoomRatio");
+    text("#zoom-effective", "dialog.zoomContinuous");
+    text("#cancel-zoom-dialog", "common.cancel");
+    text('#zoom-form button[type="submit"]', "dialog.applyZoom");
+    texts("#roi-coordinate-dialog header small, #roi-coordinate-dialog header h2, #roi-coordinate-dialog .roi-coordinate-body > p:first-child", ["roi.dialogEyebrow", "roi.dialogTitle", "roi.dialogHint"]);
+    texts("#roi-coordinate-dialog .roi-coordinate-grid label > span", ["roi.xStart", "roi.xEnd", "roi.yStart", "roi.yEnd"]);
+    text("#cancel-roi-coordinate", "common.cancel");
+    text('#roi-coordinate-form button[type="submit"]', "roi.apply");
+
+    texts("#shortcuts-dialog header small, #shortcuts-dialog header h2", ["shortcuts.eyebrow", "toolbar.shortcuts"]);
+    texts("#shortcuts-dialog .shortcuts-body section h3", ["shortcuts.fileView", "shortcuts.canvas", "shortcuts.statisticsCapture", "shortcuts.parameters"]);
+    texts("#shortcuts-dialog .shortcuts-body section:nth-child(1) div span", ["shortcuts.openRaw", "shortcuts.closeRaw", "shortcuts.exportFrame", "shortcuts.fit", "shortcuts.actual", "shortcuts.fullscreen"]);
+    texts("#shortcuts-dialog .shortcuts-body section:nth-child(2) div span", ["shortcuts.pointerZoom", "shortcuts.pan", "shortcuts.toggleFit", "shortcuts.mouseRoi", "shortcuts.coordinateRoi", "shortcuts.locatePixel", "shortcuts.enterZoom", "shortcuts.closeMenus"]);
+    text("#shortcuts-dialog .shortcuts-body section:nth-child(2) div:nth-child(2) kbd", "shortcuts.wheel");
+    text("#shortcuts-dialog .shortcuts-body section:nth-child(2) div:nth-child(3) kbd", "shortcuts.leftDrag");
+    text("#shortcuts-dialog .shortcuts-body section:nth-child(2) div:nth-child(4) kbd", "shortcuts.doubleClick");
+    texts("#shortcuts-dialog .shortcuts-body section:nth-child(3) div span", ["shortcuts.openStatistics", "capture.saveCurrent", "capture.copyCurrent", "capture.savePreview", "capture.copyPreview"]);
+    texts("#shortcuts-dialog .shortcuts-body section:nth-child(4) div span", ["shortcuts.submitLeave", "shortcuts.submitNext"]);
+    text("#shortcuts-dialog footer button", "common.done");
+
+    texts("#settings-dialog header small, #settings-dialog header h2", ["settings.eyebrow", "settings.title"]);
+    texts("#settings-dialog .settings-heading h3", ["settings.appearance", "settings.operation", "settings.performance"]);
+    texts("#settings-dialog .settings-heading p", ["settings.appearanceHint", "settings.operationHint", "settings.performanceHint"]);
+    const settingRows: Array<[string, MessageKey, MessageKey]> = [
+      ["setting-font-size", "settings.fontSize", "settings.fontHint"],
+      ["setting-sidebar-position", "settings.sidebarPosition", "settings.sidebarHint"],
+      ["setting-reduce-motion", "settings.reduceMotion", "settings.reduceMotionHint"],
+      ["setting-open-view", "settings.onOpen", "settings.onOpenHint"],
+      ["setting-wheel-speed", "settings.wheelSpeed", "settings.wheelHint"],
+      ["setting-remember-descriptor", "settings.remember", "settings.rememberHint"],
+      ["setting-tile-cache", "settings.gpuCache", "settings.gpuCacheHint"],
+    ];
+    for (const [id, titleKey, hintKey] of settingRows) {
+      const row = this.root.querySelector(`#${id}`)?.closest(".settings-row");
+      const titleElement = row?.querySelector<HTMLElement>("strong");
+      const hintElement = row?.querySelector<HTMLElement>("span");
+      if (titleElement) titleElement.dataset.i18n = titleKey;
+      if (hintElement) hintElement.dataset.i18n = hintKey;
+    }
+    texts("#setting-font-size option", ["common.standard", "common.large", "common.extraLarge"]);
+    texts("#setting-sidebar-position option", ["common.left", "common.right"]);
+    texts("#setting-open-view option", ["settings.fit", "settings.actual"]);
+    texts("#setting-wheel-speed option", ["settings.gentle", "common.standard", "settings.fast"]);
+    text('#setting-tile-cache option[value="balanced"]', "settings.recommended");
+    text("#reset-settings", "settings.reset");
+    text('#settings-dialog footer button[value="cancel"]', "common.cancel");
+    text("#confirm-settings", "common.apply");
+
+    text("#about-dialog .about-hero small", "about.lab");
+    texts("#about-dialog .about-credits span", ["about.productDesign", "about.engineering"]);
+    text("#open-source-components strong", "about.components");
+    text("#open-source-components small", "about.componentsHint");
+    text("#about-dialog footer button", "common.done");
+    texts("#open-source-dialog header small, #open-source-dialog header h2", ["about.componentsEyebrow", "about.componentsTitle"]);
+    text("#open-source-dialog .open-source-body > p:first-child", "about.componentsIntro");
+    texts("#open-source-dialog .component-list > div > span", ["about.desktopFramework", "about.fileDialog", "about.serialization", "about.memoryMap", "about.buildTool", "about.typeSystem", "about.charting"]);
+    text("#open-source-dialog .component-list > div:nth-child(1) > strong", "about.tauriApi");
+    text("#open-source-dialog .component-list > div:nth-child(3) > strong", "about.serde");
+    text("#open-source-dialog .open-source-note", "about.licenseNote");
+    text("#back-to-about", "about.back");
+    text('#open-source-dialog footer button[value="cancel"]', "common.done");
+
+    texts("#export-dialog header small, #export-dialog header h2", ["export.eyebrow", "export.title"]);
+    attribute("#export-progress", "aria-label", "export.progressLabel");
+    text("#export-dialog .export-source span", "export.snapshot");
+    text("#export-cfa-label", "export.outputCfa");
+    text("#export-dialog section:nth-of-type(1) h3", "export.range");
+    attribute("#export-range-mode", "aria-label", "export.rangeMode");
+    texts("#export-range-mode button", ["export.startSize", "export.startEnd"]);
+    const exportFields: Array<[string, MessageKey]> = [
+      ["crop-x", "export.startX"], ["crop-y", "export.startY"], ["crop-width", "export.width"],
+      ["crop-height", "export.height"], ["crop-end-x", "export.endX"], ["crop-end-y", "export.endY"],
+      ["export-packing", "sidebar.storage"], ["export-depth", "sidebar.bitDepth"],
+      ["export-endian", "sidebar.endianness"], ["export-bit-alignment", "sidebar.bitAlignment"],
+      ["export-row-alignment", "sidebar.rowAlignment"], ["export-frame-alignment", "sidebar.frameAlignment"],
+      ["export-mapping", "export.valueMapping"], ["fill-mono", "export.monoDn"],
+      ["fill-green-blue", "export.gb"], ["fill-green-red", "export.gr"],
+    ];
+    for (const [id, key] of exportFields) {
+      const label = this.root.querySelector(`#${id}`)?.closest(".export-field")?.querySelector<HTMLElement>(":scope > span");
+      if (label) label.dataset.i18n = key;
+    }
+    text("#export-dialog section:nth-of-type(2) h3", "export.encoding");
+    text('#export-bit-alignment option[value="lsb"]', "export.containerLow");
+    text('#export-bit-alignment option[value="msb"]', "export.containerHigh");
+    text('#export-mapping option[value="preserve"]', "export.preserve");
+    text('#export-mapping option[value="scaleFullRange"]', "export.scale");
+    text("#export-dialog section:nth-of-type(3) h3", "export.missingFill");
+    text("#export-dialog .export-fill-help", "export.fillHint");
+    text("#export-summary", "export.currentOnly");
+    text("#cancel-export", "common.cancel");
+    text("#confirm-export", "export.choose");
+
+    this.root.querySelectorAll<HTMLButtonElement>(".dialog-close").forEach((button) => {
+      button.dataset.i18nAriaLabel = "common.close";
+    });
+    this.root.querySelectorAll<HTMLButtonElement>("[data-theme-value]").forEach((button) => {
+      const theme = THEMES.find((candidate) => candidate.id === button.dataset.themeValue);
+      const name = button.querySelector<HTMLElement>("strong");
+      const tone = button.querySelector<HTMLElement>("small");
+      if (theme && name) name.dataset.i18n = themeMessageKey(theme.id);
+      if (theme && tone) tone.dataset.i18n = theme.id.startsWith("dark-") ? "theme.dark" : "theme.light";
+    });
   }
 
   private roiCoordinateDialogTemplate(): string {
@@ -951,6 +1188,11 @@ export class ErawApp {
       event.preventDefault();
       this.applyRoiCoordinates();
     });
+    this.bindMenuKeyboard("export-popover", "export-button", (open) => this.setExportMenuOpen(open));
+    this.bindMenuKeyboard("language-popover", "language-button", (open) => this.setLanguageMenuOpen(open));
+    this.bindMenuKeyboard("theme-popover", "theme-button", (open) => this.setThemeMenuOpen(open));
+    this.bindMenuKeyboard("utility-popover", "about-button", (open) => this.setUtilityMenuOpen(open));
+    this.bindMenuKeyboard("canvas-context-menu", null, (open) => this.setCanvasContextMenuOpen(open));
     this.root.querySelectorAll<HTMLInputElement>("[data-roi-field]").forEach((input) => {
       input.addEventListener("input", () => this.clearRoiCoordinateError());
     });
@@ -1000,8 +1242,23 @@ export class ErawApp {
       window.clearTimeout(showTimer);
       showTimer = 0;
       tooltip.classList.remove("visible");
+      tooltip.setAttribute("aria-hidden", "true");
     };
     this.root.querySelectorAll<HTMLElement>("[data-help]").forEach((target) => {
+      if (!target.hasAttribute("tabindex")) target.tabIndex = 0;
+      target.setAttribute("aria-describedby", "parameter-tooltip");
+      const showAtTarget = () => {
+        hide();
+        const rect = target.getBoundingClientRect();
+        tooltip.textContent = target.dataset.help ?? "";
+        tooltip.classList.add("visible");
+        tooltip.setAttribute("aria-hidden", "false");
+        const margin = 12;
+        const x = Math.min(window.innerWidth - tooltip.offsetWidth - margin, rect.left);
+        const y = Math.min(window.innerHeight - tooltip.offsetHeight - margin, rect.bottom + 8);
+        tooltip.style.left = `${Math.max(margin, x)}px`;
+        tooltip.style.top = `${Math.max(margin, y)}px`;
+      };
       target.addEventListener("pointerenter", (event) => {
         hide();
         pointerX = event.clientX;
@@ -1009,6 +1266,7 @@ export class ErawApp {
         showTimer = window.setTimeout(() => {
           tooltip.textContent = target.dataset.help ?? "";
           tooltip.classList.add("visible");
+          tooltip.setAttribute("aria-hidden", "false");
           const margin = 12;
           const x = Math.min(window.innerWidth - tooltip.offsetWidth - margin, pointerX + 14);
           const y = Math.min(window.innerHeight - tooltip.offsetHeight - margin, pointerY + 18);
@@ -1019,6 +1277,49 @@ export class ErawApp {
       });
       target.addEventListener("pointermove", move);
       target.addEventListener("pointerleave", hide);
+      target.addEventListener("focus", showAtTarget);
+      target.addEventListener("blur", hide);
+    });
+  }
+
+  private bindMenuKeyboard(
+    menuId: string,
+    triggerId: string | null,
+    setOpen: (open: boolean) => void,
+  ): void {
+    const menu = this.get(menuId);
+    const items = () => [...menu.querySelectorAll<HTMLButtonElement>(
+      '[role="menuitem"], [role="menuitemradio"]',
+    )].filter((item) => !item.disabled && !item.hidden);
+    const focusItem = (position: "first" | "last"): void => {
+      const available = items();
+      available[position === "first" ? 0 : available.length - 1]?.focus({ preventScroll: true });
+    };
+    const trigger = triggerId ? this.get<HTMLButtonElement>(triggerId) : null;
+    trigger?.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      setOpen(true);
+      focusItem(event.key === "ArrowDown" ? "first" : "last");
+    });
+    menu.addEventListener("keydown", (event) => {
+      const available = items();
+      if (!available.length) return;
+      const current = Math.max(0, available.indexOf(document.activeElement as HTMLButtonElement));
+      let next = -1;
+      if (event.key === "ArrowDown") next = (current + 1) % available.length;
+      else if (event.key === "ArrowUp") next = (current - 1 + available.length) % available.length;
+      else if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = available.length - 1;
+      else if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen(false);
+        trigger?.focus({ preventScroll: true });
+        return;
+      } else return;
+      event.preventDefault();
+      available[next].focus({ preventScroll: true });
     });
   }
 
@@ -1035,6 +1336,7 @@ export class ErawApp {
       await this.flushDescriptor();
       const path = await chooseRawFile();
       if (!path) return;
+      this.clearRuntimeDiagnostics(["webgl"]);
       this.showToast(t("runtime.opening"), "busy");
       const info = await openDocument(path, this.readDescriptor());
       this.document = info;
@@ -1049,7 +1351,7 @@ export class ErawApp {
       if (this.statisticsOpen) void this.requestStatistics();
       this.showToast(t("runtime.opened", { name: info.name }), "success");
     } catch (error) {
-      this.reportRuntimeError(error);
+      this.reportRuntimeError(error, undefined, 5000, "open");
     } finally {
       this.fileOperationInProgress = false;
       this.updateDocumentUi();
@@ -1073,7 +1375,7 @@ export class ErawApp {
       this.document = null;
       this.frame = 0;
       this.lastSample = null;
-      this.runtimeDiagnostics = [];
+      this.clearRuntimeDiagnostics(["webgl"]);
       this.viewport.clearDocument();
       this.statisticsRevision += 1;
       void cancelRawAnalysis(this.statisticsRevision);
@@ -1090,7 +1392,7 @@ export class ErawApp {
       this.updateDocumentUi();
       this.showToast(t("runtime.closed", { name }), "success");
     } catch (error) {
-      this.reportRuntimeError(error);
+      this.reportRuntimeError(error, undefined, 5000, "close");
     } finally {
       this.fileOperationInProgress = false;
       this.updateDocumentUi();
@@ -1106,7 +1408,7 @@ export class ErawApp {
     };
     const value = <T extends string>(field: string) => this.descriptorFieldValue(field) as T;
     return {
-      width: number("width", 1, MAX_IMAGE_DIMENSION), height: number("height", 1, MAX_IMAGE_DIMENSION), bitDepth: Number(value("bitDepth")),
+      width: number("width", 1, MAX_IMAGE_WIDTH), height: number("height", 1, MAX_IMAGE_HEIGHT), bitDepth: Number(value("bitDepth")),
       packing: value<Packing>("packing"), endianness: value<Endianness>("endianness"), bitAlignment: value<BitAlignment>("bitAlignment"), cfa: value<CfaPattern>("cfa"),
       cfaPhaseX: number("cfaPhaseX", 0, 3), cfaPhaseY: number("cfaPhaseY", 0, 3),
       rowAlignment: number("rowAlignment", 1), rowStride: number("rowStride"), frameAlignment: number("frameAlignment", 1), frameStride: number("frameStride"), headerOffset: number("headerOffset"),
@@ -1156,6 +1458,7 @@ export class ErawApp {
             const resetStatisticsView = !imageFormatDescriptorsEqual(previousDescriptor, info.descriptor);
             this.document = info;
             this.descriptor = info.descriptor;
+            this.clearRuntimeDiagnostic("descriptor");
             if (this.settings.rememberDescriptor) {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(info.descriptor));
             }
@@ -1182,7 +1485,7 @@ export class ErawApp {
               this.updateCfaDependentUi();
               this.updateDocumentUi();
             }
-            this.reportRuntimeError(error);
+            this.reportRuntimeError(error, undefined, 5000, "descriptor");
           }
         } else {
           this.descriptor = this.document.descriptor;
@@ -1245,7 +1548,7 @@ export class ErawApp {
       const message = key ? t(key, warning.arguments ?? {}) : warning.message;
       return `<div class="warning-item ${warning.severity}"><span></span><div><strong>${warning.severity === "error" ? t("common.error") : warning.severity === "warning" ? t("common.warning") : t("common.info")}<small>${t("diagnostics.layout")}</small></strong><p>${escapeHtml(message)}</p></div></div>`;
     });
-    const runtimeMarkup = this.runtimeDiagnostics.map((diagnostic) => `<div class="warning-item error runtime"><span></span><div><strong>${t("diagnostics.runtime")}<small>${formatTime(diagnostic.timestamp)}${diagnostic.count > 1 ? ` · ${t("diagnostics.repeated", { count: diagnostic.count })}` : ""}</small></strong><p>${escapeHtml(this.runtimeDiagnosticMessage(diagnostic))}</p></div></div>`);
+    const runtimeMarkup = this.runtimeDiagnostics.map((diagnostic) => `<div class="warning-item error runtime"><span></span><div><strong>${t("diagnostics.runtime")}<small>${formatTime(diagnostic.timestamp)}</small></strong><p>${escapeHtml(this.runtimeDiagnosticMessage(diagnostic))}</p></div></div>`);
     const list = this.get("diagnostics-list");
     const entries = [...runtimeMarkup, ...warningMarkup];
     list.innerHTML = entries.length ? entries.join("") : `<div class="no-warning">${this.document ? t("diagnostics.normal") : t("diagnostics.openHint")}</div>`;
@@ -1267,29 +1570,33 @@ export class ErawApp {
     return diagnostic.messageKey ? t(diagnostic.messageKey, { detail }) : detail;
   }
 
-  private runtimeDiagnosticFingerprint(source: unknown, messageKey?: MessageKey): string {
-    let serialized = "";
-    try {
-      serialized = typeof source === "string" ? source : JSON.stringify(source) ?? String(source);
-    } catch {
-      serialized = String(source);
-    }
-    return `${messageKey ?? "backend"}:${serialized.replace(/^Error:\s*/, "").trim()}`;
-  }
-
-  private reportRuntimeError(source: unknown, messageKey?: MessageKey, duration = 5000): void {
-    const fingerprint = this.runtimeDiagnosticFingerprint(source, messageKey);
-    const existing = this.runtimeDiagnostics.find((diagnostic) => diagnostic.fingerprint === fingerprint);
-    if (existing) {
-      existing.count += 1;
-      existing.timestamp = new Date();
-      this.runtimeDiagnostics = [existing, ...this.runtimeDiagnostics.filter((diagnostic) => diagnostic !== existing)];
-    } else {
-      this.runtimeDiagnostics.unshift({ source, messageKey, fingerprint, count: 1, timestamp: new Date() });
-      this.runtimeDiagnostics = this.runtimeDiagnostics.slice(0, 50);
-    }
+  private reportRuntimeError(
+    source: unknown,
+    messageKey?: MessageKey,
+    duration = 5000,
+    scope = messageKey ?? "operation",
+  ): void {
+    const diagnostic = { scope, source, messageKey, timestamp: new Date() };
+    this.runtimeDiagnostics = [
+      diagnostic,
+      ...this.runtimeDiagnostics.filter((current) => current.scope !== scope),
+    ];
     this.renderDiagnostics();
     this.showToast(this.runtimeDiagnosticMessage({ source, messageKey }), "error", duration);
+  }
+
+  private clearRuntimeDiagnostic(scope: string): void {
+    const remaining = this.runtimeDiagnostics.filter((diagnostic) => diagnostic.scope !== scope);
+    if (remaining.length === this.runtimeDiagnostics.length) return;
+    this.runtimeDiagnostics = remaining;
+    this.renderDiagnostics();
+  }
+
+  private clearRuntimeDiagnostics(preserveScopes: readonly string[] = []): void {
+    const remaining = this.runtimeDiagnostics.filter((diagnostic) => preserveScopes.includes(diagnostic.scope));
+    if (remaining.length === this.runtimeDiagnostics.length) return;
+    this.runtimeDiagnostics = remaining;
+    this.renderDiagnostics();
   }
 
   private toggleDiagnostics(): void {
@@ -1369,7 +1676,7 @@ export class ErawApp {
     refreshLocalizedTree();
     const dimensionsHelp = this.root.querySelector<HTMLElement>(".dimension-row .field-label");
     if (dimensionsHelp) {
-      dimensionsHelp.dataset.help = t("help.dimensions", { max: MAX_IMAGE_DIMENSION });
+      dimensionsHelp.dataset.help = t("help.dimensions", { maxWidth: MAX_IMAGE_WIDTH, maxHeight: MAX_IMAGE_HEIGHT });
     }
     this.root.querySelectorAll<HTMLButtonElement>("[data-step-target]").forEach((stepButton) => {
       const target = stepButton.dataset.stepTarget ?? "";
@@ -1578,7 +1885,7 @@ export class ErawApp {
       void this.emitStatisticsState();
     });
     await listen<string>("statistics:window-error", (event) => {
-      this.reportRuntimeError(event.payload);
+      this.reportRuntimeError(event.payload, undefined, 5000, "statistics-window");
     });
     await listen<string>("statistics:notify", (event) => {
       this.showToast(event.payload, "success");
@@ -1650,6 +1957,7 @@ export class ErawApp {
     if (existing) {
       await existing.show();
       await existing.setFocus();
+      this.clearRuntimeDiagnostic("statistics-window");
       await this.emitStatisticsState();
       return;
     }
@@ -1664,13 +1972,14 @@ export class ErawApp {
       resizable: true,
     });
     statisticsWindow.once("tauri://created", () => {
+      this.clearRuntimeDiagnostic("statistics-window");
       void this.emitStatisticsState();
     });
     statisticsWindow.once("tauri://error", (event) => {
       this.statisticsDetached = false;
       this.saveStatisticsPresentation();
       this.updateStatisticsDock();
-      this.reportRuntimeError(event.payload);
+      this.reportRuntimeError(event.payload, undefined, 5000, "statistics-window");
     });
   }
 
@@ -1853,7 +2162,7 @@ export class ErawApp {
       try {
         path = await choosePngFile(this.captureDefaultPath(kind));
       } catch (error) {
-        this.reportRuntimeError(error, "capture.failed");
+        this.reportRuntimeError(error, "capture.failed", 5000, "capture");
         return;
       }
       if (!path) return;
@@ -1878,9 +2187,11 @@ export class ErawApp {
       }
       if (destination === "save" && path) {
         await saveCanvasPng(canvas, path);
+        this.clearRuntimeDiagnostic("capture");
         this.showToast(t("capture.saved"), "success");
       } else {
         await copyCanvasImage(canvas);
+        this.clearRuntimeDiagnostic("capture");
         this.showToast(t("capture.copied"), "success");
       }
     } catch (error) {
@@ -1888,7 +2199,7 @@ export class ErawApp {
       if (code === "stale_generation" || code === "stale_render") {
         this.showToast(t("capture.stale"), "error");
       } else {
-        this.reportRuntimeError(error, "capture.failed");
+        this.reportRuntimeError(error, "capture.failed", 5000, "capture");
       }
     } finally {
       this.imageCaptureInProgress = false;
@@ -2296,8 +2607,9 @@ export class ErawApp {
     const appWindow = getCurrentWindow();
     try {
       await appWindow.setFullscreen(!(await appWindow.isFullscreen()));
+      this.clearRuntimeDiagnostic("fullscreen");
     } catch (error) {
-      this.reportRuntimeError(error, "runtime.fullscreenFailed");
+      this.reportRuntimeError(error, "runtime.fullscreenFailed", 5000, "fullscreen");
     }
   }
 

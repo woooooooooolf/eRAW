@@ -1,8 +1,8 @@
 use crate::analysis::{AnalysisRequest, AnalysisResult, analyze_image};
 use crate::raw::{
     ExportRequest, ExportResult, PixelInspectionRequest, PixelSample, RawDescriptor, RawLayout,
-    RawWarning, TileRequest, calculate_layout, cfa_name_at, export_raw, inspect_pixels, read_pixel,
-    render_tile_cancellable, write_output_bytes,
+    RawWarning, TileRequest, calculate_layout, cfa_name_at, export_raw_cancellable, inspect_pixels,
+    read_pixel, render_tile_cancellable, write_output_bytes,
 };
 use memmap2::{Mmap, MmapOptions};
 use serde::Serialize;
@@ -15,7 +15,10 @@ use std::{
         atomic::{AtomicU64, Ordering},
     },
 };
-use tauri::{State, ipc::Response};
+use tauri::{
+    State,
+    ipc::{Channel, Response},
+};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,6 +51,7 @@ impl From<String> for CommandError {
             "stale_generation" => "stale_generation",
             "stale_render" => "stale_render",
             "stale_analysis" => "stale_analysis",
+            "export_cancelled" => "export_cancelled",
             "analysis_invalid_roi" => "analysis_invalid_roi",
             "analysis_invalid_frame" => "analysis_invalid_frame",
             "裁剪宽度和高度必须大于 0" => "export_invalid_crop",
@@ -124,6 +128,7 @@ pub struct AppState {
     generation_clock: Arc<AtomicU64>,
     preview_revision: Arc<AtomicU64>,
     analysis_revision: Arc<AtomicU64>,
+    export_revision: Arc<AtomicU64>,
     preview_cache: Arc<Mutex<PreviewCache>>,
 }
 
@@ -134,6 +139,7 @@ impl Default for AppState {
             generation_clock: Arc::new(AtomicU64::new(0)),
             preview_revision: Arc::new(AtomicU64::new(0)),
             analysis_revision: Arc::new(AtomicU64::new(0)),
+            export_revision: Arc::new(AtomicU64::new(0)),
             preview_cache: Arc::new(Mutex::new(PreviewCache::default())),
         }
     }
@@ -462,11 +468,26 @@ pub fn sample_raw_pixel(
     })
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportProgress {
+    completed_rows: u32,
+    total_rows: u32,
+}
+
 #[tauri::command]
 pub async fn export_document(
     request: ExportRequest,
+    export_revision: u64,
+    on_progress: Channel<ExportProgress>,
     state: State<'_, AppState>,
 ) -> Result<ExportResult, CommandError> {
+    let previous_revision = state
+        .export_revision
+        .fetch_max(export_revision, Ordering::AcqRel);
+    if previous_revision > export_revision {
+        return Err(CommandError::new("export_cancelled"));
+    }
     let (map, file_size, source_path, generation) = {
         let guard = lock_document(&state)?;
         let document = guard
@@ -492,15 +513,36 @@ pub async fn export_document(
     }
     let descriptor = request.source_descriptor.clone();
     let layout = calculate_layout(&descriptor, file_size).0;
+    let export_clock = state.export_revision.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let bytes: &[u8] = match map.as_ref() {
             Some(value) => value.as_ref(),
             None => &[],
         };
-        export_raw(bytes, &descriptor, &layout, &request).map_err(CommandError::from)
+        export_raw_cancellable(
+            bytes,
+            &descriptor,
+            &layout,
+            &request,
+            || export_clock.load(Ordering::Acquire) == export_revision,
+            |completed_rows, total_rows| {
+                let _ = on_progress.send(ExportProgress {
+                    completed_rows,
+                    total_rows,
+                });
+            },
+        )
+        .map_err(CommandError::from)
     })
     .await
     .map_err(|error| CommandError::new("export_task_failed").with_cause(error))?
+}
+
+#[tauri::command]
+pub fn cancel_raw_export(export_revision: u64, state: State<'_, AppState>) {
+    state
+        .export_revision
+        .fetch_max(export_revision, Ordering::AcqRel);
 }
 
 #[tauri::command]

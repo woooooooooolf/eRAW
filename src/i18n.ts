@@ -84,6 +84,7 @@ const CATALOG = {
   "statistics.rangeStart": message("Range start", "范围起点", "範圍起點", "範囲開始", "Inicio del rango", "Début de plage", "Bereichsanfang"),
   "statistics.rangeEnd": message("Range end", "范围终点", "範圍終點", "範囲終了", "Fin del rango", "Fin de plage", "Bereichsende"),
   "statistics.resizeChart": message("Drag to resize the chart; double-click to reset", "拖动调整图表高度；双击恢复默认", "拖曳調整圖表高度；按兩下恢復預設", "ドラッグでグラフ高さを変更、ダブルクリックでリセット", "Arrastre para ajustar la altura; doble clic para restablecer", "Faites glisser pour régler la hauteur ; double-cliquez pour réinitialiser", "Ziehen zum Ändern der Diagrammhöhe; Doppelklick zum Zurücksetzen"),
+  "statistics.resizePanel": message("Drag to resize the image statistics area", "拖动调整图像统计区域大小", "拖曳調整影像統計區域大小", "ドラッグして画像統計領域のサイズを変更", "Arrastre para cambiar el tamaño del área de estadísticas", "Faites glisser pour redimensionner la zone de statistiques", "Ziehen, um den Bildstatistikbereich zu skalieren"),
   "statistics.expected": message("Expected samples", "预期样本", "預期樣本", "期待サンプル", "Muestras esperadas", "Échantillons attendus", "Erwartete Stichproben"),
   "statistics.valid": message("Valid samples", "有效样本", "有效樣本", "有効サンプル", "Muestras válidas", "Échantillons valides", "Gültige Stichproben"),
   "statistics.missing": message("Missing samples", "缺失样本", "缺失樣本", "欠損サンプル", "Muestras ausentes", "Échantillons manquants", "Fehlende Stichproben"),
@@ -281,7 +282,7 @@ const CATALOG = {
   "settings.recommended": message("64 MiB (recommended)", "64 MiB（推荐）", "64 MiB（建議）", "64 MiB（推奨）", "64 MiB (recomendado)", "64 Mio (recommandé)", "64 MiB (empfohlen)"),
   "settings.reset": message("Restore defaults", "恢复默认设置", "還原預設設定", "既定値に戻す", "Restaurar valores predeterminados", "Rétablir les valeurs par défaut", "Standardeinstellungen wiederherstellen"),
   "settings.saved": message("Settings saved", "设置已保存", "設定已儲存", "設定を保存しました", "Ajustes guardados", "Paramètres enregistrés", "Einstellungen gespeichert"),
-  "help.dimensions": message("Visible pixel width and height, excluding row or frame padding. The current range is 1×1 to {max}×{max}.", "图像中可见的有效像素宽度和高度，不包含每行或每帧末尾的填充数据。当前前端允许范围为 1×1 至 {max}×{max}。", "影像中可見的有效像素寬度與高度，不含每列或每影格末尾的填充資料。目前範圍為 1×1 至 {max}×{max}。", "行末・フレーム末のパディングを除く可視画素の幅と高さです。現在の範囲は 1×1～{max}×{max} です。", "Anchura y altura de píxeles visibles, sin relleno de fila o fotograma. Rango actual: 1×1 a {max}×{max}.", "Largeur et hauteur des pixels visibles, hors remplissage de ligne ou d’image. Plage actuelle : 1×1 à {max}×{max}.", "Sichtbare Pixelbreite und -höhe ohne Zeilen- oder Frame-Padding. Aktueller Bereich: 1×1 bis {max}×{max}."),
+  "help.dimensions": message("Visible pixel width and height, excluding row or frame padding. The current maximum is {maxWidth}×{maxHeight}.", "图像中可见的有效像素宽度和高度，不包含每行或每帧末尾的填充数据。当前最大值为 {maxWidth}×{maxHeight}。", "影像中可見的有效像素寬度與高度，不含每列或每影格末尾的填充資料。目前最大值為 {maxWidth}×{maxHeight}。", "行末・フレーム末のパディングを除く可視画素の幅と高さです。現在の最大値は {maxWidth}×{maxHeight} です。", "Anchura y altura de píxeles visibles, sin relleno de fila o fotograma. El máximo actual es {maxWidth}×{maxHeight}.", "Largeur et hauteur des pixels visibles, hors remplissage de ligne ou d’image. Le maximum actuel est de {maxWidth}×{maxHeight}.", "Sichtbare Pixelbreite und -höhe ohne Zeilen- oder Frame-Padding. Das aktuelle Maximum ist {maxWidth}×{maxHeight}."),
   "help.bitDepth": message("Effective bits used per pixel. 9/11/13/15-bit data is usually stored in a 16-bit container.", "每个像素实际使用的有效位数。9/11/13/15 bit 数据通常存放在 16-bit 容器中。", "每個像素實際使用的有效位元數。9/11/13/15 bit 資料通常存於 16-bit 容器中。", "画素ごとの有効ビット数です。9/11/13/15 bit データは通常 16-bit コンテナに格納されます。", "Bits efectivos por píxel. Los datos de 9/11/13/15 bits suelen almacenarse en un contenedor de 16 bits.", "Nombre de bits utiles par pixel. Les données 9/11/13/15 bits sont généralement stockées dans un conteneur 16 bits.", "Effektive Bits pro Pixel. 9/11/13/15-Bit-Daten werden meist in einem 16-Bit-Container gespeichert."),
   "help.packing": message("Byte layout of RAW pixels in the file; MIPI formats pack multiple pixels compactly.", "RAW 像素在文件中的字节排列方式；MIPI 格式会将多个像素紧凑打包。", "RAW 像素在檔案中的位元組排列方式；MIPI 格式會緊密打包多個像素。", "ファイル内の RAW 画素のバイト配置です。MIPI 形式は複数画素を密にパックします。", "Disposición de bytes de los píxeles RAW; los formatos MIPI empaquetan varios píxeles.", "Disposition des octets des pixels RAW ; les formats MIPI regroupent plusieurs pixels.", "Byte-Anordnung der RAW-Pixel; MIPI-Formate packen mehrere Pixel kompakt."),
   "help.endianness": message("Byte order for multi-byte Unpacked pixels; MIPI packed formats do not use this setting.", "Unpacked 多字节像素在文件中的字节顺序；MIPI packed 格式不使用此设置。", "Unpacked 多位元組像素的位元組順序；MIPI packed 格式不使用此設定。", "複数バイト Unpacked 画素のバイト順です。MIPI packed 形式では使用しません。", "Orden de bytes para píxeles Unpacked multibyte; MIPI packed no usa este ajuste.", "Ordre des octets des pixels Unpacked multi-octets ; MIPI packed n’utilise pas ce réglage.", "Byte-Reihenfolge mehrbyteiger Unpacked-Pixel; MIPI packed verwendet diese Einstellung nicht."),
@@ -385,6 +386,11 @@ const CATALOG = {
   "export.integerRange": message("Enter an integer from 0 to {max}", "请输入 0–{max} 之间的整数", "請輸入 0–{max} 之間的整數", "0～{max} の整数を入力してください", "Introduzca un entero entre 0 y {max}", "Saisissez un entier entre 0 et {max}", "Ganzzahl zwischen 0 und {max} eingeben"),
   "export.fixFields": message("Correct the highlighted export parameters and try again.", "请修正标红的导出参数后重试。", "請修正標紅的匯出參數後重試。", "強調表示されたエクスポートパラメーターを修正してください。", "Corrija los parámetros resaltados e inténtelo de nuevo.", "Corrigez les paramètres en surbrillance et réessayez.", "Markierte Exportparameter korrigieren und erneut versuchen."),
   "export.writing": message("Converting and safely writing RAW data…", "正在转换并安全写入 RAW 数据…", "正在轉換並安全寫入 RAW 資料…", "RAW データを変換して安全に書き込み中…", "Convirtiendo y escribiendo datos RAW de forma segura…", "Conversion et écriture sécurisée des données RAW…", "RAW-Daten werden konvertiert und sicher geschrieben…"),
+  "export.progress": message("Writing RAW data… {percent}% ({completed}/{total} rows)", "正在写入 RAW 数据… {percent}%（{completed}/{total} 行）", "正在寫入 RAW 資料… {percent}%（{completed}/{total} 列）", "RAW データを書き込み中… {percent}%（{completed}/{total} 行）", "Escribiendo datos RAW… {percent}% ({completed}/{total} filas)", "Écriture des données RAW… {percent} % ({completed}/{total} lignes)", "RAW-Daten werden geschrieben… {percent} % ({completed}/{total} Zeilen)"),
+  "export.progressLabel": message("Export progress", "导出进度", "匯出進度", "エクスポートの進行状況", "Progreso de exportación", "Progression de l’exportation", "Exportfortschritt"),
+  "export.cancelExport": message("Cancel export", "取消导出", "取消匯出", "エクスポートをキャンセル", "Cancelar exportación", "Annuler l’exportation", "Export abbrechen"),
+  "export.cancelling": message("Cancelling export…", "正在取消导出…", "正在取消匯出…", "エクスポートをキャンセル中…", "Cancelando exportación…", "Annulation de l’exportation…", "Export wird abgebrochen…"),
+  "export.cancelled": message("Export cancelled", "导出已取消", "匯出已取消", "エクスポートをキャンセルしました", "Exportación cancelada", "Exportation annulée", "Export abgebrochen"),
   "export.clipped": message("clipped {count} pixels", "裁剪 {count} 像素", "裁剪 {count} 像素", "{count} 画素をクリップ", "{count} píxeles recortados", "{count} pixels écrêtés", "{count} Pixel beschnitten"),
   "export.filled": message("filled {count} pixels", "填充 {count} 像素", "填充 {count} 像素", "{count} 画素を補完", "{count} píxeles rellenados", "{count} pixels remplis", "{count} Pixel gefüllt"),
   "export.success": message("Exported current frame · {bytes} · {format}{missing}{clipped}", "已导出当前帧 · {bytes} · {format}{missing}{clipped}", "已匯出目前影格 · {bytes} · {format}{missing}{clipped}", "現在のフレームをエクスポートしました・{bytes}・{format}{missing}{clipped}", "Fotograma actual exportado · {bytes} · {format}{missing}{clipped}", "Image actuelle exportée · {bytes} · {format}{missing}{clipped}", "Aktuellen Frame exportiert · {bytes} · {format}{missing}{clipped}"),
@@ -429,6 +435,8 @@ const CATALOG = {
   "runtime.fullscreenFailed": message("Could not switch native fullscreen mode.\n{detail}", "无法切换原生全屏模式。\n{detail}", "無法切換原生全螢幕模式。\n{detail}", "ネイティブ全画面モードに切り替えられませんでした。\n{detail}", "No se pudo cambiar al modo de pantalla completa nativo.\n{detail}", "Impossible de basculer en plein écran natif.\n{detail}", "Der native Vollbildmodus konnte nicht umgeschaltet werden.\n{detail}"),
   "runtime.renderFailed": message("Some tiles failed to render. Automatic retries have stopped; change parameters, frame or display mode to retry.\n{detail}", "部分瓦片渲染失败，已停止自动重试；修改参数、帧或显示模式后可重新尝试。\n{detail}", "部分圖塊渲染失敗，已停止自動重試；變更參數、影格或顯示模式後可重試。\n{detail}", "一部のタイルの描画に失敗しました。自動再試行を停止しました。パラメーター、フレーム、表示モードを変更して再試行してください。\n{detail}", "No se pudieron renderizar algunos mosaicos. Se detuvieron los reintentos automáticos; cambie los parámetros, el fotograma o el modo para reintentar.\n{detail}", "Le rendu de certaines tuiles a échoué. Les tentatives automatiques sont arrêtées ; modifiez les paramètres, l’image ou le mode pour réessayer.\n{detail}", "Einige Kacheln konnten nicht gerendert werden. Automatische Wiederholungen wurden beendet; Parameter, Frame oder Anzeigemodus ändern, um erneut zu versuchen.\n{detail}"),
   "runtime.pixelReadFailed": message("High-zoom pixel values could not be read. Automatic retries have stopped; change parameters, frame or display mode to retry.\n{detail}", "高倍率像素值读取失败，已停止自动重试；修改参数、帧或显示模式后可重新尝试。\n{detail}", "高倍率像素值讀取失敗，已停止自動重試；變更參數、影格或顯示模式後可重試。\n{detail}", "高倍率の画素値を読み取れませんでした。自動再試行を停止しました。パラメーター、フレーム、表示モードを変更して再試行してください。\n{detail}", "No se pudieron leer los valores de píxel con zoom alto. Se detuvieron los reintentos automáticos; cambie los parámetros, el fotograma o el modo.\n{detail}", "Impossible de lire les valeurs de pixel à fort zoom. Les tentatives automatiques sont arrêtées ; modifiez les paramètres, l’image ou le mode.\n{detail}", "Pixelwerte bei starker Vergrößerung konnten nicht gelesen werden. Automatische Wiederholungen wurden beendet; Parameter, Frame oder Anzeigemodus ändern.\n{detail}"),
+  "runtime.webglContextLost": message("The graphics context was lost. eRAW will restore the preview automatically.", "图形上下文已丢失，eRAW 将自动恢复预览。", "圖形內容已遺失，eRAW 將自動恢復預覽。", "グラフィックスコンテキストが失われました。eRAW はプレビューを自動的に復元します。", "Se perdió el contexto gráfico. eRAW restaurará la vista previa automáticamente.", "Le contexte graphique a été perdu. eRAW restaurera automatiquement l’aperçu.", "Der Grafikkontext ging verloren. eRAW stellt die Vorschau automatisch wieder her."),
+  "runtime.webglRestoreFailed": message("The graphics context could not be restored.\n{detail}", "图形上下文恢复失败。\n{detail}", "圖形內容無法恢復。\n{detail}", "グラフィックスコンテキストを復元できませんでした。\n{detail}", "No se pudo restaurar el contexto gráfico.\n{detail}", "Impossible de restaurer le contexte graphique.\n{detail}", "Der Grafikkontext konnte nicht wiederhergestellt werden.\n{detail}"),
   "runtime.fatalTitle": message("eRAW could not start", "eRAW 无法启动", "eRAW 無法啟動", "eRAW を起動できません", "No se pudo iniciar eRAW", "Impossible de démarrer eRAW", "eRAW konnte nicht gestartet werden"),
   "runtime.fatalHint": message("Confirm that WebView2 and the graphics driver support WebGL2.", "请确认 WebView2 和显卡驱动支持 WebGL2。", "請確認 WebView2 與顯示卡驅動程式支援 WebGL2。", "WebView2 とグラフィックスドライバーが WebGL2 に対応していることを確認してください。", "Confirme que WebView2 y el controlador gráfico son compatibles con WebGL2.", "Vérifiez que WebView2 et le pilote graphique prennent en charge WebGL2.", "Prüfen Sie, ob WebView2 und der Grafiktreiber WebGL2 unterstützen."),
   "runtime.remosaicReconstructTitle": message("View the standard Bayer mosaic after same-color bilinear reconstruction", "查看同色双线性重建后的标准 Bayer 点阵", "檢視同色雙線性重建後的標準 Bayer 點陣", "同色バイリニア再構成後の標準 Bayer モザイクを表示", "Ver el mosaico Bayer estándar tras la reconstrucción bilineal del mismo color", "Afficher la mosaïque Bayer standard après reconstruction bilinéaire de même couleur", "Standard-Bayer-Mosaik nach bilinearer Rekonstruktion gleicher Farben anzeigen"),
@@ -449,6 +457,7 @@ const CATALOG = {
   "error.programCreate": message("Could not create WebGL program", "无法创建 WebGL 程序", "無法建立 WebGL 程式", "WebGL プログラムを作成できません", "No se pudo crear el programa WebGL", "Impossible de créer le programme WebGL", "WebGL-Programm konnte nicht erstellt werden"),
   "error.programLink": message("WebGL program linking failed: {detail}", "WebGL 程序链接失败：{detail}", "WebGL 程式連結失敗：{detail}", "WebGL プログラムのリンクに失敗しました：{detail}", "Falló el enlace del programa WebGL: {detail}", "Échec de l’édition de liens du programme WebGL : {detail}", "Verknüpfung des WebGL-Programms fehlgeschlagen: {detail}"),
   "error.webglUnsupported": message("This WebView2 does not support the WebGL2 canvas required by eRAW", "当前 WebView2 不支持 eRAW 所需的 WebGL2 画布", "目前 WebView2 不支援 eRAW 所需的 WebGL2 畫布", "現在の WebView2 は eRAW に必要な WebGL2 キャンバスに対応していません", "Este WebView2 no admite el lienzo WebGL2 requerido por eRAW", "Ce WebView2 ne prend pas en charge le canevas WebGL2 requis par eRAW", "Dieses WebView2 unterstützt die von eRAW benötigte WebGL2-Arbeitsfläche nicht"),
+  "error.bufferAllocation": message("Could not allocate the WebGL vertex buffer", "无法分配 WebGL 顶点缓冲区", "無法配置 WebGL 頂點緩衝區", "WebGL 頂点バッファーを割り当てられませんでした", "No se pudo asignar el búfer de vértices WebGL", "Impossible d’allouer le tampon de sommets WebGL", "Der WebGL-Vertexpuffer konnte nicht zugewiesen werden"),
   "error.uniformUnavailable": message("WebGL uniform {name} is unavailable", "WebGL uniform {name} 不可用", "WebGL uniform {name} 無法使用", "WebGL uniform {name} は使用できません", "El uniform WebGL {name} no está disponible", "L’uniforme WebGL {name} n’est pas disponible", "WebGL-Uniform {name} ist nicht verfügbar"),
   "error.textureAllocation": message("GPU texture allocation failed", "GPU 纹理分配失败", "GPU 紋理配置失敗", "GPU テクスチャの割り当てに失敗しました", "Falló la asignación de textura GPU", "Échec de l’allocation de texture GPU", "GPU-Texturzuweisung fehlgeschlagen"),
   "error.selectionOverlayMissing": message("Image selection overlay is missing", "缺少图像选区叠加层", "缺少影像選取範圍疊加層", "画像選択オーバーレイがありません", "Falta la superposición de selección de imagen", "La superposition de sélection d’image est manquante", "Bildauswahl-Overlay fehlt"),
@@ -463,6 +472,7 @@ const CATALOG = {
   "backend.tileTaskFailed": message("The tile rendering task failed", "瓦片渲染任务异常", "圖塊渲染工作失敗", "タイル描画タスクに失敗しました", "Falló la tarea de renderizado de mosaicos", "La tâche de rendu des tuiles a échoué", "Kachel-Rendering-Aufgabe fehlgeschlagen"),
   "backend.pixelTaskFailed": message("The pixel inspection task failed", "像素检查任务异常", "像素檢查工作失敗", "画素検査タスクに失敗しました", "Falló la tarea de inspección de píxeles", "La tâche d’inspection des pixels a échoué", "Pixelprüfungsaufgabe fehlgeschlagen"),
   "backend.exportTaskFailed": message("The RAW export task failed", "RAW 导出任务异常", "RAW 匯出工作失敗", "RAW エクスポートタスクに失敗しました", "Falló la tarea de exportación RAW", "La tâche d’exportation RAW a échoué", "RAW-Exportaufgabe fehlgeschlagen"),
+  "backend.exportCancelled": message("The RAW export was cancelled", "RAW 导出已取消", "RAW 匯出已取消", "RAW エクスポートをキャンセルしました", "La exportación RAW fue cancelada", "L’exportation RAW a été annulée", "Der RAW-Export wurde abgebrochen"),
   "backend.operationFailed": message("The operation could not be completed", "操作无法完成", "操作無法完成", "操作を完了できません", "No se pudo completar la operación", "L’opération n’a pas pu être effectuée", "Vorgang konnte nicht abgeschlossen werden"),
   "backend.exportSnapshotStale": message("The export source snapshot is stale; close and reopen the export dialog", "导出来源快照已失效，请关闭导出窗口后重新打开", "匯出來源快照已失效，請關閉並重新開啟匯出對話框", "エクスポート元のスナップショットが古くなりました。ダイアログを開き直してください", "La instantánea de origen ha caducado; cierre y vuelva a abrir el diálogo", "L’instantané source a expiré ; fermez puis rouvrez la boîte de dialogue", "Export-Quell-Snapshot ist veraltet; Dialog schließen und erneut öffnen"),
   "backend.exportOverwritesSource": message("The export path cannot overwrite the currently open source RAW file", "导出路径不能覆盖当前打开的源 RAW 文件", "匯出路徑不可覆寫目前開啟的來源 RAW 檔案", "エクスポート先に現在開いている RAW ファイルを上書きできません", "La ruta de exportación no puede sobrescribir el RAW de origen abierto", "Le chemin d’exportation ne peut pas écraser le RAW source ouvert", "Exportpfad darf die aktuell geöffnete RAW-Quelldatei nicht überschreiben"),
@@ -500,16 +510,6 @@ const LOCALE_NAMES: Record<ResolvedLocale, string> = {
   fr: "Français",
   de: "Deutsch",
 };
-
-const trackedText = new Map<Text, MessageKey>();
-const trackedAttributes = new Map<Element, Map<string, MessageKey>>();
-const keyByLocalizedText = new Map<string, MessageKey>();
-
-for (const [key, entry] of Object.entries(CATALOG) as Array<[MessageKey, Entry]>) {
-  for (const value of Object.values(entry)) {
-    if (value && !value.includes("{")) keyByLocalizedText.set(value, key);
-  }
-}
 
 let preference: LanguagePreference = "system";
 let locale: ResolvedLocale = "en";
@@ -624,54 +624,26 @@ export function formatTime(value: Date): string {
   }).format(value);
 }
 
-function translatedTextKey(value: string): MessageKey | undefined {
-  return keyByLocalizedText.get(value.trim());
-}
-
-function replacePreservingWhitespace(value: string, replacement: string): string {
-  const leading = value.match(/^\s*/)?.[0] ?? "";
-  const trailing = value.match(/\s*$/)?.[0] ?? "";
-  return `${leading}${replacement}${trailing}`;
-}
-
 export function localizeTree(root: ParentNode): void {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let node = walker.nextNode();
-  while (node) {
-    const textNode = node as Text;
-    const existing = trackedText.get(textNode);
-    const key = existing ?? translatedTextKey(textNode.nodeValue ?? "");
-    if (key) {
-      trackedText.set(textNode, key);
-      textNode.nodeValue = replacePreservingWhitespace(textNode.nodeValue ?? "", t(key));
-    }
-    node = walker.nextNode();
-  }
-
   const elements = root instanceof Element
     ? [root, ...root.querySelectorAll("*")]
     : [...root.querySelectorAll("*")];
   for (const element of elements) {
-    const keys = trackedAttributes.get(element) ?? new Map<string, MessageKey>();
-    for (const attribute of ["title", "aria-label", "placeholder", "data-help"]) {
-      const value = element.getAttribute(attribute);
-      if (!value) continue;
-      const key = keys.get(attribute) ?? translatedTextKey(value);
-      if (key) {
-        keys.set(attribute, key);
-        element.setAttribute(attribute, t(key));
-      }
+    const textKey = element.getAttribute("data-i18n");
+    if (textKey && hasMessage(textKey)) element.textContent = t(textKey);
+    for (const [keyAttribute, targetAttribute] of [
+      ["data-i18n-title", "title"],
+      ["data-i18n-aria-label", "aria-label"],
+      ["data-i18n-placeholder", "placeholder"],
+      ["data-i18n-help", "data-help"],
+      ["data-i18n-label", "label"],
+    ] as const) {
+      const key = element.getAttribute(keyAttribute);
+      if (key && hasMessage(key)) element.setAttribute(targetAttribute, t(key));
     }
-    if (keys.size) trackedAttributes.set(element, keys);
   }
 }
 
-export function refreshLocalizedTree(): void {
-  for (const [node, key] of trackedText) {
-    if (node.isConnected) node.nodeValue = replacePreservingWhitespace(node.nodeValue ?? "", t(key));
-  }
-  for (const [element, attributes] of trackedAttributes) {
-    if (!element.isConnected) continue;
-    for (const [attribute, key] of attributes) element.setAttribute(attribute, t(key));
-  }
+export function refreshLocalizedTree(root: ParentNode = document): void {
+  localizeTree(root);
 }

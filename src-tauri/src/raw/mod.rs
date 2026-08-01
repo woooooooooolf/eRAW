@@ -1613,11 +1613,23 @@ pub fn write_output_bytes(path: &Path, bytes: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(test)]
 pub fn export_raw(
     data: &[u8],
     source: &RawDescriptor,
     layout: &RawLayout,
     request: &ExportRequest,
+) -> Result<ExportResult, String> {
+    export_raw_cancellable(data, source, layout, request, || true, |_, _| {})
+}
+
+pub fn export_raw_cancellable(
+    data: &[u8],
+    source: &RawDescriptor,
+    layout: &RawLayout,
+    request: &ExportRequest,
+    should_continue: impl Fn() -> bool,
+    mut on_progress: impl FnMut(u32, u32),
 ) -> Result<ExportResult, String> {
     if request.crop_width == 0 || request.crop_height == 0 {
         return Err("裁剪宽度和高度必须大于 0".into());
@@ -1718,7 +1730,11 @@ pub fn export_raw(
         let mut writer = BufWriter::with_capacity(1024 * 1024, temporary_file);
         let mut clipped = 0u64;
         let mut filled = MissingPixelCounts::default();
-        for y in request.crop_y..request.crop_y + request.crop_height {
+        let progress_interval = (request.crop_height / 100).max(1);
+        for (row_index, y) in (request.crop_y..request.crop_y + request.crop_height).enumerate() {
+            if !should_continue() {
+                return Err("export_cancelled".into());
+            }
             let row = if request.target == ExportTarget::Demosaic {
                 let mut row = Vec::with_capacity(row_bytes);
                 for x in request.crop_x..request.crop_x + request.crop_width {
@@ -1797,6 +1813,13 @@ pub fn export_raw(
                 .write_all(&row)
                 .map_err(|e| format!("写入输出文件失败：{e}"))?;
             write_zeroes(&mut writer, row_stride - row_bytes, "行填充")?;
+            let completed_rows = row_index as u32 + 1;
+            if completed_rows == request.crop_height || completed_rows % progress_interval == 0 {
+                on_progress(completed_rows, request.crop_height);
+            }
+        }
+        if !should_continue() {
+            return Err("export_cancelled".into());
         }
         write_zeroes(&mut writer, frame_stride - frame_bytes, "帧填充")?;
         writer
@@ -1812,6 +1835,10 @@ pub fn export_raw(
             return Err(error);
         }
     };
+    if !should_continue() {
+        let _ = fs::remove_file(&temporary_path);
+        return Err("export_cancelled".into());
+    }
     if let Err(error) = commit_temporary_output(&temporary_path, path) {
         let _ = fs::remove_file(&temporary_path);
         return Err(error);
@@ -1921,6 +1948,45 @@ mod tests {
 
         write_output_bytes(&output, b"replacement").unwrap();
         assert_eq!(fs::read(&output).unwrap(), b"replacement");
+        fs::remove_file(&output).unwrap();
+    }
+
+    #[test]
+    fn cancelled_export_keeps_existing_output_and_reports_progress() {
+        use std::cell::{Cell, RefCell};
+
+        let descriptor = RawDescriptor {
+            width: 4,
+            height: 6,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Mono,
+            ..RawDescriptor::default()
+        };
+        let source = vec![7; (descriptor.width * descriptor.height) as usize];
+        let layout = calculate_layout(&descriptor, source.len() as u64).0;
+        let output = test_output_path("cancelled-export");
+        write_output_bytes(&output, b"existing").unwrap();
+        let request = test_export_request(&descriptor, &output, ExportTarget::OriginalCfa);
+        let checks = Cell::new(0u32);
+        let progress = RefCell::new(Vec::new());
+
+        let error = export_raw_cancellable(
+            &source,
+            &descriptor,
+            &layout,
+            &request,
+            || {
+                checks.set(checks.get() + 1);
+                checks.get() <= 2
+            },
+            |completed, total| progress.borrow_mut().push((completed, total)),
+        )
+        .unwrap_err();
+
+        assert_eq!(error, "export_cancelled");
+        assert_eq!(fs::read(&output).unwrap(), b"existing");
+        assert_eq!(*progress.borrow(), vec![(1, 6), (2, 6)]);
         fs::remove_file(&output).unwrap();
     }
 
