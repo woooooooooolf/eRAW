@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [appSource, contentSource, windowSource, statisticsWindowSource, entrySource, capabilitySource, styleSource, pixelOverlaySource] = await Promise.all([
+const [appSource, contentSource, windowSource, statisticsWindowSource, entrySource, capabilitySource, styleSource, pixelOverlaySource, helpMathSource, packageSource, fontPolicySource] = await Promise.all([
   readFile(new URL("../src/app.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/help-content.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/help-window.ts", import.meta.url), "utf8"),
@@ -11,6 +11,9 @@ const [appSource, contentSource, windowSource, statisticsWindowSource, entrySour
   readFile(new URL("../src-tauri/capabilities/default.json", import.meta.url), "utf8"),
   readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
   readFile(new URL("../src/pixel-overlay.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/help-math.ts", import.meta.url), "utf8"),
+  readFile(new URL("../package.json", import.meta.url), "utf8"),
+  readFile(new URL("../docs/FONT_POLICY.md", import.meta.url), "utf8"),
 ]);
 
 test("help is available from the utility menu and F1 through one window lifecycle", () => {
@@ -45,23 +48,40 @@ test("the Chinese technical manual is split into task-oriented pages", () => {
   assert.match(windowSource, /data-help-previous/);
   assert.match(windowSource, /data-help-next/);
   assert.match(windowSource, /window\.history\.pushState/);
-  assert.match(windowSource, /eRAW V0\.5\.2/);
-  assert.match(contentSource, /eRAW V0\.5\.2 当前实现同步/);
+  assert.match(windowSource, /eRAW V0\.5\.3/);
+  assert.match(contentSource, /eRAW V0\.5\.3 当前实现同步/);
 });
 
-test("the technical manual documents implementation-accurate formulas and boundaries", () => {
-  assert.match(contentSource, /rowBytes = 5 · ceil\(W \/ 4\)/);
-  assert.match(contentSource, /DNᵢ = \(Bᵢ &lt;&lt; 2\)/);
-  assert.match(contentSource, /phaseX′ = \(phaseX \+ cropX\) mod 4/);
+test("the technical manual renders implementation-accurate LaTeX as native MathML", () => {
+  assert.ok(contentSource.includes(String.raw`\mathrm{rowBytes}=5\left\lceil\frac{W}{4}\right\rceil`));
+  assert.ok(contentSource.includes(String.raw`\mathrm{DN}_i=(B_i\ll2)`));
+  assert.ok(contentSource.includes(String.raw`p_x'=(p_x+\mathrm{cropX})\bmod4`));
   assert.match(contentSource, /Remosaic/);
   assert.match(contentSource, /Demosaic/);
-  assert.match(contentSource, /M2ₙ = M2ₙ₋₁/);
-  assert.match(contentSource, /variance = M2ₙ \/ n/);
-  assert.match(contentSource, /bucketSize = max\(1, ceil\(exactBinCount \/ 4096\)\)/);
-  assert.match(contentSource, /sourceMax\/2/);
+  assert.ok(contentSource.includes(String.raw`\sigma^2&=\frac{M_{2,n}}{n}`));
+  assert.ok(contentSource.includes(String.raw`\left\lceil\frac{N_{\mathrm{bin}}}{4096}\right\rceil`));
+  assert.ok(contentSource.includes(String.raw`S_{\max}/2`));
   assert.match(contentSource, /EMVA 1288/);
   assert.match(contentSource, /缺失样本/);
   assert.match(contentSource, /总体方差/);
+  assert.match(contentSource, /data-latex/);
+  assert.match(windowSource, /renderHelpMath\(root\)/);
+  assert.match(helpMathSource, /output: "mathml"/);
+  assert.match(helpMathSource, /render\(source, element, KATEX_OPTIONS\)/);
+  assert.doesNotMatch(helpMathSource, /katex\.css/);
+});
+
+test("the manual uses paper-like full-width typography and semantic admonitions", () => {
+  for (const kind of ["tip", "warning", "danger", "supplement"]) {
+    assert.match(contentSource, new RegExp(`admonition\\("${kind}"`));
+    assert.match(styleSource, new RegExp(`\\.help-admonition\\.${kind}`));
+  }
+  assert.match(styleSource, /--font-serif: ui-serif, serif/);
+  assert.match(styleSource, /\.help-document \{[^}]*font-family: var\(--font-serif\)/s);
+  assert.match(styleSource, /\.help-section \{ width: 100%; margin: 0; \}/);
+  assert.doesNotMatch(styleSource, /\.help-section \{[^}]*max-width:/s);
+  assert.match(styleSource, /\.help-page-header \{[^}]*padding: 6px 0 30px/s);
+  assert.match(styleSource, /\.help-equation \{[^}]*border: 0/s);
 });
 
 test("independent help and statistics windows suppress native context menus", () => {
@@ -72,8 +92,14 @@ test("independent help and statistics windows suppress native context menus", ()
 
 test("the application distributes no named font or font file", () => {
   assert.match(styleSource, /font-family: system-ui, sans-serif/);
+  assert.match(styleSource, /--font-serif: ui-serif, serif/);
   assert.match(styleSource, /--font-mono: ui-monospace, monospace/);
   assert.doesNotMatch(styleSource, /@font-face|Cascadia|Consolas|Segoe|Microsoft YaHei/);
   assert.match(pixelOverlaySource, /ui-monospace, monospace/);
   assert.doesNotMatch(pixelOverlaySource, /Cascadia|Consolas|Segoe|Microsoft YaHei/);
+  assert.equal(JSON.parse(packageSource).dependencies.katex, "^0.16.22");
+  assert.match(appSource, /<strong>KaTeX<\/strong>/);
+  assert.match(appSource, /<code>MIT<\/code>/);
+  assert.match(fontPolicySource, /MathML/);
+  assert.match(fontPolicySource, /不导入 KaTeX 的 CSS 或 Webfont/);
 });

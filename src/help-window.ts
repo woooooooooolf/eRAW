@@ -1,6 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { HELP_GROUPS, HELP_SECTIONS } from "./help-content";
+import { renderHelpMath } from "./help-math";
 import {
   getResolvedLocale,
   refreshLocalizedTree,
@@ -21,6 +22,7 @@ export class HelpWindowApp {
   constructor(private readonly root: HTMLElement) {
     root.addEventListener("contextmenu", (event) => event.preventDefault());
     root.innerHTML = this.template();
+    renderHelpMath(root);
     this.bindNavigation();
     if (isTauri()) void this.initialize();
   }
@@ -50,7 +52,7 @@ export class HelpWindowApp {
       </section>`).join("");
     return `<main class="help-window">
       <aside class="help-sidebar">
-        <header><div class="help-mark">Σ</div><div><small>eRAW V0.5.2</small><strong data-i18n="helpWindow.title">使用手册</strong><span>技术参考 · 中文</span></div></header>
+        <header><div class="help-mark">Σ</div><div><small>eRAW V0.5.3</small><strong data-i18n="helpWindow.title">使用手册</strong><span>技术参考 · 中文</span></div></header>
         <nav aria-label="使用手册目录">${navigation}</nav>
         <footer><button type="button" data-help-home><span>⌂</span><span>手册首页</span></button></footer>
       </aside>

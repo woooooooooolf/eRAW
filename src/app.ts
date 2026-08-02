@@ -96,7 +96,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.5.2";
+const VERSION = "0.5.3";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
@@ -830,7 +830,7 @@ export class ErawApp {
     text("#about-dialog footer button", "common.done");
     texts("#open-source-dialog header small, #open-source-dialog header h2", ["about.componentsEyebrow", "about.componentsTitle"]);
     text("#open-source-dialog .open-source-body > p:first-child", "about.componentsIntro");
-    texts("#open-source-dialog .component-list > div > span", ["about.desktopFramework", "about.fileDialog", "about.serialization", "about.memoryMap", "about.buildTool", "about.typeSystem", "about.charting"]);
+    texts("#open-source-dialog .component-list > div > span", ["about.desktopFramework", "about.fileDialog", "about.serialization", "about.memoryMap", "about.buildTool", "about.typeSystem", "about.charting", "about.mathTypesetting"]);
     text("#open-source-dialog .component-list > div:nth-child(1) > strong", "about.tauriApi");
     text("#open-source-dialog .component-list > div:nth-child(3) > strong", "about.serde");
     text("#open-source-dialog .open-source-note", "about.licenseNote");
@@ -962,6 +962,7 @@ export class ErawApp {
           <div><strong>Vite</strong><span>前端构建工具</span><code>MIT</code></div>
           <div><strong>TypeScript</strong><span>前端类型系统与编译工具</span><code>Apache-2.0</code></div>
           <div><strong>Apache ECharts</strong><span>交互式统计图表</span><code>Apache-2.0</code></div>
+          <div><strong>KaTeX</strong><span>LaTeX 解析与 MathML 公式排版</span><code>MIT</code></div>
         </div>
         <p class="open-source-note">完整传递依赖许可证清单将在正式公开发布前随源代码与发布产物提供。</p>
       </div>

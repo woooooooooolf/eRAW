@@ -26,7 +26,7 @@ flowchart LR
 
 Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予原生全屏、统计 WebviewWindow、文件对话框和写入图像剪贴板所需权限；F11 直接调用窗口 API，不通过 CSS 模拟或新增 Rust 命令。
 
-界面样式不打包或下载字体文件；正文和等宽内容分别使用 CSS 通用系统字体族，具体字形由用户系统与 WebView2 回退机制提供。
+界面样式不打包或下载字体文件；常规正文、手册正文和等宽内容分别使用 `system-ui`、`ui-serif` 与 `ui-monospace` 通用系统字体族，具体字形由用户系统与 WebView2 回退机制提供。技术手册通过 MIT 许可的 KaTeX 将 LaTeX 源直接转换为原生 MathML，不加载 KaTeX CSS 或字体资源。
 
 ## 模块职责
 
@@ -42,7 +42,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | `src/statistics-panel.ts` / `src/statistics-window.ts` | 统计纵向总览，以及底部、侧方和独立窗口承载 |
 | `src/statistics-view-state.ts` | 各图表曲线、横纵范围和分布局高度的持久状态、钳制与重置规则 |
 | `src/statistics-chart*.ts` / `src/statistics-report.ts` | 按需加载的主题自适应 ECharts 交互图表、独立的大数据图表变换，以及暂未接入入口的中性 PNG 报告绘制能力 |
-| `src/help-content.ts` / `src/help-window.ts` | 分组、分篇的中文技术参考内容，单篇路由、前后篇导航，以及与主窗口语言、主题即时同步的独立帮助窗口；其它语言暂以本地化提示说明中文手册正在审核 |
+| `src/help-content.ts` / `src/help-math.ts` / `src/help-window.ts` | 分组、分篇的中文技术参考内容，LaTeX 到原生 MathML 的公式渲染、单篇路由、前后篇导航，以及与主窗口语言、主题即时同步的独立帮助窗口；其它语言暂以本地化提示说明中文手册正在审核 |
 | `src/i18n.ts` | 语言偏好、系统语言解析、七语文案目录、日期时间格式化和静态 DOM 翻译 |
 | `src/backend-error.ts` | 解析后端结构化错误码，并在当前语言下生成用户消息 |
 | `src/channel-rendering.ts` | 将显示模式与通道渲染偏好映射为纯 GPU 着色参数 |

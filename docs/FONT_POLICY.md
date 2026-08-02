@@ -2,7 +2,9 @@
 
 eRAW 不在仓库、安装包或前端构建产物中包含、下载或嵌入字体文件。
 
-- 界面正文只使用 CSS 通用系统字体族 `system-ui, sans-serif`。
+- 常规界面正文只使用 CSS 通用系统字体族 `system-ui, sans-serif`；技术手册正文使用通用衬线字体族 `ui-serif, serif`，以获得更接近论文的阅读节奏。
 - 等宽内容只使用 CSS 通用系统字体族 `ui-monospace, monospace`。
+- 手册中的 LaTeX 源由 MIT 许可的 KaTeX 解析，但只输出浏览器原生 MathML；项目不导入 KaTeX 的 CSS 或 Webfont，数学字形仍由 WebView2 与系统字体回退机制提供。
 - 实际字形由用户操作系统和 WebView2 的字体回退机制提供；eRAW 不重新分发这些字体，也不以任何特定商业或第三方字体作为运行依赖。
+- 字体资源审计应确认源码与构建产物均不存在 `@font-face` 以及 `.woff`、`.woff2`、`.ttf`、`.otf` 文件。
 - 后续如需加入自带 Webfont，必须先确认其许可证允许桌面应用再分发、保留要求的版权与许可证文本，并在本文件和发行说明中记录来源与版本。
