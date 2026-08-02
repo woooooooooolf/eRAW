@@ -11,7 +11,7 @@ export interface HelpSection {
   readonly kicker: string;
   readonly title: string;
   readonly summary: string;
-  readonly level: "入门" | "进阶" | "参考";
+  readonly level: string;
   readonly readingTime: string;
   readonly body: string;
 }
@@ -24,11 +24,18 @@ export const HELP_GROUPS: readonly HelpGroup[] = [
   { id: "reference", title: "边界与速查" },
 ];
 
-function equation(label: string, ...expressions: readonly string[]): string {
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+export function equation(label: string, ...expressions: readonly string[]): string {
   const mathematics = expressions
-    .map((expression) => `<div class="help-latex" data-latex>${expression}</div>`)
+    .map((expression) => `<div class="help-latex" data-latex>${escapeHtml(expression)}</div>`)
     .join("");
-  return `<figure class="help-equation"><figcaption>${label}</figcaption>${mathematics}</figure>`;
+  return `<figure class="help-equation"><figcaption>${escapeHtml(label)}</figcaption>${mathematics}</figure>`;
 }
 
 type AdmonitionKind = "tip" | "warning" | "danger" | "supplement";
@@ -240,7 +247,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
         <article><h3>鼠标 ROI</h3><p>按 <kbd>R</kbd> 后持续使用右键拖动。短距离右键仍打开主画布菜单；拖动可从图像外开始，端点会钳制到图像边缘。</p></article>
         <article><h3>坐标 ROI</h3><p><kbd>Shift</kbd><kbd>R</kbd> 输入左上和右下端点。坐标从 (0,0) 开始，两端均包含；反向、非整数或越界坐标会被拒绝。</p></article>
       </div>
-      ${equation("包含式端点转矩形", String.raw`\begin{aligned}W_{\mathrm{ROI}}&=x_1-x_0+1,&0\le x_0\le x_1<W\\H_{\mathrm{ROI}}&=y_1-y_0+1,&0\le y_0\le y_1<H\end{aligned}`)}
+      ${equation("包含式端点转矩形", String.raw`\begin{aligned}W_{\mathrm{ROI}}&=x_1-x_0+1,\quad 0\le x_0\le x_1<W\\H_{\mathrm{ROI}}&=y_1-y_0+1,\quad 0\le y_0\le y_1<H\end{aligned}`)}
       <div class="help-example"><small>示例</small><p>从 <code>(10,20)</code> 到 <code>(12,21)</code> 的 ROI 宽 3、高 2，共期望 6 个像素；不是 2×1。彩色 CFA 各语义组的 expected 数量则由这 6 个绝对坐标上的站点决定。</p></div>
       ${admonition("danger", "缺失并不等于零", "不可读取的像素没有 DN。预览用缺失外观标记，统计把它计入 missing 但不计入均值，导出则使用单独指定的缺失填充值。三者不能互相替代。")}`,
   },
@@ -357,6 +364,6 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
       </div>
       <div class="help-impact"><strong>可以可靠回答</strong><span>当前描述符如何解释字节</span><span>当前帧/ROI 的原始 DN 分布</span><span>当前算法与参数会产生什么确定性输出</span></div>
       <div class="help-impact muted"><strong>不能单独回答</strong><span>未知文件真实格式是什么</span><span>传感器完整噪声与线性性能</span><span>相机 ISP 的最终颜色和画质</span></div>
-      ${admonition("supplement", "手册版本", "本中文技术参考与 eRAW V0.5.3 当前实现同步。后续增加 Packing、处理算法或统计口径时，应把手册公式、测试和程序版本作为同一项变更维护。")}`,
+      ${admonition("supplement", "手册版本", "本中文技术参考与 eRAW V0.5.4 当前实现同步。后续增加 Packing、处理算法或统计口径时，应把手册公式、测试和程序版本作为同一项变更维护。")}`,
   },
 ];

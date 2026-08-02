@@ -1,10 +1,10 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
-import { HELP_GROUPS, HELP_SECTIONS } from "./help-content";
+import { getHelpCatalog, type HelpCatalog } from "./help-content-localized";
 import { renderHelpMath } from "./help-math";
 import {
   getResolvedLocale,
-  refreshLocalizedTree,
+  isLanguagePreference,
   setLanguagePreference,
   t,
   type LanguagePreference,
@@ -17,55 +17,68 @@ interface HelpWindowPayload {
 }
 
 export class HelpWindowApp {
-  private activeSection = HELP_SECTIONS[0]?.id ?? "";
+  private catalog: HelpCatalog;
+  private activeSection = "";
 
   constructor(private readonly root: HTMLElement) {
+    const requestedLanguage = new URLSearchParams(window.location.search).get("lang");
+    if (requestedLanguage && isLanguagePreference(requestedLanguage)) setLanguagePreference(requestedLanguage);
+    this.catalog = getHelpCatalog(getResolvedLocale());
+    this.activeSection = this.catalog.sections[0]?.id ?? "";
     root.addEventListener("contextmenu", (event) => event.preventDefault());
-    root.innerHTML = this.template();
-    renderHelpMath(root);
-    this.bindNavigation();
+    window.addEventListener("hashchange", () => this.syncHash());
+    this.render();
     if (isTauri()) void this.initialize();
   }
 
   private template(): string {
-    const navigation = HELP_GROUPS.map((group) => {
-      const links = HELP_SECTIONS.map((section, index) => ({ section, index }))
+    const { groups, sections: helpSections, ui } = this.catalog;
+    const navigation = groups.map((group) => {
+      const links = helpSections.map((section, index) => ({ section, index }))
         .filter(({ section }) => section.group === group.id)
         .map(({ section, index }) => `
           <a href="#${section.id}" data-help-section="${section.id}"><b>${String(index + 1).padStart(2, "0")}</b><span>${section.title}</span></a>`)
         .join("");
       return `<section class="help-nav-group"><small>${group.title}</small>${links}</section>`;
     }).join("");
-    const sections = HELP_SECTIONS.map((section, index) => `
+    const sections = helpSections.map((section, index) => `
       <section id="${section.id}" class="help-section help-page" data-help-section-content="${section.id}"${index === 0 ? "" : " hidden"}>
         <header class="help-page-header">
           <div class="help-page-index">${String(index + 1).padStart(2, "0")}</div>
           <div><small>${section.kicker}</small><h1>${section.title}</h1><p>${section.summary}</p>
-            <div class="help-page-meta"><span>${section.level}</span><span>${section.readingTime}</span><span>第 ${index + 1} / ${HELP_SECTIONS.length} 篇</span></div>
+            <div class="help-page-meta"><span>${section.level}</span><span>${section.readingTime}</span><span>${this.formatUi(ui.article, index + 1, helpSections.length)}</span></div>
           </div>
         </header>
         <div class="help-section-body">${section.body}</div>
         <footer class="help-page-footer">
-          <button type="button" data-help-previous${index === 0 ? " disabled" : ""}><small>上一篇</small><strong>${index > 0 ? HELP_SECTIONS[index - 1].title : "已经是第一篇"}</strong></button>
-          <button type="button" data-help-next${index === HELP_SECTIONS.length - 1 ? " disabled" : ""}><small>下一篇</small><strong>${index < HELP_SECTIONS.length - 1 ? HELP_SECTIONS[index + 1].title : "已经是最后一篇"}</strong></button>
+          <button type="button" data-help-previous${index === 0 ? " disabled" : ""}><small>${ui.previous}</small><strong>${index > 0 ? helpSections[index - 1].title : ui.first}</strong></button>
+          <button type="button" data-help-next${index === helpSections.length - 1 ? " disabled" : ""}><small>${ui.next}</small><strong>${index < helpSections.length - 1 ? helpSections[index + 1].title : ui.last}</strong></button>
         </footer>
       </section>`).join("");
-    return `<main class="help-window">
+    return `<main class="help-window" data-help-locale="${getResolvedLocale()}">
       <aside class="help-sidebar">
-        <header><div class="help-mark">Σ</div><div><small>eRAW V0.5.3</small><strong data-i18n="helpWindow.title">使用手册</strong><span>技术参考 · 中文</span></div></header>
-        <nav aria-label="使用手册目录">${navigation}</nav>
-        <footer><button type="button" data-help-home><span>⌂</span><span>手册首页</span></button></footer>
+        <header><div class="help-mark">Σ</div><div><small>eRAW V0.5.4</small><strong>${ui.manualTitle}</strong><span>${ui.subtitle}</span></div></header>
+        <nav aria-label="${ui.navigationLabel}">${navigation}</nav>
+        <footer><button type="button" data-help-home><span>⌂</span><span>${ui.home}</span></button></footer>
       </aside>
       <article class="help-document">
-        <aside class="help-language-notice" hidden><strong>i</strong><p data-i18n="helpWindow.chineseReview">当前为审核中的中文手册，其它语言版本将在确认后提供。</p></aside>
         ${sections}
       </article>
     </main>`;
   }
 
+  private formatUi(template: string, current: number, total: number): string {
+    return template.replace("{current}", String(current)).replace("{total}", String(total));
+  }
+
+  private render(): void {
+    this.root.innerHTML = this.template();
+    renderHelpMath(this.root);
+    this.bindNavigation();
+    this.syncHash();
+  }
+
   private bindNavigation(): void {
-    const requested = decodeURIComponent(window.location.hash.slice(1));
-    if (HELP_SECTIONS.some((section) => section.id === requested)) this.activeSection = requested;
     this.root.querySelectorAll<HTMLAnchorElement>("[data-help-section]").forEach((link) => {
       link.addEventListener("click", (event) => {
         event.preventDefault();
@@ -73,7 +86,7 @@ export class HelpWindowApp {
       });
     });
     this.root.querySelector<HTMLButtonElement>("[data-help-home]")?.addEventListener("click", () => {
-      this.setActiveSection(HELP_SECTIONS[0]?.id ?? "", true);
+      this.setActiveSection(this.catalog.sections[0]?.id ?? "", true);
     });
     this.root.querySelectorAll<HTMLButtonElement>("[data-help-previous]").forEach((button) => {
       button.addEventListener("click", () => this.movePage(-1));
@@ -81,21 +94,23 @@ export class HelpWindowApp {
     this.root.querySelectorAll<HTMLButtonElement>("[data-help-next]").forEach((button) => {
       button.addEventListener("click", () => this.movePage(1));
     });
-    window.addEventListener("hashchange", () => {
-      const id = decodeURIComponent(window.location.hash.slice(1));
-      if (HELP_SECTIONS.some((section) => section.id === id)) this.setActiveSection(id, false);
-    });
+    this.setActiveSection(this.activeSection);
+  }
+
+  private syncHash(): void {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (this.catalog.sections.some((section) => section.id === id)) this.activeSection = id;
     this.setActiveSection(this.activeSection);
   }
 
   private movePage(offset: -1 | 1): void {
-    const index = HELP_SECTIONS.findIndex((section) => section.id === this.activeSection);
-    const target = HELP_SECTIONS[index + offset];
+    const index = this.catalog.sections.findIndex((section) => section.id === this.activeSection);
+    const target = this.catalog.sections[index + offset];
     if (target) this.setActiveSection(target.id, true);
   }
 
   private setActiveSection(id: string, updateHash = false): void {
-    if (!HELP_SECTIONS.some((section) => section.id === id)) return;
+    if (!this.catalog.sections.some((section) => section.id === id)) return;
     this.activeSection = id;
     this.root.querySelectorAll<HTMLElement>("[data-help-section]").forEach((link) => {
       const active = link.dataset.helpSection === id;
@@ -117,10 +132,13 @@ export class HelpWindowApp {
   }
 
   private setState(payload: HelpWindowPayload): void {
+    const previousLocale = getResolvedLocale();
     setLanguagePreference(payload.language);
     document.documentElement.dataset.theme = payload.theme;
     document.title = `eRAW - ${t("helpWindow.title")}`;
-    this.root.querySelector<HTMLElement>(".help-language-notice")!.hidden = getResolvedLocale() === "zh-CN";
-    refreshLocalizedTree(this.root);
+    if (getResolvedLocale() !== previousLocale) {
+      this.catalog = getHelpCatalog(getResolvedLocale());
+      this.render();
+    }
   }
 }

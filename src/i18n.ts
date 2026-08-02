@@ -162,7 +162,6 @@ const CATALOG = {
   "helpWindow.title": message("User Manual", "使用手册", "使用手冊", "ユーザーマニュアル", "Manual de usuario", "Manuel d’utilisation", "Benutzerhandbuch"),
   "helpWindow.contents": message("Contents", "目录", "目錄", "目次", "Contenido", "Sommaire", "Inhalt"),
   "helpWindow.backToTop": message("Back to top", "返回顶部", "返回頂部", "先頭に戻る", "Volver arriba", "Retour en haut", "Nach oben"),
-  "helpWindow.chineseReview": message("The Chinese manual is currently under review. Other language editions will be added after it is approved.", "当前为审核中的中文手册，其它语言版本将在确认后提供。", "目前為審核中的簡體中文手冊，其他語言版本將在確認後提供。", "現在は確認中の簡体字中国語マニュアルです。承認後に他言語版を追加します。", "El manual en chino está en revisión. Las demás versiones se añadirán tras su aprobación.", "Le manuel chinois est en cours de révision. Les autres langues seront ajoutées après validation.", "Das chinesische Handbuch wird derzeit geprüft. Weitere Sprachversionen folgen nach der Freigabe."),
   "toolbar.shortcuts": message("Shortcuts", "快捷键", "快速鍵", "ショートカット", "Atajos", "Raccourcis", "Tastenkürzel"),
   "toolbar.shortcutsHint": message("View keyboard and canvas controls", "查看键盘与画布操作速查", "檢視鍵盤與畫布操作速查", "キーボードとキャンバス操作を確認", "Ver controles de teclado y lienzo", "Voir les commandes du clavier et du canevas", "Tastatur- und Arbeitsflächensteuerung anzeigen"),
   "toolbar.about": message("About", "关于", "關於", "バージョン情報", "Acerca de", "À propos", "Info"),
