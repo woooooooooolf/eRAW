@@ -42,7 +42,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | `src/statistics-panel.ts` / `src/statistics-window.ts` | 统计纵向总览，以及底部、侧方和独立窗口承载 |
 | `src/statistics-view-state.ts` | 各图表曲线、横纵范围和分布局高度的持久状态、钳制与重置规则 |
 | `src/statistics-chart*.ts` / `src/statistics-report.ts` | 按需加载的主题自适应 ECharts 交互图表、独立的大数据图表变换，以及暂未接入入口的中性 PNG 报告绘制能力 |
-| `src/help-content.ts` / `src/help-window.ts` | 中文使用手册章节内容，以及与主窗口语言、主题即时同步的独立帮助窗口；其它语言暂以本地化提示说明中文手册正在审核 |
+| `src/help-content.ts` / `src/help-window.ts` | 分组、分篇的中文技术参考内容，单篇路由、前后篇导航，以及与主窗口语言、主题即时同步的独立帮助窗口；其它语言暂以本地化提示说明中文手册正在审核 |
 | `src/i18n.ts` | 语言偏好、系统语言解析、七语文案目录、日期时间格式化和静态 DOM 翻译 |
 | `src/backend-error.ts` | 解析后端结构化错误码，并在当前语言下生成用户消息 |
 | `src/channel-rendering.ts` | 将显示模式与通道渲染偏好映射为纯 GPU 着色参数 |

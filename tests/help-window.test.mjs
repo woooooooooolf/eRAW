@@ -34,14 +34,34 @@ test("help page is routed independently and receives language and theme updates"
   assert.deepEqual(JSON.parse(capabilitySource).windows, ["main", "statistics", "help"]);
 });
 
-test("the Chinese manual covers the complete approved chapter framework", () => {
-  for (const id of ["start", "document", "interface", "descriptor", "presentation", "processing", "roi-statistics", "export", "settings", "shortcuts", "troubleshooting"]) {
+test("the Chinese technical manual is split into task-oriented pages", () => {
+  for (const id of ["start", "workflow", "layout", "packing", "cfa", "remosaic", "demosaic", "rendering", "inspection", "statistics", "charts", "export", "boundaries", "glossary"]) {
     assert.match(contentSource, new RegExp(`id: "${id}"`));
   }
+  for (const group of ["使用基础", "数据解释", "处理与呈现", "分析与输出", "边界与速查"]) {
+    assert.match(contentSource, new RegExp(group));
+  }
+  assert.match(windowSource, /section\.hidden = section\.dataset\.helpSectionContent !== id/);
+  assert.match(windowSource, /data-help-previous/);
+  assert.match(windowSource, /data-help-next/);
+  assert.match(windowSource, /window\.history\.pushState/);
+  assert.match(windowSource, /eRAW V0\.5\.2/);
+  assert.match(contentSource, /eRAW V0\.5\.2 当前实现同步/);
+});
+
+test("the technical manual documents implementation-accurate formulas and boundaries", () => {
+  assert.match(contentSource, /rowBytes = 5 · ceil\(W \/ 4\)/);
+  assert.match(contentSource, /DNᵢ = \(Bᵢ &lt;&lt; 2\)/);
+  assert.match(contentSource, /phaseX′ = \(phaseX \+ cropX\) mod 4/);
   assert.match(contentSource, /Remosaic/);
   assert.match(contentSource, /Demosaic/);
+  assert.match(contentSource, /M2ₙ = M2ₙ₋₁/);
+  assert.match(contentSource, /variance = M2ₙ \/ n/);
+  assert.match(contentSource, /bucketSize = max\(1, ceil\(exactBinCount \/ 4096\)\)/);
+  assert.match(contentSource, /sourceMax\/2/);
   assert.match(contentSource, /EMVA 1288/);
   assert.match(contentSource, /缺失样本/);
+  assert.match(contentSource, /总体方差/);
 });
 
 test("independent help and statistics windows suppress native context menus", () => {
