@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="eRAW 是面向 SoC 与图像传感器适配工作的 Windows RAW 图像查看、诊断与格式转换工具。">
-    <meta name="theme-color" content="#070a0f">
-    <title>eRAW · 看见传感器的真实输出</title>
+    <meta name="description" content="eRAW 是一个用于查看、检查和转换 RAW 传感器数据的轻量 Windows 工具。">
+    <meta name="theme-color" content="#ffffff">
+    <title>eRAW · RAW 图像查看工具</title>
     <link rel="icon" href="data:," type="image/svg+xml">
     <link rel="stylesheet" href="./styles.css">
   </head>
@@ -13,181 +13,65 @@
     <a class="skip-link" href="#main-content">跳到主要内容</a>
 
     <header class="site-header">
-      <div class="header-inner">
+      <div class="page-width header-inner">
         <a class="brand" href="#top" aria-label="eRAW 首页">
-          <img data-eraw-icon alt="" width="40" height="40">
-          <span><strong>eRAW</strong><small>RAW ENGINEERING VIEWER</small></span>
+          <img data-eraw-icon alt="" width="32" height="32">
+          <strong>eRAW</strong>
         </a>
-        <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-navigation" aria-label="打开导航">
-          <span></span><span></span><span></span><span class="sr-only">打开导航</span>
-        </button>
-        <nav id="site-navigation" class="site-navigation" data-site-navigation data-open="false" aria-label="主要导航">
-          <a href="#capabilities">核心能力</a>
-          <a href="#workflow">工作流程</a>
-          <a href="#technology">技术方法</a>
-          <a href="#boundaries">产品边界</a>
-          <a href="https://github.com/woooooooooolf/eRAW/releases/latest">下载</a>
+        <nav class="site-navigation" aria-label="站点链接">
+          <a href="https://github.com/woooooooooolf/eRAW">源代码</a>
+          <a href="https://github.com/woooooooooolf/eRAW/blob/master/docs/README.md">文档</a>
+          <a class="header-download" href="https://github.com/woooooooooolf/eRAW/releases/latest">下载</a>
         </nav>
-        <div class="header-actions">
-          <span class="language-chip" aria-label="当前语言：简体中文">中</span>
-          <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换到浅色外观" title="切换到浅色外观">
-            <span class="theme-icon" aria-hidden="true"></span>
-          </button>
-          <a class="github-link" href="https://github.com/woooooooooolf/eRAW" aria-label="访问 eRAW GitHub 仓库">GitHub</a>
-        </div>
       </div>
     </header>
 
     <main id="main-content">
-      <section id="top" class="hero section-shell">
+      <section id="top" class="page-width hero">
         <div class="hero-copy">
-          <div class="eyebrow"><span class="status-dot"></span><span data-site-version>当前版本</span><span>Windows x64</span></div>
-          <h1>看见传感器的<br><em>真实输出</em></h1>
-          <p class="hero-lead">面向 SoC 与图像传感器适配工作的 RAW 图像查看、诊断与格式转换工具。把字节布局、CFA 语义、像素 DN 与处理结果放进同一个可验证的工作空间。</p>
+          <p class="eyebrow"><span data-site-version>eRAW</span><span aria-hidden="true">·</span><span>Windows x64</span></p>
+          <h1>打开 RAW，<br>看看里面。</h1>
+          <p class="lead">eRAW 是一个用于查看和检查 RAW 传感器数据的小工具。填写必要的图像信息，便可以开始浏览。</p>
           <div class="hero-actions">
-            <a class="button primary" href="https://github.com/woooooooooolf/eRAW/releases/latest"><span>下载 Windows x64</span><b aria-hidden="true">↓</b></a>
-            <a class="button secondary" href="https://github.com/woooooooooolf/eRAW"><span>查看源代码</span><b aria-hidden="true">↗</b></a>
+            <a class="button button-primary" href="https://github.com/woooooooooolf/eRAW/releases/latest">下载最新版</a>
+            <a class="button button-secondary" href="https://github.com/woooooooooolf/eRAW">在 GitHub 上查看</a>
           </div>
-          <p class="hero-note">GPL-3.0-or-later · 无遥测 · 本地处理</p>
         </div>
 
-        <div class="hero-visual" aria-label="eRAW 简体中文主界面预览">
-          <div class="visual-glow"></div>
-          <div class="app-window">
-            <div class="window-bar"><span></span><span></span><span></span><small>eRAW</small></div>
-            <img data-main-screenshot alt="eRAW 简体中文主窗口，展示 CFA 点阵模式和 RAW 参数面板">
+        <figure class="screenshot">
+          <div class="screenshot-bar">
+            <span>eRAW 主界面</span>
+            <span>简体中文</span>
           </div>
-          <div class="floating-card card-format"><small>PACKING</small><strong>MIPI RAW14</strong><span>7 bytes / 4 pixels</span></div>
-          <div class="floating-card card-cfa"><small>CFA</small><strong>Quad RGGB</strong><span>Phase 0 · L0</span></div>
-        </div>
+          <img data-main-screenshot alt="eRAW 简体中文暗色主界面，正在显示 RAW 图像和参数面板">
+        </figure>
       </section>
 
-      <section class="signal-strip" aria-label="主要支持范围">
-        <div class="section-shell signal-grid">
-          <div><strong>RAW8–RAW16</strong><span>整数 DN 与有效位</span></div>
-          <div><strong>MIPI 10 / 12 / 14</strong><span>标准 packed 数据</span></div>
-          <div><strong>Bayer &amp; Quad CFA</strong><span>排列与 Phase</span></div>
-          <div><strong>LOD + GPU</strong><span>大尺寸流畅浏览</span></div>
+      <section class="page-width about" aria-labelledby="about-title">
+        <div>
+          <p class="section-label">关于</p>
+          <h2 id="about-title">一个随手可用的 RAW 工具</h2>
         </div>
-      </section>
-
-      <section id="capabilities" class="content-section section-shell">
-        <header class="section-heading">
-          <div><span class="section-index">01</span><p class="kicker">CAPABILITIES</p></div>
-          <h2>从文件布局到像素结论，<br>保持每一步都可解释。</h2>
-          <p>eRAW 不猜测未知格式。描述符明确约定字节如何成为坐标与 DN，界面则帮助你逐层验证这些约定。</p>
-        </header>
-        <div class="capability-grid">
-          <article class="feature-card feature-card-wide">
-            <div class="feature-icon bytes" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-            <p class="feature-number">01 / DATA LAYOUT</p>
-            <h3>把字节布局说清楚</h3>
-            <p>配置尺寸、Packing、位深、字节序、有效位位置、文件头偏移以及行/帧 stride 与对齐。</p>
-            <ul><li>Unpacked 8 / 16</li><li>MIPI RAW10 / 12 / 14</li><li>多帧与不完整数据诊断</li></ul>
-          </article>
-          <article class="feature-card">
-            <div class="feature-icon mosaic" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-            <p class="feature-number">02 / CFA</p>
-            <h3>验证颜色站点</h3>
-            <p>支持 Mono、四种 Bayer 和四种 Quad CFA 排列，让 Phase 与裁剪后的空间语义保持明确。</p>
-          </article>
-          <article class="feature-card">
-            <div class="feature-icon inspect" aria-hidden="true"></div>
-            <p class="feature-number">03 / INSPECTION</p>
-            <h3>检查每一个 DN</h3>
-            <p>缩放、平移、像素网格、坐标定位及原始/重建通道读数共同服务于局部诊断。</p>
-          </article>
-          <article class="feature-card">
-            <div class="feature-icon chart" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-            <p class="feature-number">04 / STATISTICS</p>
-            <h3>在 L0 上做统计</h3>
-            <p>以包含式 ROI 统计原始 CFA DN，查看直方图、水平/垂直 Profile、均值、方差与百分位数。</p>
-          </article>
-          <article class="feature-card feature-card-wide export-card">
-            <div>
-              <p class="feature-number">05 / EXPORT</p>
-              <h3>安全地转换与导出</h3>
-              <p>导出原始 CFA、Remosaic Bayer 或 Demosaic RGB48。严格检查裁剪、目标格式、溢出和源文件覆盖风险。</p>
-            </div>
-            <div class="export-flow" aria-label="安全导出流程"><span>冻结快照</span><b>→</b><span>严格校验</span><b>→</b><span>临时写入</span><b>→</b><span>原子替换</span></div>
-          </article>
-        </div>
-      </section>
-
-      <section id="workflow" class="workflow-section">
-        <div class="section-shell">
-          <header class="section-heading light-heading">
-            <div><span class="section-index">02</span><p class="kicker">WORKFLOW</p></div>
-            <h2>一条面向工程诊断的<br>清晰路径。</h2>
-            <p>先确认解释字节的契约，再逐步进入空间、处理和统计结论，避免被“看起来像图像”的结果误导。</p>
-          </header>
-          <ol class="workflow-list">
-            <li><span>01</span><div><small>DESCRIBE</small><h3>描述数据</h3><p>输入尺寸、Packing、位深、offset 与 stride。</p></div><code>bytes → DN</code></li>
-            <li><span>02</span><div><small>VALIDATE</small><h3>验证布局</h3><p>从 RAW 强度与帧连续性检查地址计算。</p></div><code>(x, y, frame)</code></li>
-            <li><span>03</span><div><small>INTERPRET</small><h3>解释 CFA</h3><p>确认排列、Phase 与颜色站点是否符合预期。</p></div><code>site(x, y)</code></li>
-            <li><span>04</span><div><small>ANALYZE</small><h3>处理与分析</h3><p>选择 Remosaic、Demosaic、ROI 与统计视图。</p></div><code>result + evidence</code></li>
-            <li><span>05</span><div><small>EXPORT</small><h3>生成结果</h3><p>冻结源数据和参数，以严格路径安全写出。</p></div><code>deterministic output</code></li>
-          </ol>
-        </div>
-      </section>
-
-      <section id="technology" class="content-section section-shell">
-        <header class="section-heading">
-          <div><span class="section-index">03</span><p class="kicker">TECHNICAL METHOD</p></div>
-          <h2>算法服务于诊断，<br>而不是掩盖数据。</h2>
-          <p>显示与重建方法保持克制，并在技术手册中给出公式、有效样本条件和边界行为。</p>
-        </header>
-        <div class="method-grid">
-          <article class="method-card">
-            <div class="method-mark remosaic-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-            <p class="feature-number">QUAD CFA → BAYER</p>
-            <h3>Remosaic</h3>
-            <p>支持 4×4 Quad CFA 的确定性重排，以及面向缺失或非整数位置的同色双线性重建。</p>
-            <code>vsrc = block + permutation(local) − phase</code>
-          </article>
-          <article class="method-card">
-            <div class="method-mark rgb-mark" aria-hidden="true"><span>R</span><span>G</span><span>B</span></div>
-            <p class="feature-number">CFA → RGB</p>
-            <h3>Demosaic</h3>
-            <p>当前使用局部 3×3 邻域的双线性方法；原站点值保持不变，只从有效同色邻点重建缺失分量。</p>
-            <code>Cc(x,y) = mean(valid neighbors of c)</code>
-          </article>
-          <article class="method-card statistics-method">
-            <div class="method-mark sigma-mark" aria-hidden="true">Σ</div>
-            <p class="feature-number">RAW L0 EVIDENCE</p>
-            <h3>统计与图表</h3>
-            <p>统计摘要先在完整有效样本上计算；图表仅对渲染点进行有界聚合，不改变均值、方差和百分位结论。</p>
-            <code>σ² = M₂ / n · Qp from histogram rank</code>
-          </article>
-        </div>
-        <div class="manual-link-panel">
-          <div><small>BUILT-IN TECHNICAL MANUAL</small><h3>需要公式、边界条件和诊断方法？</h3><p>按 F1 打开内置技术参考手册；手册会即时响应软件的语言和主题切换。</p></div>
-          <span class="keycap">F1</span>
-        </div>
-      </section>
-
-      <section id="boundaries" class="boundary-section">
-        <div class="section-shell boundary-grid">
-          <div class="boundary-title"><span class="section-index">04</span><p class="kicker">ENGINEERING BOUNDARIES</p><h2>对容错与严格，<br>做出明确区分。</h2></div>
-          <article class="boundary-card preview-boundary"><small>PREVIEW PATH</small><h3>预览用于诊断</h3><p>允许显示部分帧、短 stride 或截断数据，并把缺失样本显式标记出来，帮助定位描述符或源文件问题。</p><span>容错，但不隐瞒</span></article>
-          <article class="boundary-card export-boundary"><small>EXPORT PATH</small><h3>导出要求确定性</h3><p>拒绝无效 crop、不兼容 Packing、整数溢出、过期 generation 和覆盖当前源文件等风险。</p><span>严格，且可取消</span></article>
-        </div>
-      </section>
-
-      <section class="download-section section-shell">
-        <div class="download-panel">
-          <div class="download-grid-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-          <div><p class="kicker">WINDOWS X64</p><h2>开始检查下一份 RAW。</h2><p>从 GitHub Releases 下载最新版本。软件在本地处理文件，不上传传感器数据。</p></div>
-          <div class="download-actions"><a class="button primary" href="https://github.com/woooooooooolf/eRAW/releases/latest"><span>下载最新版</span><b aria-hidden="true">↓</b></a><a href="https://github.com/woooooooooolf/eRAW/blob/master/docs/README.md">阅读工程文档 ↗</a></div>
+        <div class="about-copy">
+          <p>eRAW 面向 Windows，用于浏览 RAW 图像、检查像素和统计信息，也可以在需要时进行 Remosaic、Demosaic 或格式导出。</p>
+          <p>文件始终在本地处理。想进一步了解数据解释、算法和边界条件时，可以通过帮助菜单或 <kbd>F1</kbd> 打开内置技术手册。</p>
+          <ul class="project-facts" aria-label="项目信息">
+            <li><strong>平台</strong><span>Windows x64</span></li>
+            <li><strong>许可</strong><span>GPL-3.0-or-later</span></li>
+            <li><strong>数据</strong><span>本地处理，无遥测</span></li>
+          </ul>
         </div>
       </section>
     </main>
 
     <footer class="site-footer">
-      <div class="section-shell footer-grid">
-        <div class="footer-brand"><img data-eraw-icon alt="" width="44" height="44"><div><strong>eRAW</strong><span>RAW 传感器数据查看、诊断与转换工具。</span></div></div>
-        <div class="footer-links"><a href="https://github.com/woooooooooolf/eRAW">GitHub</a><a href="https://github.com/woooooooooolf/eRAW/releases">Releases</a><a href="https://github.com/woooooooooolf/eRAW/blob/master/CONTRIBUTING.md">贡献指南</a><a href="https://github.com/woooooooooolf/eRAW/blob/master/SECURITY.md">安全策略</a></div>
-        <div class="footer-meta"><span>© <span data-current-year></span> eRAW contributors</span><a href="https://github.com/woooooooooolf/eRAW/blob/master/LICENSE">GPL-3.0-or-later</a></div>
+      <div class="page-width footer-inner">
+        <span>© <span data-current-year></span> eRAW contributors</span>
+        <div class="footer-links">
+          <a href="https://github.com/woooooooooolf/eRAW/releases">Releases</a>
+          <a href="https://github.com/woooooooooolf/eRAW/blob/master/CONTRIBUTING.md">贡献指南</a>
+          <a href="https://github.com/woooooooooolf/eRAW/blob/master/LICENSE">许可证</a>
+        </div>
       </div>
     </footer>
 
