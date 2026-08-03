@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import test from "node:test";
 
 const root = new URL("../", import.meta.url);
@@ -32,28 +32,49 @@ test("the project site builds independently without owning the application versi
   assert.match(readmeSource, /站点迭代不修改 eRAW 软件版本/);
 });
 
-test("the Chinese site is a restrained single-page introduction with stable destinations", () => {
+test("the Chinese site follows the agreed single-page reading order", () => {
   assert.match(htmlSource, /<html lang="zh-CN"/);
-  assert.match(htmlSource, /打开 RAW/);
-  assert.match(htmlSource, /一个随手可用的 RAW 工具/);
+  const orderedPhrases = [
+    "页面语言",
+    "打开 RAW，看看里面",
+    "data-screenshot-dark",
+    "data-screenshot-light",
+    "<p>基于 Tauri 的极简轻量化 RAW 图像查看器",
+    "data-download-exe",
+    "page-divider",
+    "project-info",
+    "site-footer",
+  ];
+  let previous = -1;
+  for (const phrase of orderedPhrases) {
+    const current = htmlSource.indexOf(phrase);
+    assert.ok(current > previous, `${phrase} should follow the previous page section`);
+    previous = current;
+  }
+  assert.match(htmlSource, /中文/);
+  assert.match(htmlSource, />EN</);
+  assert.match(htmlSource, /github\.com\/woooooooooolf\/eRAW/);
   assert.match(htmlSource, /本地处理，无遥测/);
-  assert.match(htmlSource, /github\.com\/woooooooooolf\/eRAW\/releases\/latest/);
-  assert.match(htmlSource, /data-main-screenshot/);
-  assert.doesNotMatch(htmlSource, /核心能力|工作流程|技术方法|产品边界/);
-  assert.doesNotMatch(htmlSource, /data-theme|theme-toggle|menu-toggle/);
+  assert.doesNotMatch(htmlSource, /一个随手可用的 RAW 工具|<p class="section-label">关于/);
   assert.doesNotMatch(htmlSource, /0\.5\.5/);
   assert.doesNotMatch(htmlSource, /google-analytics|googletagmanager|fonts\.googleapis|use\.typekit/i);
 });
 
-test("site behavior and styles keep the light, wide, responsive presentation", () => {
-  assert.match(scriptSource, /__ERAW_VERSION__/);
-  assert.match(scriptSource, /data-main-screenshot/);
-  assert.doesNotMatch(scriptSource, /localStorage|data-theme|aria-expanded/);
+test("the showcase uses real theme captures and a version-aware EXE link", async () => {
+  const [dark, light] = await Promise.all([
+    stat(new URL("../site/screenshots/app-main-dark-zh-CN.png", import.meta.url)),
+    stat(new URL("../site/screenshots/app-main-light-zh-CN.png", import.meta.url)),
+  ]);
+  assert.ok(dark.size > 100_000);
+  assert.ok(light.size > 100_000);
+  assert.match(scriptSource, /app-main-dark-zh-CN\.png/);
+  assert.match(scriptSource, /app-main-light-zh-CN\.png/);
+  assert.match(scriptSource, /releases\/latest\/download\/eRAW-V\$\{__ERAW_VERSION__\}-windows-x64\.exe/);
+  assert.match(styleSource, /perspective: 1800px/);
+  assert.match(styleSource, /shot-reflection/);
   assert.match(styleSource, /color-scheme: light/);
   assert.match(styleSource, /width: min\(1344px/);
-  assert.match(styleSource, /-apple-system, BlinkMacSystemFont, "Segoe UI"/);
-  assert.doesNotMatch(styleSource, /\[data-theme=/);
-  assert.match(styleSource, /@media \(max-width: 820px\)/);
-  assert.match(styleSource, /@media \(max-width: 560px\)/);
+  assert.match(styleSource, /@media \(max-width: 980px\)/);
+  assert.match(styleSource, /@media \(max-width: 620px\)/);
   assert.match(styleSource, /@media \(prefers-reduced-motion: reduce\)/);
 });
