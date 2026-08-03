@@ -1,6 +1,6 @@
 # eRAW 工程文档
 
-本文档集记录 eRAW V0.5.4 的当前共识与实现边界。源码是最终事实来源；设计发生变化时，应在同一迭代中更新相关文档。
+本文档集记录 eRAW V0.5.5 的当前共识与实现边界。源码是最终事实来源；设计发生变化时，应在同一迭代中更新相关文档。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -12,10 +12,11 @@
 | [TESTING.md](TESTING.md) | 自动化覆盖、人工验证范围与已知空白 |
 | [WORKFLOW.md](WORKFLOW.md) | 需求评审、分支、提交、版本、构建与发布流程 |
 | [FONT_POLICY.md](FONT_POLICY.md) | 字体选择与不分发字体文件的许可策略 |
+| [PUBLICATION.md](PUBLICATION.md) | 仓库公开前检查与公开后 GitHub 安全配置 |
 
 ## 当前工程快照
 
-- 当前开发版本：`V0.5.4`
+- 当前开发版本：`V0.5.5`
 - 目标平台：Windows 优先；不受平台约束的部分尽量保持 Linux 兼容
 - 桌面框架：Tauri 2
 - 前端：TypeScript、WebGL2、Canvas 2D、Apache ECharts、原生 HTML/CSS

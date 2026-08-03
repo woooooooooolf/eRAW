@@ -21,6 +21,10 @@
 
 ![Ventana principal de eRAW en español](docs/images/readme-main-es.jpg)
 
+## Descarga
+
+Descarga la versión más reciente para Windows x64 y consulta sus notas en [GitHub Releases](https://github.com/woooooooooolf/eRAW/releases/latest).
+
 ## Funciones principales
 
 - Lee RAW8, RAW9–RAW16 en contenedores de 16 bits y MIPI RAW10/12/14.
@@ -87,8 +91,14 @@ Consulta el [índice de documentación técnica](docs/README.md) para conocer la
 
 - eRAW diagnostica datos sin procesar del sensor; no realiza mejoras fotográficas como reducción de ruido, enfoque, corrección de color o reparación de píxeles defectuosos.
 - Demosaic utiliza actualmente un algoritmo bilineal.
-- Existe un modelo de selección rectangular reservado, pero todavía no está conectado a las estadísticas de región.
+- Se admiten la selección de ROI rectangular, la entrada de coordenadas y las estadísticas regionales sobre DN CFA RAW de nivel L0.
 - No hay un flujo de procesamiento por lotes de propósito general.
+
+## Mantenimiento y contribuciones
+
+El proyecto prioriza la estabilidad, la corrección de defectos y la integridad de los flujos existentes. Se aceptan defectos reproducibles, mejoras de compatibilidad, documentación y pruebas, y optimizaciones acotadas que mantengan la semántica actual. Las funciones que cambien de forma sustancial la arquitectura, el procesamiento o el comportamiento del usuario normalmente no son prioritarias; primero debe explicarse el alcance del problema y el coste de mantenimiento a largo plazo.
+
+Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para el alcance y el proceso, y [SECURITY.md](SECURITY.md) para informar vulnerabilidades.
 
 ## Licencia
 

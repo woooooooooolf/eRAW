@@ -50,8 +50,8 @@ test("the technical manual is split into task-oriented pages", () => {
   assert.match(windowSource, /data-help-previous/);
   assert.match(windowSource, /data-help-next/);
   assert.match(windowSource, /window\.history\.pushState/);
-  assert.match(windowSource, /eRAW V0\.5\.4/);
-  assert.match(contentSource, /eRAW V0\.5\.4 当前实现同步/);
+  assert.match(windowSource, /eRAW V0\.5\.5/);
+  assert.match(contentSource, /eRAW V0\.5\.5 当前实现同步/);
 });
 
 test("the technical manual renders implementation-accurate LaTeX as native MathML", () => {
@@ -87,7 +87,7 @@ test("all seven interface locales provide a complete localized manual", () => {
     assert.match(localizedContentSource, new RegExp(`(?:${locale === "zh-TW" ? '"zh-TW"' : locale}): [A-Z_]+_COPY`));
   }
   assert.match(localizedContentSource, /if \(locale === "zh-CN"\)/);
-  assert.match(localizedContentSource, /V0\.5\.4/g);
+  assert.match(localizedContentSource, /V0\.5\.5/g);
   assert.match(windowSource, /data-help-locale="\$\{getResolvedLocale\(\)\}"/);
   assert.match(windowSource, /isLanguagePreference\(requestedLanguage\)/);
   assert.match(windowSource, /this\.catalog = getHelpCatalog\(getResolvedLocale\(\)\)/);

@@ -57,7 +57,7 @@ export class HelpWindowApp {
       </section>`).join("");
     return `<main class="help-window" data-help-locale="${getResolvedLocale()}">
       <aside class="help-sidebar">
-        <header><div class="help-mark">Σ</div><div><small>eRAW V0.5.4</small><strong>${ui.manualTitle}</strong><span>${ui.subtitle}</span></div></header>
+        <header><div class="help-mark">Σ</div><div><small>eRAW V0.5.5</small><strong>${ui.manualTitle}</strong><span>${ui.subtitle}</span></div></header>
         <nav aria-label="${ui.navigationLabel}">${navigation}</nav>
         <footer><button type="button" data-help-home><span>⌂</span><span>${ui.home}</span></button></footer>
       </aside>

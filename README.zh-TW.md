@@ -21,6 +21,10 @@
 
 ![eRAW 繁體中文主介面](docs/images/readme-main-zh-TW.jpg)
 
+## 下載
+
+請從 [GitHub Releases](https://github.com/woooooooooolf/eRAW/releases/latest) 下載最新 Windows x64 版本並閱讀更新說明。
+
 ## 核心特色
 
 - 支援 RAW8、16-bit 容器 RAW9–RAW16，以及 MIPI RAW10/12/14。
@@ -87,8 +91,14 @@ npm.cmd run release
 
 - eRAW 面向感測器原始資料診斷，不進行降噪、銳化、色彩校正、壞點修復等照片品質最佳化。
 - 目前 Demosaic 演算法為雙線性。
-- 矩形區域選取模型已預留，但尚未連接區域統計。
+- 支援矩形 ROI 選取、座標輸入，以及基於 L0 原始 CFA DN 的區域統計。
 - 目前不提供通用批次處理流程。
+
+## 維護與貢獻
+
+專案目前以穩定性、缺陷修復與既有能力完善為主。歡迎可重現缺陷、相容性問題、文件與測試改進，以及不改變既有語意的局部最佳化。會顯著改變架構、處理流程或使用者行為的新功能通常不列為優先；如確有需要，請先說明問題邊界與長期維護成本。
+
+範圍與提交流程請參閱[貢獻指南](CONTRIBUTING.md)；安全問題請遵循[安全策略](SECURITY.md)。
 
 ## 授權條款
 

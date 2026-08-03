@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -19,7 +21,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Require a version tag
         shell: pwsh
@@ -38,22 +40,33 @@ jobs:
           }
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          toolchain: stable
 
       - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
         with:
           workspaces: "src-tauri -> target"
 
       - name: Install frontend dependencies
         run: npm.cmd ci
+
+      - name: Verify third-party dependency notices
+        shell: pwsh
+        run: |
+          npm.cmd run notices
+          if ($LASTEXITCODE -ne 0) {
+            throw "Third-party notice generation failed."
+          }
+          git diff --exit-code -- THIRD_PARTY_NOTICES.md
 
       - name: Check TypeScript
         run: npm.cmd run check
@@ -71,14 +84,43 @@ jobs:
         shell: pwsh
         env:
           RELEASE_TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           $tag = $env:RELEASE_TAG
           $assetDirectory = "artifacts"
           $assetPath = "$assetDirectory/eRAW-$tag-windows-x64.exe"
+          $licensePath = "$assetDirectory/THIRD_PARTY_LICENSES.txt"
+          $sbomPath = "$assetDirectory/eRAW-$tag.spdx.json"
+          $checksumPath = "$assetDirectory/eRAW-$tag-SHA256SUMS.txt"
 
           New-Item -ItemType Directory -Force -Path $assetDirectory | Out-Null
           Copy-Item -LiteralPath "src-tauri/target/release/eraw.exe" -Destination $assetPath
+          npm.cmd run notices -- --licenses $licensePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "Third-party license collection failed."
+          }
+
+          $sbomResponse = gh api "repos/$env:GITHUB_REPOSITORY/dependency-graph/sbom" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $null -eq $sbomResponse.sbom) {
+            throw "GitHub dependency SBOM export failed."
+          }
+          $sbomResponse.sbom | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $sbomPath -Encoding utf8
+
+          @($assetPath, $licensePath, $sbomPath) | ForEach-Object {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_).Hash.ToLowerInvariant()
+            "$hash  $(Split-Path -Leaf $_)"
+          } | Set-Content -LiteralPath $checksumPath -Encoding ascii
+
           "RELEASE_ASSET=$assetPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_LICENSES=$licensePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_SBOM=$sbomPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_CHECKSUMS=$checksumPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Attest release executable
+        if: github.event.repository.visibility == 'public'
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: ${{ env.RELEASE_ASSET }}
 
       - name: Create GitHub release
         shell: pwsh
@@ -90,9 +132,9 @@ jobs:
           gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
 
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $env:RELEASE_ASSET --clobber --repo $env:GITHUB_REPOSITORY
+            gh release upload $tag $env:RELEASE_ASSET $env:RELEASE_CHECKSUMS $env:RELEASE_SBOM $env:RELEASE_LICENSES --clobber --repo $env:GITHUB_REPOSITORY
           } else {
-            gh release create $tag $env:RELEASE_ASSET `
+            gh release create $tag $env:RELEASE_ASSET $env:RELEASE_CHECKSUMS $env:RELEASE_SBOM $env:RELEASE_LICENSES `
               --repo $env:GITHUB_REPOSITORY `
               --verify-tag `
               --title "eRAW $tag" `

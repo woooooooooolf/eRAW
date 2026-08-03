@@ -1,14 +1,26 @@
 {
   "name": "eraw",
   "private": true,
-  "version": "0.5.4",
+  "version": "0.5.5",
+  "description": "Windows RAW sensor-data viewer, diagnostic tool, and converter for Bayer and Quad CFA workflows",
+  "license": "GPL-3.0-or-later",
+  "author": "eRAW contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/woooooooooolf/eRAW.git"
+  },
+  "homepage": "https://github.com/woooooooooolf/eRAW#readme",
+  "bugs": {
+    "url": "https://github.com/woooooooooolf/eRAW/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "check": "tsc --noEmit",
+    "notices": "node scripts/generate-third-party-notices.mjs",
     "test:i18n": "node --test --test-timeout=30000 tests/i18n.test.mjs",
-    "test:frontend": "node --test --test-timeout=30000 tests/app-settings.test.mjs tests/help-window.test.mjs tests/i18n.test.mjs tests/channel-rendering.test.mjs tests/descriptor-input.test.mjs tests/document-close.test.mjs tests/fullscreen.test.mjs tests/image-capture.test.mjs tests/image-statistics.test.mjs tests/missing-pixel-rendering.test.mjs tests/packing-controls.test.mjs tests/pixel-overlay.test.mjs tests/pixel-value-display.test.mjs tests/roi-selection.test.mjs tests/statistics-chart-data.test.mjs tests/statistics-view-state.test.mjs tests/theme-styles.test.mjs tests/viewport-pixel-alignment.test.mjs tests/viewport-transform.test.mjs",
+    "test:frontend": "node --test --test-timeout=30000 tests/app-settings.test.mjs tests/help-window.test.mjs tests/i18n.test.mjs tests/channel-rendering.test.mjs tests/descriptor-input.test.mjs tests/document-close.test.mjs tests/fullscreen.test.mjs tests/image-capture.test.mjs tests/image-statistics.test.mjs tests/missing-pixel-rendering.test.mjs tests/packing-controls.test.mjs tests/pixel-overlay.test.mjs tests/pixel-value-display.test.mjs tests/repository-publication.test.mjs tests/roi-selection.test.mjs tests/statistics-chart-data.test.mjs tests/statistics-view-state.test.mjs tests/theme-styles.test.mjs tests/viewport-pixel-alignment.test.mjs tests/viewport-transform.test.mjs",
     "release": "tauri build --no-bundle",
     "tauri": "tauri"
   },
@@ -16,7 +28,7 @@
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
     "@tauri-apps/plugin-dialog": "^2.0.0",
-    "echarts": "^6.0.0",
+    "echarts": "^6.1.0",
     "katex": "^0.16.22"
   },
   "devDependencies": {

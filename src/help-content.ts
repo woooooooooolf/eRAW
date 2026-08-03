@@ -364,6 +364,6 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
       </div>
       <div class="help-impact"><strong>可以可靠回答</strong><span>当前描述符如何解释字节</span><span>当前帧/ROI 的原始 DN 分布</span><span>当前算法与参数会产生什么确定性输出</span></div>
       <div class="help-impact muted"><strong>不能单独回答</strong><span>未知文件真实格式是什么</span><span>传感器完整噪声与线性性能</span><span>相机 ISP 的最终颜色和画质</span></div>
-      ${admonition("supplement", "手册版本", "本中文技术参考与 eRAW V0.5.4 当前实现同步。后续增加 Packing、处理算法或统计口径时，应把手册公式、测试和程序版本作为同一项变更维护。")}`,
+      ${admonition("supplement", "手册版本", "本中文技术参考与 eRAW V0.5.5 当前实现同步。后续增加 Packing、处理算法或统计口径时，应把手册公式、测试和程序版本作为同一项变更维护。")}`,
   },
 ];

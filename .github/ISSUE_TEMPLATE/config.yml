@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation / 文档
+    url: https://github.com/woooooooooolf/eRAW/blob/master/docs/README.md
+    about: Read the technical and engineering documentation before opening an Issue.
+  - name: Security policy / 安全策略
+    url: https://github.com/woooooooooolf/eRAW/security/policy
+    about: Do not disclose unpatched vulnerabilities in a public Issue.

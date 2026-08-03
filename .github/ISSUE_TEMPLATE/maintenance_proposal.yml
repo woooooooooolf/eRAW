@@ -1,0 +1,52 @@
+name: Maintenance proposal / 维护建议
+description: Propose a scoped compatibility, documentation, test, security, or behavior-preserving improvement
+title: "[Maintenance]: "
+labels:
+  - maintenance
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        eRAW prioritizes defect fixes and the completeness of existing workflows. New features that materially change architecture, processing flow, data semantics, or user behavior are generally not prioritized.
+        eRAW 优先处理缺陷和既有流程完善。通常不优先接受会显著改变架构、处理流程、数据语义或用户行为的新功能。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Concrete maintenance problem / 具体维护问题
+      description: Describe the compatibility, reliability, documentation, testing, security, or performance problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Proposed scope and boundaries / 建议范围与边界
+      description: Explain what changes and what explicitly remains unchanged.
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan / 验证方案
+      description: Describe automated tests and any necessary visual or interaction checks.
+    validations:
+      required: true
+
+  - type: textarea
+    id: maintenance
+    attributes:
+      label: Long-term maintenance impact / 长期维护影响
+      description: Note new dependencies, states, translations, platform assumptions, or release work. Write "none" when not applicable.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmation / 确认
+      options:
+        - label: This proposal is narrowly scoped and does not duplicate an existing Issue. / 本建议范围明确，且未与现有 Issue 重复。
+          required: true
