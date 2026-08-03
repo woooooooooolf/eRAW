@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const root = new URL("../", import.meta.url);
@@ -100,15 +100,18 @@ test("the English page mirrors the Chinese structure and links back", () => {
 
 test("both locales use replaceable theme captures and a release-resolved x64 download", async () => {
   const [darkZh, lightZh, darkEn, lightEn] = await Promise.all([
-    stat(new URL("../site/screenshots/app-main-dark-zh-CN.png", import.meta.url)),
-    stat(new URL("../site/screenshots/app-main-light-zh-CN.png", import.meta.url)),
-    stat(new URL("../site/screenshots/app-main-dark-en.png", import.meta.url)),
-    stat(new URL("../site/screenshots/app-main-light-en.png", import.meta.url)),
+    readFile(new URL("../site/screenshots/app-main-dark-zh-CN.png", import.meta.url)),
+    readFile(new URL("../site/screenshots/app-main-light-zh-CN.png", import.meta.url)),
+    readFile(new URL("../site/screenshots/app-main-dark-en.png", import.meta.url)),
+    readFile(new URL("../site/screenshots/app-main-light-en.png", import.meta.url)),
   ]);
-  assert.ok(darkZh.size > 100_000);
-  assert.ok(lightZh.size > 100_000);
-  assert.equal(darkEn.size, darkZh.size);
-  assert.equal(lightEn.size, lightZh.size);
+  const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  for (const capture of [darkZh, lightZh, darkEn, lightEn]) {
+    assert.ok(capture.length > 100_000);
+    assert.ok(capture.subarray(0, pngSignature.length).equals(pngSignature));
+  }
+  assert.notEqual(Buffer.compare(darkEn, darkZh), 0);
+  assert.notEqual(Buffer.compare(lightEn, lightZh), 0);
   assert.match(zhScriptSource, /app-main-dark-zh-CN\.png/);
   assert.match(zhScriptSource, /app-main-light-zh-CN\.png/);
   assert.match(enScriptSource, /app-main-dark-en\.png/);
