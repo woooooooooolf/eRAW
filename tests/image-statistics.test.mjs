@@ -111,6 +111,13 @@ test("statistics view supports three presentations, independent curves, two-axis
   assert.ok(capability.permissions.includes("core:webview:allow-create-webview-window"));
 });
 
+test("sampling-site controls start on a new line below each chart heading", () => {
+  const headerRule = styleSource.match(/\.statistics-section > header \{[^}]*\}/)?.[0] ?? "";
+  const headingRule = styleSource.match(/\.statistics-section-heading \{[^}]*\}/)?.[0] ?? "";
+  assert.match(headerRule, /flex-wrap:\s*wrap/);
+  assert.match(headingRule, /flex:\s*0 0 100%/);
+});
+
 test("statistics charts release plain wheel scrolling and state refreshes preserve the reading position", () => {
   assert.match(chartSource, /zoomOnMouseWheel:\s*"ctrl"/);
   assert.match(chartSource, /zoomOnMouseWheel:\s*"shift"/);
