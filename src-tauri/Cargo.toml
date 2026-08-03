@@ -6,7 +6,7 @@ authors = ["eRAW contributors"]
 license = "GPL-3.0-or-later"
 repository = "https://github.com/woooooooooolf/eRAW"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 
 [lib]
 name = "eraw_lib"

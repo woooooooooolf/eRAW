@@ -54,6 +54,7 @@ test("public package metadata and application versions stay synchronized", () =>
   assert.equal(packageJson.repository.url, "git+https://github.com/woooooooooolf/eRAW.git");
   assert.equal(tauriConfig.version, packageJson.version);
   assert.match(cargoSource, new RegExp(`version = "${packageJson.version.replaceAll(".", "\\.")}"`));
+  assert.match(cargoSource, /rust-version = "1\.88"/);
   assert.match(cargoSource, /repository = "https:\/\/github\.com\/woooooooooolf\/eRAW"/);
   assert.match(appSource, new RegExp(`const VERSION = "${packageJson.version.replaceAll(".", "\\.")}"`));
   assert.match(helpWindowSource, new RegExp(`eRAW V${packageJson.version.replaceAll(".", "\\.")}`));
@@ -98,4 +99,6 @@ test("workflows pin actions and release integrity metadata", () => {
   assert.match(releaseSource, /repository\.visibility == 'public'/);
   assert.match(publicationSource, /Secret scanning/);
   assert.match(publicationSource, /enforce_admins=false/);
+  assert.match(publicationSource, /GHSA-wrw7-89jp-8q8g/);
+  assert.match(publicationSource, /不关闭或忽略该告警/);
 });

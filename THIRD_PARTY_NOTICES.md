@@ -120,6 +120,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | block2 | 0.6.2 | MIT |
 | brotli | 8.0.4 | BSD-3-Clause AND MIT |
 | brotli-decompressor | 5.0.3 | BSD-3-Clause/MIT |
+| bs58 | 0.5.1 | MIT/Apache-2.0 |
 | bumpalo | 3.20.3 | MIT OR Apache-2.0 |
 | bytemuck | 1.25.2 | Zlib OR Apache-2.0 OR MIT |
 | byteorder | 1.5.0 | Unlicense OR MIT |
@@ -154,9 +155,9 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | cssparser-macros | 0.6.1 | MPL-2.0 |
 | ctor | 0.8.0 | Apache-2.0 OR MIT |
 | ctor-proc-macro | 0.0.7 | Apache-2.0 OR MIT |
-| darling | 0.21.3 | MIT |
-| darling_core | 0.21.3 | MIT |
-| darling_macro | 0.21.3 | MIT |
+| darling | 0.23.0 | MIT |
+| darling_core | 0.23.0 | MIT |
+| darling_macro | 0.23.0 | MIT |
 | dbus | 0.9.12 | Apache-2.0/MIT |
 | deranged | 0.5.8 | MIT OR Apache-2.0 |
 | derive_more | 2.1.1 | MIT |
@@ -295,7 +296,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | nom | 8.0.0 | MIT |
 | num_enum | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
 | num_enum_derive | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 |
-| num-conv | 0.1.0 | MIT OR Apache-2.0 |
+| num-conv | 0.2.2 | MIT OR Apache-2.0 |
 | num-traits | 0.2.19 | MIT OR Apache-2.0 |
 | objc2 | 0.6.4 | MIT |
 | objc2-app-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT |
@@ -379,8 +380,8 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | serde_repr | 0.1.21 | MIT OR Apache-2.0 |
 | serde_spanned | 0.6.9 | MIT OR Apache-2.0 |
 | serde_spanned | 1.1.1 | MIT OR Apache-2.0 |
-| serde_with | 3.17.0 | MIT OR Apache-2.0 |
-| serde_with_macros | 3.17.0 | MIT OR Apache-2.0 |
+| serde_with | 3.21.0 | MIT OR Apache-2.0 |
+| serde_with_macros | 3.21.0 | MIT OR Apache-2.0 |
 | serde-untagged | 0.1.9 | MIT OR Apache-2.0 |
 | serialize-to-javascript | 0.1.2 | MIT OR Apache-2.0 |
 | serialize-to-javascript-impl | 0.1.2 | MIT OR Apache-2.0 |
@@ -427,10 +428,12 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | thiserror-impl | 1.0.69 | MIT OR Apache-2.0 |
 | thiserror-impl | 2.0.19 | MIT OR Apache-2.0 |
 | tiff | 0.10.3 | MIT |
-| time | 0.3.45 | MIT OR Apache-2.0 |
-| time-core | 0.1.7 | MIT OR Apache-2.0 |
-| time-macros | 0.2.25 | MIT OR Apache-2.0 |
+| time | 0.3.47 | MIT OR Apache-2.0 |
+| time-core | 0.1.8 | MIT OR Apache-2.0 |
+| time-macros | 0.2.27 | MIT OR Apache-2.0 |
 | tinystr | 0.8.3 | Unicode-3.0 |
+| tinyvec | 1.12.0 | Zlib OR Apache-2.0 OR MIT |
+| tinyvec_macros | 0.1.1 | MIT OR Apache-2.0 OR Zlib |
 | tokio | 1.53.1 | MIT |
 | tokio-util | 0.7.19 | MIT |
 | toml | 0.8.2 | MIT OR Apache-2.0 |
@@ -525,7 +528,6 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | windows_x86_64_msvc | 0.53.1 | MIT OR Apache-2.0 |
 | windows-collections | 0.2.0 | MIT OR Apache-2.0 |
 | windows-core | 0.61.2 | MIT OR Apache-2.0 |
-| windows-core | 0.62.2 | MIT OR Apache-2.0 |
 | windows-future | 0.2.1 | MIT OR Apache-2.0 |
 | windows-implement | 0.60.2 | MIT OR Apache-2.0 |
 | windows-interface | 0.59.3 | MIT OR Apache-2.0 |
@@ -533,9 +535,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | windows-link | 0.2.1 | MIT OR Apache-2.0 |
 | windows-numerics | 0.2.0 | MIT OR Apache-2.0 |
 | windows-result | 0.3.4 | MIT OR Apache-2.0 |
-| windows-result | 0.4.1 | MIT OR Apache-2.0 |
 | windows-strings | 0.4.2 | MIT OR Apache-2.0 |
-| windows-strings | 0.5.1 | MIT OR Apache-2.0 |
 | windows-sys | 0.45.0 | MIT OR Apache-2.0 |
 | windows-sys | 0.59.0 | MIT OR Apache-2.0 |
 | windows-sys | 0.60.2 | MIT OR Apache-2.0 |
