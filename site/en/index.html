@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="eRAW is a minimal, lightweight RAW image viewer built with Tauri.">
+    <meta name="theme-color" content="#ffffff">
+    <title>eRAW · RAW image viewer</title>
+    <link rel="icon" href="data:," type="image/svg+xml">
+    <link rel="stylesheet" href="../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <header class="site-header">
+      <div class="page-width header-inner">
+        <a class="brand" href="#top" aria-label="eRAW home">
+          <img data-eraw-icon alt="" width="32" height="32">
+          <strong>eRAW</strong>
+        </a>
+        <div class="header-actions">
+          <nav class="language-switch" aria-label="Page language">
+            <a href="../" lang="zh-CN" hreflang="zh-CN">中文</a>
+            <i aria-hidden="true">/</i>
+            <span aria-current="page">EN</span>
+          </nav>
+          <a class="github-link" href="https://github.com/woooooooooolf/eRAW" target="_blank" rel="noopener noreferrer">
+            <span>GitHub</span><span aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section id="top" class="page-width hero">
+        <h1>Open RAW. See what's inside.</h1>
+
+        <div class="showcase" aria-label="eRAW dark and light workspaces">
+          <figure class="window-shot shot-dark">
+            <figcaption class="window-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>eRAW · Dark theme</span></figcaption>
+            <img class="shot-image" data-screenshot-dark alt="eRAW dark workspace showing a Quad RGGB color-gradient RAW and docked statistics">
+            <img class="shot-reflection" data-screenshot-dark alt="" aria-hidden="true">
+          </figure>
+          <figure class="window-shot shot-light">
+            <figcaption class="window-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>eRAW · Light theme</span></figcaption>
+            <img class="shot-image" data-screenshot-light alt="eRAW light workspace showing a Quad RGGB color-gradient RAW and docked statistics">
+            <img class="shot-reflection" data-screenshot-light alt="" aria-hidden="true">
+          </figure>
+        </div>
+
+        <div class="intro">
+          <p>A minimal, lightweight RAW image viewer built with Tauri.<br>Take it anywhere. Run locally. Get straight to the point.</p>
+          <a class="download-button" data-download-exe href="https://github.com/woooooooooolf/eRAW/releases/latest">
+            <span><strong>Download Windows x64 EXE</strong><small>Get the latest release from GitHub</small></span>
+            <span class="download-icon" aria-hidden="true">↓</span>
+          </a>
+        </div>
+      </section>
+
+      <hr class="page-width page-divider">
+
+      <section class="page-width project-info" aria-label="About eRAW">
+        <div class="info-copy">
+          <p>eRAW runs on Windows and helps you browse RAW images, inspect pixels and statistics, and perform Remosaic, Demosaic, or format export when needed.</p>
+          <p>Files stay on your computer. For data interpretation, algorithms, and boundary conditions, open the built-in technical manual from the Help menu or press <kbd>F1</kbd>.</p>
+        </div>
+        <ul class="project-facts">
+          <li><strong>Platform</strong><span>Windows x64</span></li>
+          <li><strong>License</strong><span>GPL-3.0-or-later</span></li>
+          <li><strong>Data</strong><span>Local processing, no telemetry</span></li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="page-width footer-inner">
+        <span>© <span data-current-year></span> eRAW contributors</span>
+        <div class="footer-links">
+          <a href="https://github.com/woooooooooolf/eRAW/releases">Releases</a>
+          <a href="https://github.com/woooooooooolf/eRAW/blob/master/docs/README.md">Documentation</a>
+          <a href="https://github.com/woooooooooolf/eRAW/blob/master/CONTRIBUTING.md">Contributing</a>
+          <a href="https://github.com/woooooooooolf/eRAW/blob/master/LICENSE">License</a>
+        </div>
+      </div>
+    </footer>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
