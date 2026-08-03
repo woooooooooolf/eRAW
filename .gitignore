@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-site/
 .vite/
 src-tauri/target/
 src-tauri/gen/
@@ -11,4 +12,3 @@ src-tauri/gen/
 .vscode/
 .DS_Store
 Thumbs.db
-
