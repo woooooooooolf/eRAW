@@ -68,6 +68,7 @@ test("the Chinese page follows the agreed reading order and links to English", (
     previous = current;
   }
   assert.match(zhHtmlSource, /href="\.\/en\/" lang="en"/);
+  assert.match(zhHtmlSource, /支持简体中文、繁體中文、English、日本語、Español、Français、Deutsch。/);
   assert.match(zhHtmlSource, /本地处理，无遥测/);
   assert.doesNotMatch(zhHtmlSource, /一个随手可用的 RAW 工具|<p class="section-label">关于/);
 });
@@ -92,6 +93,7 @@ test("the English page mirrors the Chinese structure and links back", () => {
     previous = current;
   }
   assert.match(enHtmlSource, /href="\.\.\/" lang="zh-CN"/);
+  assert.match(enHtmlSource, /Available in English, 简体中文, 繁體中文, 日本語, Español, Français, and Deutsch\./);
   assert.match(enHtmlSource, /Local processing, no telemetry/);
   assert.doesNotMatch(enHtmlSource, /<h2[^>]*>About/);
 });
