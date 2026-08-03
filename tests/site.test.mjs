@@ -23,6 +23,9 @@ test("the project site builds independently without owning the application versi
   assert.match(packageJson.scripts["build:site"], /site\/tsconfig\.json/);
   assert.match(configSource, /root: "site"/);
   assert.match(configSource, /base: "\/eRAW\/"/);
+  assert.match(configSource, /host: "127\.0\.0\.1"/);
+  assert.match(configSource, /port: 4174/);
+  assert.match(configSource, /strictPort: true/);
   assert.match(configSource, /outDir: "\.\.\/dist-site"/);
   assert.match(configSource, /packageJson\.version/);
   assert.match(gitignoreSource, /^dist-site\/$/m);

@@ -8,6 +8,11 @@ const packageJson = JSON.parse(readFileSync(new URL("./package.json", import.met
 export default defineConfig({
   root: "site",
   base: "/eRAW/",
+  server: {
+    host: "127.0.0.1",
+    port: 4174,
+    strictPort: true,
+  },
   define: {
     __ERAW_VERSION__: JSON.stringify(packageJson.version),
   },
