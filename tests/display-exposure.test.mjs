@@ -35,8 +35,14 @@ test("exposure affects only full-color Demosaic display values", () => {
 });
 
 test("the exposure control is continuous, temporary, and resets for a new document", () => {
-  assert.match(appSource, /id="presentation-demosaic-exposure-range"[^>]*min="\$\{MIN_DEMOSAIC_DISPLAY_EXPOSURE\}"[^>]*step="\$\{DEMOSAIC_DISPLAY_EXPOSURE_STEP\}"/);
+  assert.doesNotMatch(appSource, /id="presentation-demosaic-exposure-range"|type="range"[^>]*demosaic-exposure/);
+  assert.match(appSource, /class="stepper-control presentation-exposure-control"/);
+  assert.match(appSource, /id="decrease-demosaic-exposure"[^>]*data-exposure-step="-\$\{DEMOSAIC_DISPLAY_EXPOSURE_STEP\}"/);
   assert.match(appSource, /id="presentation-demosaic-exposure" type="number"/);
+  assert.match(appSource, /id="increase-demosaic-exposure"[^>]*data-exposure-step="\$\{DEMOSAIC_DISPLAY_EXPOSURE_STEP\}"/);
+  assert.match(appSource, /this\.demosaicDisplayExposure \+ Number\(button\.dataset\.exposureStep\)/);
+  assert.match(appSource, /demosaicDisplayExposure <= MIN_DEMOSAIC_DISPLAY_EXPOSURE/);
+  assert.match(appSource, /demosaicDisplayExposure >= MAX_DEMOSAIC_DISPLAY_EXPOSURE/);
   assert.match(appSource, /this\.setDemosaicDisplayExposure\(0\);\s*this\.viewport\.setDocument\(info\)/);
   assert.match(appSource, /exposureAvailable = Boolean\(this\.document\) && this\.displayMode === "demosaic"/);
   assert.doesNotMatch(appSource, /localStorage[^\n]*demosaicDisplayExposure/);

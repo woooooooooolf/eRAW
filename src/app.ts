@@ -457,12 +457,10 @@ export class ErawApp {
                   </label>
                   <div class="parameter-row presentation-exposure-row presentation-disabled" id="presentation-demosaic-exposure-row">
                     <span class="field-label" data-help="只改变 Demosaic 全彩图及其 PNG 抓拍，不改变 DN、统计或 RAW/RGB48 导出">Demosaic 显示曝光</span>
-                    <div class="presentation-exposure-control">
-                      <input id="presentation-demosaic-exposure-range" type="range" min="${MIN_DEMOSAIC_DISPLAY_EXPOSURE}" max="${MAX_DEMOSAIC_DISPLAY_EXPOSURE}" step="${DEMOSAIC_DISPLAY_EXPOSURE_STEP}" value="0" aria-label="Demosaic 显示曝光"/>
-                      <div class="presentation-exposure-value">
-                        <div class="number-input"><input id="presentation-demosaic-exposure" type="number" min="${MIN_DEMOSAIC_DISPLAY_EXPOSURE}" max="${MAX_DEMOSAIC_DISPLAY_EXPOSURE}" step="${DEMOSAIC_DISPLAY_EXPOSURE_STEP}" value="0.0" aria-label="Demosaic 显示曝光"/><b>EV</b></div>
-                        <button id="reset-demosaic-exposure" type="button">重置</button>
-                      </div>
+                    <div class="stepper-control presentation-exposure-control">
+                      <button id="decrease-demosaic-exposure" type="button" data-exposure-step="-${DEMOSAIC_DISPLAY_EXPOSURE_STEP}" aria-label="减小 Demosaic 显示曝光">−</button>
+                      <div class="number-input"><input id="presentation-demosaic-exposure" type="number" min="${MIN_DEMOSAIC_DISPLAY_EXPOSURE}" max="${MAX_DEMOSAIC_DISPLAY_EXPOSURE}" step="${DEMOSAIC_DISPLAY_EXPOSURE_STEP}" value="0.0" aria-label="Demosaic 显示曝光"/><b>EV</b></div>
+                      <button id="increase-demosaic-exposure" type="button" data-exposure-step="${DEMOSAIC_DISPLAY_EXPOSURE_STEP}" aria-label="增加 Demosaic 显示曝光">+</button>
                     </div>
                   </div>
                   <label class="parameter-row processing-toggle-row">
@@ -743,9 +741,9 @@ export class ErawApp {
     attribute("#remosaic-processing-row .field-label", "help", "runtime.sameColorHelp");
     field("presentation-channel-rendering", "settings.channelRendering", "settings.channelRenderingHint");
     field("presentation-demosaic-exposure", "presentation.demosaicExposure", "presentation.demosaicExposureHint");
-    attribute("#presentation-demosaic-exposure-range", "aria-label", "presentation.demosaicExposure");
     attribute("#presentation-demosaic-exposure", "aria-label", "presentation.demosaicExposure");
-    text("#reset-demosaic-exposure", "presentation.resetExposure");
+    attribute("#decrease-demosaic-exposure", "aria-label", "presentation.decreaseExposure");
+    attribute("#increase-demosaic-exposure", "aria-label", "presentation.increaseExposure");
     field("presentation-pixel-values", "settings.showPixelValues", "settings.showPixelValuesHint");
     field("presentation-pixel-grid-color", "presentation.pixelGridColor", "presentation.pixelGridColorHint");
     field("presentation-demosaic-pixel-values", "settings.demosaicValues", "settings.demosaicValuesHint");
@@ -1202,9 +1200,6 @@ export class ErawApp {
     this.get("confirm-settings").addEventListener("click", () => this.saveSettingsFromDialog());
     this.get("reset-settings").addEventListener("click", () => this.writeSettingsForm(DEFAULT_SETTINGS));
     this.get<HTMLSelectElement>("presentation-channel-rendering").addEventListener("change", () => this.savePresentationSettings());
-    this.get<HTMLInputElement>("presentation-demosaic-exposure-range").addEventListener("input", (event) => {
-      this.setDemosaicDisplayExposure(Number((event.currentTarget as HTMLInputElement).value));
-    });
     const exposureInput = this.get<HTMLInputElement>("presentation-demosaic-exposure");
     exposureInput.addEventListener("change", () => this.setDemosaicDisplayExposure(Number(exposureInput.value)));
     exposureInput.addEventListener("keydown", (event) => {
@@ -1212,7 +1207,13 @@ export class ErawApp {
       event.preventDefault();
       exposureInput.blur();
     });
-    this.get("reset-demosaic-exposure").addEventListener("click", () => this.setDemosaicDisplayExposure(0));
+    this.root.querySelectorAll<HTMLButtonElement>("[data-exposure-step]").forEach((button) => {
+      button.addEventListener("click", () => {
+        this.setDemosaicDisplayExposure(
+          this.demosaicDisplayExposure + Number(button.dataset.exposureStep),
+        );
+      });
+    });
     this.get<HTMLInputElement>("presentation-pixel-values").addEventListener("change", () => this.savePresentationSettings());
     this.get<HTMLInputElement>("presentation-pixel-grid-color").addEventListener("input", () => this.savePresentationSettings());
     this.get<HTMLSelectElement>("presentation-demosaic-pixel-values").addEventListener("change", () => this.savePresentationSettings());
@@ -2791,9 +2792,8 @@ export class ErawApp {
   }
 
   private writeDemosaicDisplayExposureControls(): void {
-    const value = this.demosaicDisplayExposure.toFixed(1);
-    this.get<HTMLInputElement>("presentation-demosaic-exposure-range").value = value;
-    this.get<HTMLInputElement>("presentation-demosaic-exposure").value = value;
+    this.get<HTMLInputElement>("presentation-demosaic-exposure").value =
+      this.demosaicDisplayExposure.toFixed(1);
   }
 
   private setDemosaicDisplayExposure(value: number): void {
@@ -2835,10 +2835,11 @@ export class ErawApp {
   private updatePresentationAvailability(): void {
     const exposureAvailable = Boolean(this.document) && this.displayMode === "demosaic";
     this.get("presentation-demosaic-exposure-row").classList.toggle("presentation-disabled", !exposureAvailable);
-    this.get<HTMLInputElement>("presentation-demosaic-exposure-range").disabled = !exposureAvailable;
     this.get<HTMLInputElement>("presentation-demosaic-exposure").disabled = !exposureAvailable;
-    this.get<HTMLButtonElement>("reset-demosaic-exposure").disabled = !exposureAvailable
-      || this.demosaicDisplayExposure === 0;
+    this.get<HTMLButtonElement>("decrease-demosaic-exposure").disabled = !exposureAvailable
+      || this.demosaicDisplayExposure <= MIN_DEMOSAIC_DISPLAY_EXPOSURE;
+    this.get<HTMLButtonElement>("increase-demosaic-exposure").disabled = !exposureAvailable
+      || this.demosaicDisplayExposure >= MAX_DEMOSAIC_DISPLAY_EXPOSURE;
     const pixelValuesEnabled = this.get<HTMLInputElement>("presentation-pixel-values").checked;
     this.get<HTMLSelectElement>("presentation-demosaic-pixel-values").disabled = !pixelValuesEnabled;
     this.get("presentation-demosaic-values-row").classList.toggle("presentation-disabled", !pixelValuesEnabled);
