@@ -6,61 +6,26 @@ It records the complete locked dependency inventory and each package's declared 
 
 eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain with their respective owners.
 
-## npm dependencies (84)
+## npm dependencies (60)
 
 | Package | Version | Scope | Declared license |
 | --- | --- | --- | --- |
-| @esbuild/aix-ppc64 | 0.28.1 | development | MIT |
-| @esbuild/android-arm | 0.28.1 | development | MIT |
-| @esbuild/android-arm64 | 0.28.1 | development | MIT |
-| @esbuild/android-x64 | 0.28.1 | development | MIT |
-| @esbuild/darwin-arm64 | 0.28.1 | development | MIT |
-| @esbuild/darwin-x64 | 0.28.1 | development | MIT |
-| @esbuild/freebsd-arm64 | 0.28.1 | development | MIT |
-| @esbuild/freebsd-x64 | 0.28.1 | development | MIT |
-| @esbuild/linux-arm | 0.28.1 | development | MIT |
-| @esbuild/linux-arm64 | 0.28.1 | development | MIT |
-| @esbuild/linux-ia32 | 0.28.1 | development | MIT |
-| @esbuild/linux-loong64 | 0.28.1 | development | MIT |
-| @esbuild/linux-mips64el | 0.28.1 | development | MIT |
-| @esbuild/linux-ppc64 | 0.28.1 | development | MIT |
-| @esbuild/linux-riscv64 | 0.28.1 | development | MIT |
-| @esbuild/linux-s390x | 0.28.1 | development | MIT |
-| @esbuild/linux-x64 | 0.28.1 | development | MIT |
-| @esbuild/netbsd-arm64 | 0.28.1 | development | MIT |
-| @esbuild/netbsd-x64 | 0.28.1 | development | MIT |
-| @esbuild/openbsd-arm64 | 0.28.1 | development | MIT |
-| @esbuild/openbsd-x64 | 0.28.1 | development | MIT |
-| @esbuild/openharmony-arm64 | 0.28.1 | development | MIT |
-| @esbuild/sunos-x64 | 0.28.1 | development | MIT |
-| @esbuild/win32-arm64 | 0.28.1 | development | MIT |
-| @esbuild/win32-ia32 | 0.28.1 | development | MIT |
-| @esbuild/win32-x64 | 0.28.1 | development | MIT |
-| @rollup/rollup-android-arm-eabi | 4.62.2 | development | MIT |
-| @rollup/rollup-android-arm64 | 4.62.2 | development | MIT |
-| @rollup/rollup-darwin-arm64 | 4.62.2 | development | MIT |
-| @rollup/rollup-darwin-x64 | 4.62.2 | development | MIT |
-| @rollup/rollup-freebsd-arm64 | 4.62.2 | development | MIT |
-| @rollup/rollup-freebsd-x64 | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-arm-gnueabihf | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-arm-musleabihf | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-arm64-gnu | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-arm64-musl | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-loong64-gnu | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-loong64-musl | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-ppc64-gnu | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-ppc64-musl | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-riscv64-gnu | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-riscv64-musl | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-s390x-gnu | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-x64-gnu | 4.62.2 | development | MIT |
-| @rollup/rollup-linux-x64-musl | 4.62.2 | development | MIT |
-| @rollup/rollup-openbsd-x64 | 4.62.2 | development | MIT |
-| @rollup/rollup-openharmony-arm64 | 4.62.2 | development | MIT |
-| @rollup/rollup-win32-arm64-msvc | 4.62.2 | development | MIT |
-| @rollup/rollup-win32-ia32-msvc | 4.62.2 | development | MIT |
-| @rollup/rollup-win32-x64-gnu | 4.62.2 | development | MIT |
-| @rollup/rollup-win32-x64-msvc | 4.62.2 | development | MIT |
+| @oxc-project/types | 0.143.0 | development | MIT |
+| @rolldown/binding-android-arm64 | 1.2.3 | development | MIT |
+| @rolldown/binding-darwin-arm64 | 1.2.3 | development | MIT |
+| @rolldown/binding-darwin-x64 | 1.2.3 | development | MIT |
+| @rolldown/binding-freebsd-x64 | 1.2.3 | development | MIT |
+| @rolldown/binding-linux-arm-gnueabihf | 1.2.3 | development | MIT |
+| @rolldown/binding-linux-arm64-gnu | 1.2.3 | development | MIT |
+| @rolldown/binding-linux-arm64-musl | 1.2.3 | development | MIT |
+| @rolldown/binding-linux-ppc64-gnu | 1.2.3 | development | MIT |
+| @rolldown/binding-linux-s390x-gnu | 1.2.3 | development | MIT |
+| @rolldown/binding-linux-x64-gnu | 1.2.3 | development | MIT |
+| @rolldown/binding-linux-x64-musl | 1.2.3 | development | MIT |
+| @rolldown/binding-openharmony-arm64 | 1.2.3 | development | MIT |
+| @rolldown/binding-win32-arm64-msvc | 1.2.3 | development | MIT |
+| @rolldown/binding-win32-x64-msvc | 1.2.3 | development | MIT |
+| @rolldown/pluginutils | 1.0.1 | development | MIT |
 | @tauri-apps/api | 2.11.1 | runtime | Apache-2.0 OR MIT |
 | @tauri-apps/cli | 2.11.4 | development | Apache-2.0 OR MIT |
 | @tauri-apps/cli-darwin-arm64 | 2.11.4 | development | Apache-2.0 OR MIT |
@@ -76,23 +41,34 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | @tauri-apps/cli-win32-x64-msvc | 2.11.4 | development | Apache-2.0 OR MIT |
 | @tauri-apps/plugin-clipboard-manager | 2.3.2 | runtime | MIT OR Apache-2.0 |
 | @tauri-apps/plugin-dialog | 2.7.2 | runtime | MIT OR Apache-2.0 |
-| @types/estree | 1.0.9 | development | MIT |
 | commander | 8.3.0 | runtime | MIT |
+| detect-libc | 2.1.2 | development | Apache-2.0 |
 | echarts | 6.1.0 | runtime | Apache-2.0 |
-| esbuild | 0.28.1 | development | MIT |
 | fdir | 6.5.0 | development | MIT |
 | fsevents | 2.3.3 | development | MIT |
 | katex | 0.18.1 | runtime | MIT |
+| lightningcss | 1.33.0 | development | MPL-2.0 |
+| lightningcss-android-arm64 | 1.33.0 | development | MPL-2.0 |
+| lightningcss-darwin-arm64 | 1.33.0 | development | MPL-2.0 |
+| lightningcss-darwin-x64 | 1.33.0 | development | MPL-2.0 |
+| lightningcss-freebsd-x64 | 1.33.0 | development | MPL-2.0 |
+| lightningcss-linux-arm-gnueabihf | 1.33.0 | development | MPL-2.0 |
+| lightningcss-linux-arm64-gnu | 1.33.0 | development | MPL-2.0 |
+| lightningcss-linux-arm64-musl | 1.33.0 | development | MPL-2.0 |
+| lightningcss-linux-x64-gnu | 1.33.0 | development | MPL-2.0 |
+| lightningcss-linux-x64-musl | 1.33.0 | development | MPL-2.0 |
+| lightningcss-win32-arm64-msvc | 1.33.0 | development | MPL-2.0 |
+| lightningcss-win32-x64-msvc | 1.33.0 | development | MPL-2.0 |
 | nanoid | 3.3.18 | development | MIT |
 | picocolors | 1.1.1 | development | ISC |
 | picomatch | 4.0.5 | development | MIT |
 | postcss | 8.5.26 | development | MIT |
-| rollup | 4.62.2 | development | MIT |
+| rolldown | 1.2.3 | development | MIT |
 | source-map-js | 1.2.1 | development | BSD-3-Clause |
 | tinyglobby | 0.2.17 | development | MIT |
 | tslib | 2.3.0 | runtime | 0BSD |
 | typescript | 5.8.3 | development | Apache-2.0 |
-| vite | 7.3.6 | development | MIT |
+| vite | 8.2.1 | development | MIT |
 | zrender | 6.1.0 | runtime | BSD-3-Clause |
 
 ## Cargo dependencies (470)
