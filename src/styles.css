@@ -774,6 +774,13 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 }
 .presentation-color-row input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
 .presentation-color-row input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
+.presentation-exposure-control { display: grid; gap: 5px; min-width: 0; }
+.presentation-exposure-control > input[type="range"] { width: 100%; min-width: 0; accent-color: var(--cyan); }
+.presentation-exposure-value { display: grid; grid-template-columns: minmax(72px, 1fr) auto; gap: 6px; min-width: 0; }
+.presentation-exposure-value .number-input input { padding-right: 26px; font-family: var(--font-mono); }
+.presentation-exposure-value button { min-width: 48px; height: 27px; padding: 0 8px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); background: var(--control-surface); font-size: var(--font-xs); cursor: pointer; }
+.presentation-exposure-value button:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text); }
+.presentation-exposure-value button:disabled { opacity: .45; cursor: default; }
 .parameter-row.presentation-disabled { opacity: .46; }
 
 .warning-item { display: flex; gap: 8px; padding: 8px; border-radius: 5px; background: rgba(255, 255, 255, .018); }

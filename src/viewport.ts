@@ -4,6 +4,7 @@ import {
   channelTint,
   type ChannelRenderingMode,
 } from "./channel-rendering";
+import { effectiveDemosaicDisplayExposure } from "./display-exposure";
 import {
   drawViewportBackground,
   renderPreviewCanvas,
@@ -101,6 +102,7 @@ uniform sampler2D u_texture;
 uniform vec4 u_rect;
 uniform float u_opacity;
 uniform vec3 u_channel_tint;
+uniform float u_demosaic_exposure;
 uniform int u_missing_pattern;
 uniform vec3 u_missing_color;
 in vec2 v_image_point;
@@ -130,7 +132,8 @@ void main() {
   }
   float spread = max(max(abs(color.r - color.g), abs(color.g - color.b)), abs(color.r - color.b));
   vec3 tinted = mix(color.rgb * u_channel_tint, color.rgb, step(0.5 / 255.0, spread));
-  outColor = vec4(tinted, color.a * u_opacity);
+  vec3 exposed = clamp(tinted * exp2(u_demosaic_exposure), 0.0, 1.0);
+  outColor = vec4(exposed, color.a * u_opacity);
 }`;
 
 function createShader(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
@@ -176,6 +179,7 @@ export class RawViewport {
   private zoomLocation!: WebGLUniformLocation;
   private opacityLocation!: WebGLUniformLocation;
   private channelTintLocation!: WebGLUniformLocation;
+  private demosaicExposureLocation!: WebGLUniformLocation;
   private missingPatternLocation!: WebGLUniformLocation;
   private missingColorLocation!: WebGLUniformLocation;
   private readonly horizontalScrollbar: HTMLElement;
@@ -217,6 +221,7 @@ export class RawViewport {
   private maxTextures = DEFAULT_MAX_TEXTURES;
   private wheelSensitivity = 0.0015;
   private channelRendering: ChannelRenderingMode = "color";
+  private demosaicDisplayExposure = 0;
   private missingPixelAppearance: MissingPixelAppearance = {
     pattern: "darkCheckerboard",
     color: "#808080",
@@ -287,6 +292,7 @@ export class RawViewport {
     this.zoomLocation = this.requireUniform(this.program, "u_zoom");
     this.opacityLocation = this.requireUniform(this.program, "u_opacity");
     this.channelTintLocation = this.requireUniform(this.program, "u_channel_tint");
+    this.demosaicExposureLocation = this.requireUniform(this.program, "u_demosaic_exposure");
     this.missingPatternLocation = this.requireUniform(this.program, "u_missing_pattern");
     this.missingColorLocation = this.requireUniform(this.program, "u_missing_color");
     const buffer = gl.createBuffer();
@@ -430,6 +436,12 @@ export class RawViewport {
     this.requestDraw();
   }
 
+  setDemosaicDisplayExposure(exposure: number): void {
+    if (exposure === this.demosaicDisplayExposure) return;
+    this.demosaicDisplayExposure = exposure;
+    this.requestDraw();
+  }
+
   setMissingPixelAppearance(appearance: MissingPixelAppearance): void {
     if (
       appearance.pattern === this.missingPixelAppearance.pattern
@@ -503,6 +515,7 @@ export class RawViewport {
       displayMin: this.settings.displayMin,
       displayMax: this.settings.displayMax,
       channelRendering: this.channelRendering,
+      demosaicDisplayExposure: this.demosaicDisplayExposure,
       missingPixelAppearance: { ...this.missingPixelAppearance },
     };
   }
@@ -1093,6 +1106,10 @@ export class RawViewport {
     gl.uniform1f(this.zoomLocation, this.zoom);
     const tint = channelTint(this.settings.mode, this.channelRendering);
     gl.uniform3f(this.channelTintLocation, tint[0], tint[1], tint[2]);
+    gl.uniform1f(
+      this.demosaicExposureLocation,
+      effectiveDemosaicDisplayExposure(this.settings.mode, this.demosaicDisplayExposure),
+    );
     gl.uniform1i(
       this.missingPatternLocation,
       missingPixelPatternIndex(this.missingPixelAppearance.pattern),
