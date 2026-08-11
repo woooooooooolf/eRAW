@@ -3,6 +3,7 @@ import {
   channelTint,
   type ChannelRenderingMode,
 } from "./channel-rendering";
+import { effectiveDemosaicDisplayExposure } from "./display-exposure";
 import {
   normalizeMissingPixelColor,
   type MissingPixelAppearance,
@@ -37,6 +38,7 @@ export interface PreviewCaptureSnapshot {
   displayMin: number;
   displayMax: number;
   channelRendering: ChannelRenderingMode;
+  demosaicDisplayExposure: number;
   missingPixelAppearance: MissingPixelAppearance;
 }
 
@@ -89,9 +91,11 @@ export function applyPreviewPresentation(
   mode: DisplayMode,
   rendering: ChannelRenderingMode,
   missing: MissingPixelAppearance,
+  demosaicDisplayExposure = 0,
   tileSize = CAPTURE_TILE_SIZE,
 ): Uint8Array {
   const tint = channelTint(mode, rendering);
+  const exposureGain = 2 ** effectiveDemosaicDisplayExposure(mode, demosaicDisplayExposure);
   const solid = solidColor(missing.color);
   for (let offset = 0; offset + 3 < bytes.length; offset += 4) {
     const alpha = bytes[offset + 3];
@@ -117,6 +121,11 @@ export function applyPreviewPresentation(
       bytes[offset] = Math.round(bytes[offset] * tint[0]);
       bytes[offset + 1] = Math.round(bytes[offset + 1] * tint[1]);
       bytes[offset + 2] = Math.round(bytes[offset + 2] * tint[2]);
+    }
+    if (alpha !== 0 && mode === "demosaic" && demosaicDisplayExposure !== 0) {
+      bytes[offset] = Math.min(255, Math.round(bytes[offset] * exposureGain));
+      bytes[offset + 1] = Math.min(255, Math.round(bytes[offset + 1] * exposureGain));
+      bytes[offset + 2] = Math.min(255, Math.round(bytes[offset + 2] * exposureGain));
     }
   }
   return bytes;
@@ -163,6 +172,7 @@ export async function renderPreviewCanvas(
         snapshot.mode,
         snapshot.channelRendering,
         snapshot.missingPixelAppearance,
+        snapshot.demosaicDisplayExposure,
       );
       context.putImageData(
         new ImageData(

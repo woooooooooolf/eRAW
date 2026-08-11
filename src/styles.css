@@ -748,8 +748,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 .dimension-control input { padding-right: 8px; }
 .stepper-control { display: grid; grid-template-columns: 29px minmax(0, 1fr) 29px; gap: 5px; min-width: 0; }
 .stepper-control > button { display: grid; place-items: center; width: 29px; height: 29px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); background: var(--control-surface); font-size: 17px; line-height: 1; }
-.stepper-control > button:hover { color: var(--text); border-color: rgb(var(--accent-rgb) / .4); background: rgb(var(--accent-rgb) / .1); }
-.stepper-control > button:active { color: var(--cyan-bright); background: rgb(var(--accent-rgb) / .2); }
+.stepper-control > button:hover:not(:disabled) { color: var(--text); border-color: rgb(var(--accent-rgb) / .4); background: rgb(var(--accent-rgb) / .1); }
+.stepper-control > button:active:not(:disabled) { color: var(--cyan-bright); background: rgb(var(--accent-rgb) / .2); }
+.stepper-control > button:disabled { opacity: .45; cursor: default; }
 .segmented-control { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; padding: 2px; border: 1px solid var(--border); border-radius: 6px; background: var(--segment-surface); }
 .segmented-control button { min-width: 0; height: 27px; padding: 0 6px; overflow: hidden; border-radius: 4px; color: var(--muted); background: transparent; font-size: var(--font-xs); text-overflow: ellipsis; white-space: nowrap; }
 .segmented-control button:hover { color: var(--text); }
@@ -774,6 +775,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 }
 .presentation-color-row input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
 .presentation-color-row input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
+.presentation-exposure-control .number-input input { padding-right: 26px; font-family: var(--font-mono); }
 .parameter-row.presentation-disabled { opacity: .46; }
 
 .warning-item { display: flex; gap: 8px; padding: 8px; border-radius: 5px; background: rgba(255, 255, 255, .018); }

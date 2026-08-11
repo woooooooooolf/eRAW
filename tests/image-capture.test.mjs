@@ -40,6 +40,14 @@ const runnableSource = outputText
     `)),
   )
   .replaceAll(
+    '"./display-exposure"',
+    JSON.stringify(dataUrl(`
+      export function effectiveDemosaicDisplayExposure(mode, exposure) {
+        return mode === "demosaic" ? Math.max(-8, Math.min(8, exposure)) : 0;
+      }
+    `)),
+  )
+  .replaceAll(
     '"./missing-pixel-rendering"',
     JSON.stringify(dataUrl(`
       export function normalizeMissingPixelColor(value) {
@@ -87,6 +95,14 @@ test("preview presentation keeps global missing-pixel phase and only tints grays
   const colors = new Uint8Array([100, 100, 100, 255, 10, 20, 30, 255]);
   capture.applyPreviewPresentation(colors, 0, 0, "red", "color", missing);
   assert.deepEqual([...colors], [100, 0, 0, 255, 10, 20, 30, 255]);
+
+  const exposed = new Uint8Array([64, 128, 200, 255]);
+  capture.applyPreviewPresentation(exposed, 0, 0, "demosaic", "color", missing, 1);
+  assert.deepEqual([...exposed], [128, 255, 255, 255]);
+
+  const unchangedRaw = new Uint8Array([64, 64, 64, 255]);
+  capture.applyPreviewPresentation(unchangedRaw, 0, 0, "raw", "color", missing, 4);
+  assert.deepEqual([...unchangedRaw], [64, 64, 64, 255]);
 });
 
 test("native context menus are suppressed globally and the canvas menu exposes only four capture actions", () => {
