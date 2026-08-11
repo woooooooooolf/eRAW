@@ -82,7 +82,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | esbuild | 0.28.1 | development | MIT |
 | fdir | 6.5.0 | development | MIT |
 | fsevents | 2.3.3 | development | MIT |
-| katex | 0.16.22 | runtime | MIT |
+| katex | 0.18.1 | runtime | MIT |
 | nanoid | 3.3.18 | development | MIT |
 | picocolors | 1.1.1 | development | ISC |
 | picomatch | 4.0.5 | development | MIT |
