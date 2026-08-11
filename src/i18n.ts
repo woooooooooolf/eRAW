@@ -333,9 +333,10 @@ const CATALOG = {
   "shortcuts.submitLeave": message("Submit current input and leave", "提交当前输入并离开", "提交目前輸入並離開", "現在の入力を確定して離れる", "Enviar entrada actual y salir", "Valider la saisie et quitter", "Aktuelle Eingabe übernehmen und verlassen"),
   "shortcuts.submitNext": message("Submit and move to next item", "提交并切换到下一项", "提交並切換至下一項", "確定して次の項目へ移動", "Enviar y pasar al siguiente elemento", "Valider et passer à l’élément suivant", "Übernehmen und zum nächsten Element wechseln"),
 
-  "about.lab": message("RAW SENSOR LAB", "RAW 传感器实验室", "RAW 感測器實驗室", "RAW センサーラボ", "LABORATORIO DE SENSORES RAW", "LABORATOIRE DE CAPTEURS RAW", "RAW-SENSORLABOR"),
   "about.productDesign": message("Product design", "产品设计", "產品設計", "プロダクトデザイン", "Diseño de producto", "Conception du produit", "Produktdesign"),
   "about.engineering": message("Engineering", "工程实现", "工程實作", "実装", "Implementación", "Réalisation", "Implementierung"),
+  "about.repository": message("GitHub repository", "GitHub 仓库", "GitHub 儲存庫", "GitHub リポジトリ", "Repositorio de GitHub", "Dépôt GitHub", "GitHub-Repository"),
+  "about.repositoryAvailability": message("(Subject to the repository's actual public availability)", "（以仓库实际公开情况为准）", "（以儲存庫實際公開情況為準）", "（リポジトリの実際の公開状況に準じます）", "(Sujeto a la disponibilidad pública real del repositorio)", "(Sous réserve de la disponibilité publique effective du dépôt)", "(Maßgeblich ist die tatsächliche öffentliche Verfügbarkeit des Repositorys)"),
   "about.components": message("Open-source components", "开源组件", "開源元件", "オープンソースコンポーネント", "Componentes de código abierto", "Composants open source", "Open-Source-Komponenten"),
   "about.componentsHint": message("View major third-party components and license information", "查看主要第三方组件与许可证信息", "檢視主要第三方元件與授權資訊", "主なサードパーティコンポーネントとライセンスを表示", "Ver principales componentes de terceros y licencias", "Voir les principaux composants tiers et leurs licences", "Wichtige Drittanbieterkomponenten und Lizenzinformationen anzeigen"),
   "about.componentsEyebrow": message("OPEN SOURCE ACKNOWLEDGEMENTS", "开源致谢", "開源致謝", "オープンソース謝辞", "AGRADECIMIENTOS DE CÓDIGO ABIERTO", "REMERCIEMENTS OPEN SOURCE", "OPEN-SOURCE-DANKSAGUNGEN"),

@@ -842,8 +842,9 @@ export class ErawApp {
     text('#settings-dialog footer button[value="cancel"]', "common.cancel");
     text("#confirm-settings", "common.apply");
 
-    text("#about-dialog .about-hero small", "about.lab");
     texts("#about-dialog .about-credits span", ["about.productDesign", "about.engineering"]);
+    text("#about-repository strong", "about.repository");
+    text("#about-repository small", "about.repositoryAvailability");
     text("#open-source-components strong", "about.components");
     text("#open-source-components small", "about.componentsHint");
     text("#about-dialog footer button", "common.done");
@@ -959,12 +960,13 @@ export class ErawApp {
   private aboutDialogTemplate(): string {
     return `<dialog id="about-dialog" class="modal about-modal"><form method="dialog">
       <button value="cancel" class="dialog-close floating">×</button>
-      <div class="about-hero"><img src="${erawIconUrl}" alt="eRAW"/><div><small>RAW SENSOR LAB</small><h2>eRAW</h2><p>V${VERSION}</p><time id="about-build-time" datetime="${BUILD_TIME_SOURCE}">${t("about.builtAt", { time: formatDateTime(BUILD_TIME_SOURCE) })}</time></div></div>
+      <div class="about-hero"><img src="${erawIconUrl}" alt="eRAW"/><div><h2 class="about-product-name">eRAW</h2><p>V${VERSION}</p><time id="about-build-time" datetime="${BUILD_TIME_SOURCE}">${t("about.builtAt", { time: formatDateTime(BUILD_TIME_SOURCE) })}</time></div></div>
       <div class="about-copy">
         <div class="about-credits">
           <div><span>产品设计</span><strong>凌净清河</strong></div>
           <div><span>工程实现</span><strong>Codex (GPT-5.6 Sol)</strong></div>
         </div>
+        <a id="about-repository" class="about-repository" href="https://github.com/woooooooooolf/eRAW" target="_blank" rel="noopener noreferrer"><strong>GitHub</strong><span>github.com/woooooooooolf/eRAW</span><small>（以仓库实际公开情况为准）</small></a>
         <button id="open-source-components" type="button" class="about-link"><span><strong>开源组件</strong><small>查看主要第三方组件与许可证信息</small></span><b>›</b></button>
       </div>
       <footer><button value="cancel" class="primary-button">完成</button></footer>
