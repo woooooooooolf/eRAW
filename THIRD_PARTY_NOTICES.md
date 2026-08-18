@@ -46,7 +46,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | echarts | 6.1.0 | runtime | Apache-2.0 |
 | fdir | 6.5.0 | development | MIT |
 | fsevents | 2.3.3 | development | MIT |
-| katex | 0.18.1 | runtime | MIT |
+| katex | 0.18.4 | runtime | MIT |
 | lightningcss | 1.33.0 | development | MPL-2.0 |
 | lightningcss-android-arm64 | 1.33.0 | development | MPL-2.0 |
 | lightningcss-darwin-arm64 | 1.33.0 | development | MPL-2.0 |
