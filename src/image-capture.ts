@@ -176,7 +176,7 @@ export async function renderPreviewCanvas(
       );
       context.putImageData(
         new ImageData(
-          new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+          new Uint8ClampedArray(bytes),
           CAPTURE_TILE_SIZE,
           CAPTURE_TILE_SIZE,
         ),
