@@ -1018,7 +1018,7 @@ export class ErawApp {
     this.get("empty-open-button").addEventListener("click", () => void this.openFile());
     this.get<HTMLButtonElement>("export-button").addEventListener("click", (event) => {
       event.stopPropagation();
-      this.setExportMenuOpen(this.get("export-popover").hidden);
+      this.setExportMenuOpen(Boolean(this.get("export-popover").hidden));
     });
     this.root.querySelectorAll<HTMLButtonElement>("[data-export-target]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -1044,7 +1044,7 @@ export class ErawApp {
     });
     this.get("language-button").addEventListener("click", (event) => {
       event.stopPropagation();
-      this.setLanguageMenuOpen(this.get("language-popover").hidden);
+      this.setLanguageMenuOpen(Boolean(this.get("language-popover").hidden));
     });
     this.root.querySelectorAll<HTMLButtonElement>("[data-language-value]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -1054,7 +1054,7 @@ export class ErawApp {
     });
     this.get("theme-button").addEventListener("click", (event) => {
       event.stopPropagation();
-      this.setThemeMenuOpen(this.get("theme-popover").hidden);
+      this.setThemeMenuOpen(Boolean(this.get("theme-popover").hidden));
     });
     this.root.querySelectorAll<HTMLButtonElement>("[data-theme-value]").forEach((button) => button.addEventListener("click", () => {
       this.setTheme(button.dataset.themeValue as AppTheme);
@@ -1123,7 +1123,7 @@ export class ErawApp {
     });
     this.get("about-button").addEventListener("click", (event) => {
       event.stopPropagation();
-      this.setUtilityMenuOpen(this.get("utility-popover").hidden);
+      this.setUtilityMenuOpen(Boolean(this.get("utility-popover").hidden));
     });
     this.get("help-menu-item").addEventListener("click", () => {
       this.setUtilityMenuOpen(false);
