@@ -71,7 +71,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | vite | 8.2.1 | development | MIT |
 | zrender | 6.1.0 | runtime | BSD-3-Clause |
 
-## Cargo dependencies (470)
+## Cargo dependencies (469)
 
 | Crate | Version | Declared license |
 | --- | --- | --- |
@@ -307,7 +307,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | phf_shared | 0.13.1 | MIT |
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
 | pkg-config | 0.3.33 | MIT OR Apache-2.0 |
-| plist | 1.8.0 | MIT |
+| plist | 1.10.0 | MIT |
 | png | 0.17.16 | MIT OR Apache-2.0 |
 | png | 0.18.1 | MIT OR Apache-2.0 |
 | potential_utf | 0.1.5 | Unicode-3.0 |
@@ -321,7 +321,6 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 |
 | pxfm | 0.1.30 | BSD-3-Clause OR Apache-2.0 |
 | quick-error | 2.0.1 | MIT/Apache-2.0 |
-| quick-xml | 0.38.4 | MIT |
 | quick-xml | 0.41.0 | MIT |
 | quote | 1.0.47 | MIT OR Apache-2.0 |
 | r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |

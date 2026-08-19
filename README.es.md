@@ -25,6 +25,8 @@
 
 Descarga la versión más reciente para Windows x64 y consulta sus notas en [GitHub Releases](https://github.com/woooooooooolf/eRAW/releases/latest).
 
+Los EXE publicados no están firmados con Authenticode, por lo que Windows puede mostrar una advertencia de SmartScreen. Descárgalos únicamente desde Latest Release y verifica los archivos con el manifiesto SHA-256 incluido.
+
 ## Funciones principales
 
 - Lee RAW8, RAW9–RAW16 en contenedores de 16 bits y MIPI RAW10/12/14.

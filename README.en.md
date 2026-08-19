@@ -25,6 +25,8 @@
 
 Download the latest Windows x64 build and read its release notes from [GitHub Releases](https://github.com/woooooooooolf/eRAW/releases/latest).
 
+Release EXEs are not Authenticode-signed, so Windows may show a SmartScreen warning. Download only from the Latest Release and verify files against the provided SHA-256 manifest.
+
 ## Highlights
 
 - Reads RAW8, RAW9–RAW16 in 16-bit containers, and MIPI RAW10/12/14.

@@ -8,6 +8,7 @@ const read = (path) => readFile(new URL(path, root), "utf8");
 const [
   packageSource,
   cargoSource,
+  cargoLockSource,
   tauriSource,
   appSource,
   helpWindowSource,
@@ -23,6 +24,7 @@ const [
 ] = await Promise.all([
   read("package.json"),
   read("src-tauri/Cargo.toml"),
+  read("src-tauri/Cargo.lock"),
   read("src-tauri/tauri.conf.json"),
   read("src/app.ts"),
   read("src/help-window.ts"),
@@ -74,6 +76,10 @@ test("all localized READMEs describe implemented ROI statistics and contribution
   for (const source of readmes) {
     assert.match(source, /CONTRIBUTING\.md/);
     assert.match(source, /SECURITY\.md/);
+    assert.match(source, /releases\/latest/);
+    assert.match(source, /Authenticode/);
+    assert.match(source, /SmartScreen/);
+    assert.match(source, /SHA-256/);
     assert.doesNotMatch(source, /not yet connected to region statistics|尚未接入区域统计|尚未連接區域統計|領域統計にはまだ接続|todavía no está conectado|n’est pas encore relié|noch nicht mit Bereichsstatistiken/i);
   }
 });
@@ -83,6 +89,9 @@ test("dependency automation covers npm, Cargo, and GitHub Actions", () => {
   assert.match(dependabotSource, /package-ecosystem:\s*cargo/);
   assert.match(dependabotSource, /package-ecosystem:\s*github-actions/);
   assert.match(packageSource, /"notices":\s*"node scripts\/generate-third-party-notices\.mjs"/);
+  assert.doesNotMatch(cargoLockSource, /name = "quick-xml"\r?\nversion = "0\.38\./);
+  assert.match(publicationSource, /RUSTSEC-2026-0194/);
+  assert.match(publicationSource, /RUSTSEC-2026-0195/);
 });
 
 test("workflows pin actions and release integrity metadata", () => {

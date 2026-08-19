@@ -25,6 +25,8 @@
 
 最新の Windows x64 版とリリースノートは [GitHub Releases](https://github.com/woooooooooolf/eRAW/releases/latest) から入手できます。
 
+Release EXE は Authenticode 署名されていないため、Windows が SmartScreen の警告を表示する場合があります。Latest Release からのみダウンロードし、同梱の SHA-256 一覧でファイルを検証してください。
+
 ## 主な機能
 
 - RAW8、16-bit コンテナの RAW9–RAW16、および MIPI RAW10/12/14 に対応。

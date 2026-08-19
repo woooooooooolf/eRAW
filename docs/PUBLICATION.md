@@ -13,6 +13,7 @@
 
 ### 已知依赖告警
 
+- 公开前 RustSec 审计发现 `plist 1.8.0` 引入的 `quick-xml 0.38.4` 受到高危告警 `RUSTSEC-2026-0194` 和 `RUSTSEC-2026-0195` 影响。锁文件已将 `plist` 更新到 `1.10.0`，并统一使用已修复的 `quick-xml 0.41.0`；后续依赖更新不得重新引入 `quick-xml 0.38.x`。
 - `glib 0.18.5` 的中危告警 `GHSA-wrw7-89jp-8q8g` 保持开启。该依赖由 Tauri 的 Linux GTK 运行时链路引入，不进入官方 Windows x64 Release；当前 Tauri 约束为 `gtk ^0.18`，无法单独升级到已修复的 `glib >= 0.20.0`。
 - 不关闭或忽略该告警；持续跟踪 Tauri 上游依赖更新。在提供任何 Linux Release 前，必须重新评估并消除该风险。
 

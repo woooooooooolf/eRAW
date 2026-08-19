@@ -25,6 +25,8 @@
 
 請從 [GitHub Releases](https://github.com/woooooooooolf/eRAW/releases/latest) 下載最新 Windows x64 版本並閱讀更新說明。
 
+Release EXE 目前未使用 Authenticode 簽章，Windows 可能顯示 SmartScreen 提示。請僅從 Latest Release 下載，並使用版本隨附的 SHA-256 清單驗證檔案。
+
 ## 核心特色
 
 - 支援 RAW8、16-bit 容器 RAW9–RAW16，以及 MIPI RAW10/12/14。
