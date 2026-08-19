@@ -32,6 +32,8 @@ test("help is available from the utility menu and F1 through one window lifecycl
 test("help page is routed independently and receives language and theme updates", () => {
   assert.match(entrySource, /page\.get\("help"\) === "1"/);
   assert.match(entrySource, /import\("\.\/help-window"\)/);
+  assert.match(entrySource, /appRoot\.replaceChildren\(fatal\)/);
+  assert.doesNotMatch(entrySource, /appRoot\.innerHTML/);
   assert.match(windowSource, /listen<HelpWindowPayload>\("help:state"/);
   assert.match(windowSource, /setLanguagePreference\(payload\.language\)/);
   assert.match(windowSource, /document\.documentElement\.dataset\.theme = payload\.theme/);
@@ -89,7 +91,8 @@ test("all seven interface locales provide a complete localized manual", () => {
   assert.match(localizedContentSource, /if \(locale === "zh-CN"\)/);
   assert.match(localizedContentSource, /V0\.5\.5/g);
   assert.match(windowSource, /data-help-locale="\$\{getResolvedLocale\(\)\}"/);
-  assert.match(windowSource, /isLanguagePreference\(requestedLanguage\)/);
+  assert.match(windowSource, /queryLanguagePreference\(new URLSearchParams/);
+  assert.doesNotMatch(windowSource, /isLanguagePreference\(requestedLanguage\)/);
   assert.match(windowSource, /this\.catalog = getHelpCatalog\(getResolvedLocale\(\)\)/);
   assert.match(windowSource, /if \(getResolvedLocale\(\) !== previousLocale\)/);
   assert.match(windowSource, /this\.render\(\)/);

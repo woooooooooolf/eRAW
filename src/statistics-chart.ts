@@ -364,7 +364,7 @@ export class StatisticsCharts {
       {
         id: `${chartKey}-x-slider`, type: "slider", xAxisIndex: 0, filterMode: "none",
         height: 16, bottom: 12, borderColor: border, backgroundColor: surface,
-        fillerColor: colors.all.replace("rgb(", "rgb(").replace(")", " / .16)"),
+        fillerColor: colors.all.replace(/\)$/, " / .16)"),
         handleStyle: { color: colors.all, borderColor: colors.all },
         textStyle: { color: dim, fontSize: 9 }, showDetail: false, ...range(xRange),
       },
@@ -375,7 +375,7 @@ export class StatisticsCharts {
       {
         id: `${chartKey}-y-slider`, type: "slider", yAxisIndex: 0, orient: "vertical", filterMode: "none",
         width: 14, right: 8, top: 38, bottom: 66, borderColor: border, backgroundColor: surface,
-        fillerColor: colors.all.replace("rgb(", "rgb(").replace(")", " / .12)"),
+        fillerColor: colors.all.replace(/\)$/, " / .12)"),
         handleStyle: { color: colors.all, borderColor: colors.all },
         textStyle: { color: dim, fontSize: 9 }, showDetail: false, ...range(yRange),
       },
