@@ -8,7 +8,16 @@ if (!root) throw new Error(t("error.rootMissing"));
 const appRoot = root;
 
 function showFatalError(error: unknown): void {
-  appRoot.innerHTML = `<main class="fatal-error"><h1>${t("runtime.fatalTitle")}</h1><p>${String(error)}</p><small>${t("runtime.fatalHint")}</small></main>`;
+  const fatal = document.createElement("main");
+  fatal.className = "fatal-error";
+  const title = document.createElement("h1");
+  title.textContent = t("runtime.fatalTitle");
+  const detail = document.createElement("p");
+  detail.textContent = String(error);
+  const hint = document.createElement("small");
+  hint.textContent = t("runtime.fatalHint");
+  fatal.append(title, detail, hint);
+  appRoot.replaceChildren(fatal);
 }
 
 try {

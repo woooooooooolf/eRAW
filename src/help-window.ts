@@ -4,7 +4,6 @@ import { getHelpCatalog, type HelpCatalog } from "./help-content-localized";
 import { renderHelpMath } from "./help-math";
 import {
   getResolvedLocale,
-  isLanguagePreference,
   setLanguagePreference,
   t,
   type LanguagePreference,
@@ -16,13 +15,27 @@ interface HelpWindowPayload {
   theme: AppTheme;
 }
 
+function queryLanguagePreference(value: string | null): LanguagePreference | null {
+  switch (value) {
+    case "system": return "system";
+    case "en": return "en";
+    case "zh-CN": return "zh-CN";
+    case "zh-TW": return "zh-TW";
+    case "ja": return "ja";
+    case "es": return "es";
+    case "fr": return "fr";
+    case "de": return "de";
+    default: return null;
+  }
+}
+
 export class HelpWindowApp {
   private catalog: HelpCatalog;
   private activeSection = "";
 
   constructor(private readonly root: HTMLElement) {
-    const requestedLanguage = new URLSearchParams(window.location.search).get("lang");
-    if (requestedLanguage && isLanguagePreference(requestedLanguage)) setLanguagePreference(requestedLanguage);
+    const requestedLanguage = queryLanguagePreference(new URLSearchParams(window.location.search).get("lang"));
+    if (requestedLanguage) setLanguagePreference(requestedLanguage);
     this.catalog = getHelpCatalog(getResolvedLocale());
     this.activeSection = this.catalog.sections[0]?.id ?? "";
     root.addEventListener("contextmenu", (event) => event.preventDefault());

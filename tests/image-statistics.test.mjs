@@ -97,6 +97,7 @@ test("statistics view supports three presentations, independent curves, two-axis
   assert.match(chartSource, /zoomOnMouseWheel:\s*"ctrl"/);
   assert.match(chartSource, /id: `\$\{chartKey\}-y-inside`[\s\S]*?zoomOnMouseWheel:\s*"shift"/);
   assert.match(chartSource, /orient: "vertical"/);
+  assert.doesNotMatch(chartSource, /\.replace\("rgb\(", "rgb\("\)/);
   assert.match(chartSource, /backgroundColor: "transparent"/);
   assert.match(panelSource, /data-stat-group-chart=/);
   assert.match(panelSource, /data-stat-y-reset=/);
