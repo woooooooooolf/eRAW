@@ -6,7 +6,7 @@ export default defineConfig({
   base: "/eRAW/",
   server: {
     host: "127.0.0.1",
-    port: 4174,
+    port: 44174,
     strictPort: true,
   },
   build: {

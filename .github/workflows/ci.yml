@@ -57,11 +57,17 @@ jobs:
       - name: Check TypeScript
         run: npm.cmd run check
 
+      - name: Check project site TypeScript
+        run: npm.cmd run check:site
+
       - name: Run frontend tests
         run: npm.cmd run test:frontend
 
       - name: Build frontend
         run: npm.cmd run build
+
+      - name: Build project site
+        run: npm.cmd run build:site
 
       - name: Run Rust tests
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml

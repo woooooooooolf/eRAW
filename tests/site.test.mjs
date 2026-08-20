@@ -37,7 +37,7 @@ test("the bilingual project site builds independently of the application version
   assert.match(configSource, /root: "site"/);
   assert.match(configSource, /base: "\/eRAW\/"/);
   assert.match(configSource, /host: "127\.0\.0\.1"/);
-  assert.match(configSource, /port: 4174/);
+  assert.match(configSource, /port: 44174/);
   assert.match(configSource, /strictPort: true/);
   assert.match(configSource, /outDir: "\.\.\/dist-site"/);
   assert.match(configSource, /site\/index\.html/);
@@ -127,5 +127,6 @@ test("both locales use replaceable theme captures and a release-resolved x64 dow
   assert.match(styleSource, /@media \(max-width: 980px\)/);
   assert.match(styleSource, /@media \(max-width: 620px\)/);
   assert.match(styleSource, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.doesNotMatch(styleSource, /body\s*\{[^}]*min-width:\s*320px/);
   assert.doesNotMatch(`${zhHtmlSource}\n${enHtmlSource}`, /google-analytics|googletagmanager|fonts\.googleapis|use\.typekit/i);
 });

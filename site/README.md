@@ -5,11 +5,12 @@
 ```powershell
 npm.cmd run dev:site
 npm.cmd run check:site
+npm.cmd run test:site
 npm.cmd run build:site
 ```
 
-开发服务器固定使用 `http://127.0.0.1:4174/eRAW/`，避免落入 Windows 可能保留的默认 Vite 端口范围。
+开发服务器默认使用 `http://127.0.0.1:44174/eRAW/`。如果该端口在本机被占用或保留，可以通过 `npm.cmd run dev:site -- --port <端口>` 临时覆盖。
 
 - 本地开发入口由 `vite.pages.config.ts` 管理。
 - 生产构建输出到被 Git 忽略的 `dist-site/`。
-- GitHub Pages 发布暂未启用；等仓库公开且中英文页面通过最终审阅后再增加部署工作流。
+- GitHub Pages 由 `.github/workflows/pages.yml` 构建并部署；对站点相关文件的 `master` 推送会自动发布，也可以手动触发。
