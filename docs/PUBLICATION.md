@@ -35,11 +35,13 @@ GitHub 免费私有仓库不开放以下配置；可见性切换后应在同一�
 5. 确认 fork Pull Request 的工作流需要首次贡献者批准，且不会向 fork 暴露 secrets。
 6. 检查 About 区域、Topics、Social preview、README 徽章和 Latest Release 的公开显示。
 7. 从未登录会话检查 README、Releases、Issues、Security policy 与下载资产。
+8. 将 GitHub Pages 的构建来源设为 GitHub Actions，并由 `.github/workflows/pages.yml` 发布 `dist-site/`。
 
 ## 发布与供应链
 
 - GitHub Actions 使用允许列表并固定到完整 commit SHA；Dependabot 负责跟踪 Action 更新。
 - 默认 `GITHUB_TOKEN` 为只读；只有 Release job 获得 `contents: write`，公开时的 attestation step 另获 `id-token: write` 与 `attestations: write`。
+- Pages 工作流仅获得 `contents: read`、`pages: write` 与 `id-token: write`，只部署静态站点产物，不创建 tag 或 Release。
 - Release EXE 目前没有商业代码签名证书。SHA-256、SBOM 与构建来源证明用于完整性和来源核验，但不能替代 Windows Authenticode。
 - 历史 Release 保留用于追溯；新用户应下载 Latest Release。
 

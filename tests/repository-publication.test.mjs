@@ -14,6 +14,7 @@ const [
   helpWindowSource,
   ciSource,
   releaseSource,
+  pagesSource,
   dependabotSource,
   contributingSource,
   securitySource,
@@ -30,6 +31,7 @@ const [
   read("src/help-window.ts"),
   read(".github/workflows/ci.yml"),
   read(".github/workflows/release.yml"),
+  read(".github/workflows/pages.yml"),
   read(".github/dependabot.yml"),
   read("CONTRIBUTING.md"),
   read("SECURITY.md"),
@@ -94,18 +96,27 @@ test("dependency automation covers npm, Cargo, and GitHub Actions", () => {
   assert.match(publicationSource, /RUSTSEC-2026-0195/);
 });
 
-test("workflows pin actions and release integrity metadata", () => {
-  for (const workflow of [ciSource, releaseSource]) {
+test("workflows pin actions and protect build and release integrity", () => {
+  for (const workflow of [ciSource, releaseSource, pagesSource]) {
     const uses = [...workflow.matchAll(/^\s*uses:\s*([^\s#]+).*$/gm)].map((match) => match[1]);
     assert.ok(uses.length > 0);
     for (const action of uses) assert.match(action, /@[0-9a-f]{40}$/);
   }
   assert.match(ciSource, /Verify third-party dependency notices/);
+  assert.match(ciSource, /npm\.cmd run check:site/);
+  assert.match(ciSource, /npm\.cmd run build:site/);
   assert.match(releaseSource, /SHA256SUMS/);
   assert.match(releaseSource, /dependency-graph\/sbom/);
   assert.match(releaseSource, /THIRD_PARTY_LICENSES\.txt/);
   assert.match(releaseSource, /attest-build-provenance@[0-9a-f]{40}/);
   assert.match(releaseSource, /repository\.visibility == 'public'/);
+  assert.match(pagesSource, /pages:\s*write/);
+  assert.match(pagesSource, /id-token:\s*write/);
+  assert.match(pagesSource, /npm run check:site/);
+  assert.match(pagesSource, /npm run test:site/);
+  assert.match(pagesSource, /npm run build:site/);
+  assert.match(pagesSource, /path:\s*\.\/dist-site/);
+  assert.match(pagesSource, /name:\s*github-pages/);
   assert.match(publicationSource, /Secret scanning/);
   assert.match(publicationSource, /enforce_admins=false/);
   assert.match(publicationSource, /GHSA-wrw7-89jp-8q8g/);
