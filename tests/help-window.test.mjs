@@ -19,9 +19,9 @@ const [appSource, contentSource, localizedContentSource, windowSource, statistic
 
 test("help is available from the utility menu and F1 through one window lifecycle", () => {
   assert.match(appSource, /id="help-menu-item"/);
-  assert.match(appSource, /event\.key === "F1"/);
+  assert.match(appSource, /matchesShortcut\(event, \{ key: "F1" \}\)/);
   assert.ok(
-    appSource.indexOf('event.key === "F1"') < appSource.indexOf("else if (this.shortcutTargetIsEditable"),
+    appSource.indexOf('matchesShortcut(event, { key: "F1" })') < appSource.indexOf("else if (this.shortcutTargetIsEditable"),
     "F1 remains available while a parameter field has focus",
   );
   assert.match(appSource, /new WebviewWindow\("help"/);

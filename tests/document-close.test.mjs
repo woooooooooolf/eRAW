@@ -14,7 +14,7 @@ test("the frontend exposes and invokes the backend close command", () => {
     apiSource,
     /export function closeDocument\(\): Promise<void> \{\s*return invoke\("close_document"\);\s*\}/,
   );
-  assert.match(appSource, /event\.key\.toLowerCase\(\) === "w" && this\.document/);
+  assert.match(appSource, /matchesShortcut\(event, \{ key: "w", ctrl: true \}\) && this\.document/);
   assert.match(appSource, /await closeDocument\(\)/);
 });
 

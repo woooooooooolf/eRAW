@@ -326,6 +326,8 @@ const CATALOG = {
   "shortcuts.openRaw": message("Open RAW file", "打开 RAW 文件", "開啟 RAW 檔案", "RAW ファイルを開く", "Abrir archivo RAW", "Ouvrir un fichier RAW", "RAW-Datei öffnen"),
   "shortcuts.closeRaw": message("Close current RAW file", "关闭当前 RAW 文件", "關閉目前的 RAW 檔案", "現在の RAW ファイルを閉じる", "Cerrar el archivo RAW actual", "Fermer le fichier RAW actuel", "Aktuelle RAW-Datei schließen"),
   "shortcuts.exportFrame": message("Export current frame", "导出当前帧", "匯出目前影格", "現在のフレームをエクスポート", "Exportar fotograma actual", "Exporter l’image actuelle", "Aktuellen Frame exportieren"),
+  "shortcuts.frameNavigation": message("Previous / next frame", "上一帧 / 下一帧", "上一影格 / 下一影格", "前 / 次のフレーム", "Fotograma anterior / siguiente", "Image précédente / suivante", "Vorheriger / nächster Frame"),
+  "shortcuts.displayModeNavigation": message("Next / previous primary display mode", "下一个 / 上一个主要显示模式", "下一個 / 上一個主要顯示模式", "次 / 前の主要表示モード", "Modo de visualización principal siguiente / anterior", "Mode d’affichage principal suivant / précédent", "Nächster / vorheriger Hauptanzeigemodus"),
   "shortcuts.fit": message("Fit to window", "适应窗口", "符合視窗", "ウィンドウに合わせる", "Ajustar a la ventana", "Adapter à la fenêtre", "An Fenster anpassen"),
   "shortcuts.actual": message("100% actual pixels", "100% 实际像素", "100% 實際像素", "100% 等倍表示", "100% píxeles reales", "100 % pixels réels", "100 % tatsächliche Pixel"),
   "shortcuts.fullscreen": message("Toggle fullscreen", "切换全屏", "切換全螢幕", "全画面を切り替え", "Alternar pantalla completa", "Basculer en plein écran", "Vollbild umschalten"),

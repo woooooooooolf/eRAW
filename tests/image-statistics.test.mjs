@@ -201,11 +201,11 @@ test("ROI is a main-window tool with inclusive coordinate entry and a high-contr
 });
 
 test("ROI, pixel, zoom, statistics and capture actions expose the agreed shortcuts", () => {
-  assert.match(appSource, /event\.shiftKey && event\.key\.toLowerCase\(\) === "r"/);
-  assert.match(appSource, /!event\.shiftKey && event\.key\.toLowerCase\(\) === "r"/);
-  assert.match(appSource, /event\.key\.toLowerCase\(\) === "p"/);
-  assert.match(appSource, /event\.key\.toLowerCase\(\) === "z"/);
-  assert.match(appSource, /event\.key\.toLowerCase\(\) === "i"/);
+  assert.match(appSource, /matchesShortcut\(event, \{ key: "r", shift: true \}\)/);
+  assert.match(appSource, /matchesShortcut\(event, \{ key: "r" \}\)/);
+  assert.match(appSource, /matchesShortcut\(event, \{ key: "p" \}\)/);
+  assert.match(appSource, /matchesShortcut\(event, \{ key: "z" \}\)/);
+  assert.match(appSource, /matchesShortcut\(event, \{ key: "i", ctrl: true \}\)/);
   assert.match(appSource, /performImageCapture\("preview", "save"\)/);
   assert.match(appSource, /performImageCapture\("preview", "copy"\)/);
   assert.match(appSource, /performImageCapture\("current", "save"\)/);

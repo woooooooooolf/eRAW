@@ -47,6 +47,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | `src/backend-error.ts` | 解析后端结构化错误码，并在当前语言下生成用户消息 |
 | `src/channel-rendering.ts` | 将显示模式与通道渲染偏好映射为纯 GPU 着色参数 |
 | `src/display-adjustment.ts` | 全显示链路共用的黑白点、曝光输入归一化与自动范围结果选择 |
+| `src/keyboard-shortcuts.ts` | 快捷键精确修饰键匹配，以及按 CFA 能力生成和循环主要显示模式的纯逻辑 |
 | `src/missing-pixel-rendering.ts` | 缺失数据外观类型、持久值校验和 GPU 参数转换 |
 | `src/viewport.ts` | WebGL2、LOD、瓦片队列、纹理缓存、缩放和平移 |
 | `src/viewport-transform.ts` | 屏幕、图像和像素坐标的唯一变换来源；画布尺寸变化时的中心锚定；选区模型 |

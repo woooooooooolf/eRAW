@@ -47,6 +47,7 @@ import {
   type DisplayWindowField,
 } from "./display-adjustment";
 import { ExportDialog, exportDialogTemplate } from "./export-dialog";
+import { cyclePrimaryDisplayMode, matchesShortcut } from "./keyboard-shortcuts";
 import { packingControlState } from "./packing-controls";
 import {
   formatDateTime,
@@ -726,6 +727,7 @@ export class ErawApp {
     text('#cfa-mode', "toolbar.cfaMosaic");
     attribute("#export-popover", "aria-label", "toolbar.exportSelect");
     attribute(".display-modes", "aria-label", "toolbar.displayModes");
+    this.root.querySelector<HTMLElement>(".display-modes")!.title = `${t("shortcuts.displayModeNavigation")} (M / Shift+M)`;
     attribute("#demosaic-group", "aria-label", "toolbar.demosaicChannels");
     attribute('[data-mode="red"]', "title", "toolbar.redPlane");
     attribute('[data-mode="red"]', "aria-label", "toolbar.redPlane");
@@ -805,8 +807,8 @@ export class ErawApp {
     attribute("#canvas-context-menu", "aria-label", "capture.menuLabel");
     texts("#canvas-context-menu button span", ["statistics.title", "capture.saveCurrent", "capture.copyCurrent", "capture.savePreview", "capture.copyPreview"]);
     attribute("#first-frame", "title", "frame.first");
-    attribute("#previous-frame", "title", "frame.previous");
-    attribute("#next-frame", "title", "frame.next");
+    this.get("previous-frame").title = `${t("frame.previous")} ([)`;
+    this.get("next-frame").title = `${t("frame.next")} (])`;
     attribute("#last-frame", "title", "frame.last");
     text("#diagnostics-drawer header strong", "diagnostics.title");
     text("#diagnostics-summary", "diagnostics.waiting");
@@ -838,7 +840,7 @@ export class ErawApp {
 
     texts("#shortcuts-dialog header small, #shortcuts-dialog header h2", ["shortcuts.eyebrow", "toolbar.shortcuts"]);
     texts("#shortcuts-dialog .shortcuts-body section h3", ["shortcuts.fileView", "shortcuts.canvas", "shortcuts.statisticsCapture", "shortcuts.parameters"]);
-    texts("#shortcuts-dialog .shortcuts-body section:nth-child(1) div span", ["shortcuts.openRaw", "shortcuts.closeRaw", "shortcuts.exportFrame", "shortcuts.fit", "shortcuts.actual", "shortcuts.fullscreen"]);
+    texts("#shortcuts-dialog .shortcuts-body section:nth-child(1) div span", ["shortcuts.openRaw", "shortcuts.closeRaw", "shortcuts.exportFrame", "shortcuts.frameNavigation", "shortcuts.displayModeNavigation", "shortcuts.fit", "shortcuts.actual", "shortcuts.fullscreen"]);
     texts("#shortcuts-dialog .shortcuts-body section:nth-child(2) div span", ["shortcuts.pointerZoom", "shortcuts.pan", "shortcuts.toggleFit", "shortcuts.mouseRoi", "shortcuts.coordinateRoi", "shortcuts.locatePixel", "shortcuts.enterZoom", "shortcuts.closeMenus"]);
     text("#shortcuts-dialog .shortcuts-body section:nth-child(2) div:nth-child(2) kbd", "shortcuts.wheel");
     text("#shortcuts-dialog .shortcuts-body section:nth-child(2) div:nth-child(3) kbd", "shortcuts.leftDrag");
@@ -960,6 +962,8 @@ export class ErawApp {
           <div><span>打开 RAW 文件</span><kbd>Ctrl</kbd><kbd>O</kbd></div>
           <div><span>关闭当前 RAW 文件</span><kbd>Ctrl</kbd><kbd>W</kbd></div>
           <div><span>导出当前帧</span><kbd>Ctrl</kbd><kbd>E</kbd></div>
+          <div><span>上一帧 / 下一帧</span><kbd>[</kbd><b class="shortcut-separator" aria-hidden="true">/</b><kbd>]</kbd></div>
+          <div><span>下一个 / 上一个主要显示模式</span><kbd>M</kbd><b class="shortcut-separator" aria-hidden="true">/</b><kbd>Shift</kbd><kbd>M</kbd></div>
           <div><span>适应窗口</span><kbd>Ctrl</kbd><kbd>0</kbd></div>
           <div><span>100% 实际像素</span><kbd>Ctrl</kbd><kbd>1</kbd></div>
           <div><span>切换全屏</span><kbd>F11</kbd></div>
@@ -2684,12 +2688,24 @@ export class ErawApp {
       || (target instanceof HTMLElement && target.isContentEditable);
   }
 
+  private shortcutMenuIsOpen(): boolean {
+    return ["language-popover", "theme-popover", "utility-popover", "export-popover", "canvas-context-menu"]
+      .some((id) => !this.get(id).hidden);
+  }
+
+  private cycleDisplayMode(direction: -1 | 1): void {
+    const cfa = this.descriptorFieldValue("cfa") as CfaPattern;
+    const nextMode = cyclePrimaryDisplayMode(this.displayMode, cfa, direction);
+    if (nextMode !== this.displayMode) this.setDisplayMode(nextMode);
+  }
+
   private onKeyDown(event: KeyboardEvent): void {
+    if (event.defaultPrevented) return;
     if (event.key === "Escape" && this.viewport.cancelSelection()) {
       event.preventDefault();
       this.updateRoiPresentation();
     }
-    else if (event.key === "Escape" && (!this.get("language-popover").hidden || !this.get("theme-popover").hidden || !this.get("utility-popover").hidden || !this.get("export-popover").hidden || !this.get("canvas-context-menu").hidden)) {
+    else if (event.key === "Escape" && this.shortcutMenuIsOpen()) {
       event.preventDefault();
       this.setLanguageMenuOpen(false);
       this.setThemeMenuOpen(false);
@@ -2698,60 +2714,76 @@ export class ErawApp {
       this.setCanvasContextMenuOpen(false);
     }
     else if (event.key === "Escape" && this.root.querySelector(".app-shell")!.classList.contains("diagnostics-open")) { event.preventDefault(); this.setDiagnosticsOpen(false); }
-    else if (!event.ctrlKey && !event.altKey && !event.shiftKey && event.key === "F1") {
+    else if (matchesShortcut(event, { key: "F1" })) {
       event.preventDefault();
       void this.openHelpWindow();
     }
-    else if (this.shortcutTargetIsEditable(event) || this.root.querySelector("dialog[open]")) return;
-    else if (!event.ctrlKey && !event.altKey && event.shiftKey && event.key.toLowerCase() === "r" && this.document?.layout.frameCount) {
+    else if (this.shortcutTargetIsEditable(event) || this.root.querySelector("dialog[open]") || this.shortcutMenuIsOpen()) return;
+    else if (matchesShortcut(event, { key: "r", shift: true }) && this.document?.layout.frameCount) {
       event.preventDefault();
       if (this.roiSource === "coordinates" && this.viewport.getSelection()) this.clearRoi(); else this.openRoiCoordinateDialog();
     }
-    else if (!event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "r" && this.document?.layout.frameCount) {
+    else if (matchesShortcut(event, { key: "r" }) && this.document?.layout.frameCount) {
       event.preventDefault();
       if (this.roiSource === "mouse") this.clearRoi(); else this.beginMouseRoiSelection();
     }
-    else if (!event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "p" && this.document?.layout.frameCount) {
+    else if (matchesShortcut(event, { key: "p" }) && this.document?.layout.frameCount) {
       event.preventDefault();
       this.openPixelLocator();
     }
-    else if (!event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "z" && this.document?.layout.frameCount) {
+    else if (matchesShortcut(event, { key: "z" }) && this.document?.layout.frameCount) {
       event.preventDefault();
       this.openZoomDialog();
     }
-    else if (event.ctrlKey && !event.altKey && event.key.toLowerCase() === "i" && this.document?.layout.frameCount) {
+    else if (matchesShortcut(event, { key: "[" }) && (this.document?.layout.frameCount ?? 0) > 1) {
+      event.preventDefault();
+      this.setFrame(this.frame - 1);
+    }
+    else if (matchesShortcut(event, { key: "]" }) && (this.document?.layout.frameCount ?? 0) > 1) {
+      event.preventDefault();
+      this.setFrame(this.frame + 1);
+    }
+    else if (matchesShortcut(event, { key: "m", shift: true }) && this.document?.layout.frameCount) {
+      event.preventDefault();
+      this.cycleDisplayMode(-1);
+    }
+    else if (matchesShortcut(event, { key: "m" }) && this.document?.layout.frameCount) {
+      event.preventDefault();
+      this.cycleDisplayMode(1);
+    }
+    else if (matchesShortcut(event, { key: "i", ctrl: true }) && this.document?.layout.frameCount) {
       event.preventDefault();
       void this.openStatistics();
     }
-    else if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s" && this.document?.layout.frameCount) {
+    else if (matchesShortcut(event, { key: "s", ctrl: true, shift: true }) && this.document?.layout.frameCount) {
       event.preventDefault();
       void this.performImageCapture("preview", "save");
     }
-    else if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "c" && this.document?.layout.frameCount) {
+    else if (matchesShortcut(event, { key: "c", ctrl: true, shift: true }) && this.document?.layout.frameCount) {
       event.preventDefault();
       void this.performImageCapture("preview", "copy");
     }
-    else if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === "s" && this.document?.layout.frameCount) {
+    else if (matchesShortcut(event, { key: "s", ctrl: true }) && this.document?.layout.frameCount) {
       event.preventDefault();
       void this.performImageCapture("current", "save");
     }
-    else if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === "c" && this.document?.layout.frameCount && !window.getSelection()?.toString()) {
+    else if (matchesShortcut(event, { key: "c", ctrl: true }) && this.document?.layout.frameCount && !window.getSelection()?.toString()) {
       event.preventDefault();
       void this.performImageCapture("current", "copy");
     }
-    else if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); void this.openFile(); }
-    else if (event.ctrlKey && event.key.toLowerCase() === "w" && this.document) {
+    else if (matchesShortcut(event, { key: "o", ctrl: true })) { event.preventDefault(); void this.openFile(); }
+    else if (matchesShortcut(event, { key: "w", ctrl: true }) && this.document) {
       event.preventDefault();
       if (this.exportDialog.isOpen) this.showToast(t("runtime.closeBlockedByExport"), "error");
       else if (!this.root.querySelector("dialog[open]")) void this.closeFile();
     }
-    else if (event.ctrlKey && event.key.toLowerCase() === "e" && this.document?.layout.frameCount && !this.exportDialog.isOpen) {
+    else if (matchesShortcut(event, { key: "e", ctrl: true }) && this.document?.layout.frameCount && !this.exportDialog.isOpen) {
       event.preventDefault();
       void this.openExport("originalCfa");
     }
-    else if (event.ctrlKey && event.key === "0") { event.preventDefault(); this.viewport.fit(); }
-    else if (event.ctrlKey && event.key === "1") { event.preventDefault(); this.viewport.actualSize(); }
-    else if (event.key === "F11") { event.preventDefault(); void this.toggleFullscreen(); }
+    else if (matchesShortcut(event, { key: "0", ctrl: true })) { event.preventDefault(); this.viewport.fit(); }
+    else if (matchesShortcut(event, { key: "1", ctrl: true })) { event.preventDefault(); this.viewport.actualSize(); }
+    else if (matchesShortcut(event, { key: "F11" })) { event.preventDefault(); void this.toggleFullscreen(); }
   }
 
   private async openExport(target: ExportTarget): Promise<void> {

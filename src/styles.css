@@ -1450,6 +1450,7 @@ html[data-reduce-motion="true"] .empty-grid span::before { content: none; animat
 .shortcuts-body section > div:last-child { border-bottom: 0; }
 .shortcuts-body span { flex: 1; color: var(--text); font-size: var(--font-sm); }
 .shortcuts-body kbd { min-width: 25px; margin-left: 5px; padding: 3px 7px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 5px; color: var(--cyan); background: var(--soft-fill); font-family: var(--font-mono); font-size: var(--font-xs); text-align: center; }
+.shortcuts-body .shortcut-separator { margin-left: 5px; color: var(--muted); font: 500 var(--font-xs)/1 var(--font-mono); }
 .shortcuts-modal footer { justify-content: flex-end; }
 
 .about-modal { width: min(520px, calc(100vw - 60px)); }

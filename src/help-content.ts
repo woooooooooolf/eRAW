@@ -87,13 +87,16 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
     body: `
       <div class="help-card-grid">
         <article><h3>文档会话</h3><p>应用同一时间只维护一个当前 RAW 文件。重新打开文件或成功提交新描述符后，旧瓦片和旧统计会失效；<kbd>Ctrl</kbd><kbd>W</kbd> 关闭文件并释放只读映射。</p></article>
-        <article><h3>帧与观察状态</h3><p>切换同尺寸帧时保留缩放和平移。尺寸变化会清除依赖旧坐标的 ROI。关闭文件不会清除已保存的描述符、处理选项和应用设置。</p></article>
+        <article><h3>帧与观察状态</h3><p>多帧文件使用 <kbd>[</kbd> / <kbd>]</kbd> 切换相邻帧；同尺寸帧保留缩放和平移，尺寸变化会清除依赖旧坐标的 ROI。关闭文件不会清除已保存的描述符、处理选项和应用设置。</p></article>
         <article><h3>画布导航</h3><p>滚轮以指针下的图像点为锚连续缩放，左键拖动平移。<kbd>Ctrl</kbd><kbd>0</kbd> 适应窗口，<kbd>Ctrl</kbd><kbd>1</kbd> 回到 100% 实际像素。</p></article>
         <article><h3>诊断的含义</h3><p>诊断面板只描述当前状态，不是历史日志。修正参数、重新渲染或打开新文件后，不再成立的运行时错误会自动消失。</p></article>
       </div>
+      <p>除 <kbd>F1</kbd> 和 <kbd>Esc</kbd> 外，主窗口快捷键仅在焦点不位于输入控件、没有弹出菜单且没有模态对话框时生效；组合键按精确修饰键匹配。</p>
       <div class="help-table-wrap"><table><thead><tr><th>任务</th><th>快捷键</th><th>生效条件</th></tr></thead><tbody>
-        <tr><td>打开 / 关闭文件</td><td><kbd>Ctrl</kbd><kbd>O</kbd> / <kbd>Ctrl</kbd><kbd>W</kbd></td><td>全局；关闭会释放源文件映射</td></tr>
-        <tr><td>适应 / 100% / 全屏</td><td><kbd>Ctrl</kbd><kbd>0</kbd> / <kbd>Ctrl</kbd><kbd>1</kbd> / <kbd>F11</kbd></td><td>主窗口没有模态对话框时</td></tr>
+        <tr><td>打开 / 关闭文件</td><td><kbd>Ctrl</kbd><kbd>O</kbd> / <kbd>Ctrl</kbd><kbd>W</kbd></td><td>主窗口快捷键上下文；关闭会释放源文件映射</td></tr>
+        <tr><td>上一帧 / 下一帧</td><td><kbd>[</kbd> / <kbd>]</kbd></td><td>多帧文件；首尾不循环</td></tr>
+        <tr><td>下一个 / 上一个主要显示模式</td><td><kbd>M</kbd> / <kbd>Shift</kbd><kbd>M</kbd></td><td>仅循环当前 CFA 支持的 RAW、CFA、Remosaic、Demosaic</td></tr>
+        <tr><td>适应 / 100% / 全屏</td><td><kbd>Ctrl</kbd><kbd>0</kbd> / <kbd>Ctrl</kbd><kbd>1</kbd> / <kbd>F11</kbd></td><td>主窗口快捷键上下文</td></tr>
         <tr><td>鼠标 ROI / 坐标 ROI</td><td><kbd>R</kbd> / <kbd>Shift</kbd><kbd>R</kbd></td><td>已打开文件；ROI 端点均包含</td></tr>
         <tr><td>定位像素 / 输入缩放</td><td><kbd>P</kbd> / <kbd>Z</kbd></td><td>已打开文件</td></tr>
         <tr><td>统计 / 导出</td><td><kbd>Ctrl</kbd><kbd>I</kbd> / <kbd>Ctrl</kbd><kbd>E</kbd></td><td>已打开文件</td></tr>
