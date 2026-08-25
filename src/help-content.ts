@@ -218,10 +218,10 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
     level: "进阶",
     readingTime: "约 10 分钟",
     body: `
-      <div class="help-prose"><h3>8-bit 预览归一化</h3><p>瓦片纹理最终使用 8-bit 通道。RAW 强度与 CFA 点阵可设置黑点 <var>B</var> 和白点 <var>W</var>，且必须满足 <code>0≤B&lt;W≤2^bitDepth−1</code>；先钳制 DN，再线性映射并进行整数四舍五入。其它显示模式固定使用当前位深全量程。</p></div>
+      <div class="help-prose"><h3>8-bit 预览归一化</h3><p>瓦片纹理最终使用 8-bit 通道。所有显示模式共用黑点 <var>B</var> 和白点 <var>W</var>，且必须满足 <code>0≤B&lt;W≤2^bitDepth−1</code>；各模式完成 RAW 读取、Remosaic 或 Demosaic/通道重建后，先钳制产生的 DN，再线性映射并进行整数四舍五入。</p></div>
       ${equation("正常范围 H > L", String.raw`\mathrm{preview}=\left\lfloor\frac{(\operatorname{clamp}(\mathrm{DN},L,H)-L)\cdot255+\frac{H-L}{2}}{H-L}\right\rfloor`)}
       ${equation("显示曝光", String.raw`\mathrm{preview}_{EV}=\operatorname{clamp}(\mathrm{preview}\cdot2^{EV},0,255)`)}
-      <div class="help-prose"><h3>RAW 显示调整</h3><p>RAW/CFA 的 EV 在最终呈现阶段应用。P1–P99 会精确扫描当前整帧 L0 All DN、忽略缺失像素并一次性设置黑白点；若 P1 与 P99 相同则回退 Min/Max，平坦或全缺失帧保持当前范围。它不读取 ROI，也不修改 DN、统计、Remosaic/Demosaic 或导出。</p></div>
+      <div class="help-prose"><h3>统一显示调整</h3><p>同一 EV 在 RAW/CFA/Remosaic/Demosaic/R/G/B 的最终呈现阶段应用。P1–P99 会精确扫描当前整帧 L0 原始 All DN、忽略缺失像素，并一次性设置所有模式共用的黑白点；若 P1 与 P99 相同则回退 Min/Max，平坦或全缺失帧保持当前范围。它不读取 ROI，也不修改源/处理 DN、统计、算法或导出。</p></div>
       <div class="help-prose"><h3>LOD 层级选择</h3><p>层级 <var>l</var> 的一个输出 texel 覆盖最多 <code>2^l × 2^l</code> 个源像素。100% 及以上始终使用 L0；缩小时由缩放率计算理想层级。</p></div>
       ${equation("理想层级", String.raw`\begin{aligned}\ell_{\max}&=\min\!\left(30,\left\lceil\log_2(\max(W,H))\right\rceil\right)\\\ell_{\mathrm{ideal}}&=\operatorname{clamp}\!\left(\log_2\frac{1}{z},0,\ell_{\max}\right)\end{aligned}`)}
       <div class="help-card-grid">

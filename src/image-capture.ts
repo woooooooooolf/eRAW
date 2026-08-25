@@ -3,7 +3,7 @@ import {
   channelTint,
   type ChannelRenderingMode,
 } from "./channel-rendering";
-import { effectiveDisplayExposure } from "./raw-display-adjustment";
+import { normalizeDisplayExposure } from "./display-adjustment";
 import {
   normalizeMissingPixelColor,
   type MissingPixelAppearance,
@@ -38,8 +38,7 @@ export interface PreviewCaptureSnapshot {
   processing: ProcessingSettings;
   displayWindow: DisplayWindow;
   channelRendering: ChannelRenderingMode;
-  rawDisplayExposure: number;
-  demosaicDisplayExposure: number;
+  displayExposure: number;
   missingPixelAppearance: MissingPixelAppearance;
 }
 
@@ -92,17 +91,12 @@ export function applyPreviewPresentation(
   mode: DisplayMode,
   rendering: ChannelRenderingMode,
   missing: MissingPixelAppearance,
-  rawDisplayExposure = 0,
-  demosaicDisplayExposure = 0,
+  displayExposure = 0,
   tileSize = CAPTURE_TILE_SIZE,
 ): Uint8Array {
   const tint = channelTint(mode, rendering);
-  const displayExposure = effectiveDisplayExposure(
-    mode,
-    rawDisplayExposure,
-    demosaicDisplayExposure,
-  );
-  const exposureGain = 2 ** displayExposure;
+  const normalizedExposure = normalizeDisplayExposure(displayExposure);
+  const exposureGain = 2 ** normalizedExposure;
   const solid = solidColor(missing.color);
   for (let offset = 0; offset + 3 < bytes.length; offset += 4) {
     const alpha = bytes[offset + 3];
@@ -129,7 +123,7 @@ export function applyPreviewPresentation(
       bytes[offset + 1] = Math.round(bytes[offset + 1] * tint[1]);
       bytes[offset + 2] = Math.round(bytes[offset + 2] * tint[2]);
     }
-    if (alpha !== 0 && displayExposure !== 0) {
+    if (alpha !== 0 && normalizedExposure !== 0) {
       bytes[offset] = Math.min(255, Math.round(bytes[offset] * exposureGain));
       bytes[offset + 1] = Math.min(255, Math.round(bytes[offset + 1] * exposureGain));
       bytes[offset + 2] = Math.min(255, Math.round(bytes[offset + 2] * exposureGain));
@@ -178,8 +172,7 @@ export async function renderPreviewCanvas(
         snapshot.mode,
         snapshot.channelRendering,
         snapshot.missingPixelAppearance,
-        snapshot.rawDisplayExposure,
-        snapshot.demosaicDisplayExposure,
+        snapshot.displayExposure,
       );
       context.putImageData(
         new ImageData(

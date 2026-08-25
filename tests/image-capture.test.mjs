@@ -40,11 +40,10 @@ const runnableSource = outputText
     `)),
   )
   .replaceAll(
-    '"./raw-display-adjustment"',
+    '"./display-adjustment"',
     JSON.stringify(dataUrl(`
-      export function effectiveDisplayExposure(mode, rawExposure, demosaicExposure) {
-        if (mode === "raw" || mode === "bayer") return Math.max(-8, Math.min(8, rawExposure));
-        return mode === "demosaic" ? Math.max(-8, Math.min(8, demosaicExposure)) : 0;
+      export function normalizeDisplayExposure(exposure) {
+        return Math.max(-8, Math.min(8, exposure));
       }
     `)),
   )
@@ -97,13 +96,14 @@ test("preview presentation keeps global missing-pixel phase and only tints grays
   capture.applyPreviewPresentation(colors, 0, 0, "red", "color", missing);
   assert.deepEqual([...colors], [100, 0, 0, 255, 10, 20, 30, 255]);
 
-  const exposed = new Uint8Array([64, 128, 200, 255]);
-  capture.applyPreviewPresentation(exposed, 0, 0, "demosaic", "color", missing, 0, 1);
-  assert.deepEqual([...exposed], [128, 255, 255, 255]);
-
-  const exposedRaw = new Uint8Array([64, 64, 64, 255]);
-  capture.applyPreviewPresentation(exposedRaw, 0, 0, "raw", "color", missing, 1);
-  assert.deepEqual([...exposedRaw], [128, 128, 128, 255]);
+  for (const mode of ["raw", "bayer", "remosaic", "demosaic"]) {
+    const exposed = new Uint8Array([64, 64, 64, 255]);
+    capture.applyPreviewPresentation(exposed, 0, 0, mode, "color", missing, 1);
+    assert.deepEqual([...exposed], [128, 128, 128, 255]);
+  }
+  const exposedRed = new Uint8Array([64, 64, 64, 255]);
+  capture.applyPreviewPresentation(exposedRed, 0, 0, "red", "color", missing, 1);
+  assert.deepEqual([...exposedRed], [128, 0, 0, 255]);
 });
 
 test("native context menus are suppressed globally and the canvas menu exposes only four capture actions", () => {

@@ -1,5 +1,4 @@
 import type {
-  DisplayMode,
   DisplayWindow,
   RawDisplayRangeResult,
 } from "./types";
@@ -9,10 +8,6 @@ export const MAX_DISPLAY_EXPOSURE = 8;
 export const DISPLAY_EXPOSURE_STEP = 0.1;
 
 export type DisplayWindowField = "blackPoint" | "whitePoint";
-
-export function isRawDisplayMode(mode: DisplayMode): boolean {
-  return mode === "raw" || mode === "bayer";
-}
 
 export function displayFullScale(bitDepth: number): number {
   const depth = Math.max(1, Math.min(16, Math.trunc(bitDepth) || 1));
@@ -86,26 +81,6 @@ export function automaticDisplayWindow(
     return normalizeDisplayWindow({ blackPoint, whitePoint }, bitDepth);
   }
   return null;
-}
-
-export function effectiveDisplayWindow(
-  mode: DisplayMode,
-  rawWindow: DisplayWindow,
-  bitDepth: number,
-): DisplayWindow {
-  return isRawDisplayMode(mode)
-    ? normalizeDisplayWindow(rawWindow, bitDepth)
-    : defaultDisplayWindow(bitDepth);
-}
-
-export function effectiveDisplayExposure(
-  mode: DisplayMode,
-  rawExposure: number,
-  demosaicExposure: number,
-): number {
-  if (isRawDisplayMode(mode)) return normalizeDisplayExposure(rawExposure);
-  if (mode === "demosaic") return normalizeDisplayExposure(demosaicExposure);
-  return 0;
 }
 
 export function displayValueToUnit(

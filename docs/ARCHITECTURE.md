@@ -46,7 +46,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | `src/i18n.ts` | 语言偏好、系统语言解析、七语文案目录、日期时间格式化和静态 DOM 翻译 |
 | `src/backend-error.ts` | 解析后端结构化错误码，并在当前语言下生成用户消息 |
 | `src/channel-rendering.ts` | 将显示模式与通道渲染偏好映射为纯 GPU 着色参数 |
-| `src/raw-display-adjustment.ts` / `src/display-exposure.ts` | RAW/CFA 显示窗口、自动范围结果归一化及 RAW/Demosaic 模式化曝光边界 |
+| `src/display-adjustment.ts` | 全显示链路共用的黑白点、曝光输入归一化与自动范围结果选择 |
 | `src/missing-pixel-rendering.ts` | 缺失数据外观类型、持久值校验和 GPU 参数转换 |
 | `src/viewport.ts` | WebGL2、LOD、瓦片队列、纹理缓存、缩放和平移 |
 | `src/viewport-transform.ts` | 屏幕、图像和像素坐标的唯一变换来源；画布尺寸变化时的中心锚定；选区模型 |
@@ -61,9 +61,9 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 
 ## RAW 显示调整边界
 
-RAW 强度和 CFA 点阵共享一组仅属于当前文件的黑点、白点与 EV。黑白点作为显式 `DisplayWindow` 进入瓦片请求、前后端缓存键和完整预览快照，由 `raw/mod.rs` 在 u16 DN 转 RGBA8 之前执行线性映射；EV 在 WebGL uniform 与 PNG 拼接的最终呈现阶段应用，因此修改 EV 只重绘，修改黑白点才使瓦片失效。Remosaic、Demosaic 和 R/G/B 通道始终使用当前位深的全量程窗口；Demosaic 只读取自身独立曝光。
+RAW 强度、CFA 点阵、Remosaic、Demosaic 和 R/G/B 通道共享一组仅属于当前文件的黑点、白点与 EV。黑白点作为显式 `DisplayWindow` 进入所有瓦片请求、前后端缓存键和完整预览快照，由 `raw/mod.rs` 在对应模式完成原始读取或处理后、从 u16 DN 转 RGBA8 之前执行同一线性映射；EV 在 WebGL uniform 与 PNG 拼接的最终呈现阶段统一应用。因此修改 EV 只重绘，修改黑白点才使瓦片失效。显示调整不参与 Remosaic/Demosaic 算法，也不改变检查 DN、统计或导出。
 
-自动归一化不复用完整图像统计任务。`analysis/mod.rs` 使用独立 `displayRangeRevision` 顺序扫描当前整帧 L0 All DN，只累积一个精确 Histogram 和有效/缺失计数，返回 Min/Max/P1/P99；前端优先采用 `P1 < P99`，否则回退到 `Min < Max`，平坦或全缺失帧不修改现有窗口。换帧、离开 RAW/CFA、修改描述符或关闭文件会协作取消旧任务，完成结果还必须匹配 generation、revision 与 frame。该扫描不读取 ROI、不生成语义通道、Profile 或原子平面。
+自动归一化不复用完整图像统计任务。`analysis/mod.rs` 使用独立 `displayRangeRevision` 顺序扫描当前整帧 L0 原始 All DN，只累积一个精确 Histogram 和有效/缺失计数，返回 Min/Max/P1/P99；前端优先采用 `P1 < P99`，否则回退到 `Min < Max`，平坦或全缺失帧不修改现有窗口。结果作为所有显示模式共用的窗口；切换模式不会取消任务，换帧、修改描述符或关闭文件会协作取消旧任务，完成结果还必须匹配 generation、revision 与 frame。该扫描不读取 ROI、处理后 DN，也不生成语义通道、Profile 或原子平面。
 
 ## 图像统计边界
 

@@ -56,9 +56,8 @@ const runnableSource = outputText
     JSON.stringify(dataUrl(pixelGridSource)),
   )
   .replaceAll(
-    '"./raw-display-adjustment"',
+    '"./display-adjustment"',
     JSON.stringify(dataUrl(`
-      export function effectiveDisplayExposure() { return 0; }
       export function displayValueToUnit(value, window) {
         return Math.max(0, Math.min(1, (value - window.blackPoint) / (window.whitePoint - window.blackPoint)));
       }

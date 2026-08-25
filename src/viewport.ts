@@ -4,7 +4,7 @@ import {
   channelTint,
   type ChannelRenderingMode,
 } from "./channel-rendering";
-import { effectiveDisplayExposure } from "./raw-display-adjustment";
+import { normalizeDisplayExposure } from "./display-adjustment";
 import {
   drawViewportBackground,
   renderPreviewCanvas,
@@ -220,8 +220,7 @@ export class RawViewport {
   private maxTextures = DEFAULT_MAX_TEXTURES;
   private wheelSensitivity = 0.0015;
   private channelRendering: ChannelRenderingMode = "color";
-  private rawDisplayExposure = 0;
-  private demosaicDisplayExposure = 0;
+  private displayExposure = 0;
   private missingPixelAppearance: MissingPixelAppearance = {
     pattern: "darkCheckerboard",
     color: "#808080",
@@ -436,15 +435,10 @@ export class RawViewport {
     this.requestDraw();
   }
 
-  setRawDisplayExposure(exposure: number): void {
-    if (exposure === this.rawDisplayExposure) return;
-    this.rawDisplayExposure = exposure;
-    this.requestDraw();
-  }
-
-  setDemosaicDisplayExposure(exposure: number): void {
-    if (exposure === this.demosaicDisplayExposure) return;
-    this.demosaicDisplayExposure = exposure;
+  setDisplayExposure(exposure: number): void {
+    const normalized = normalizeDisplayExposure(exposure);
+    if (normalized === this.displayExposure) return;
+    this.displayExposure = normalized;
     this.requestDraw();
   }
 
@@ -520,8 +514,7 @@ export class RawViewport {
       },
       displayWindow: { ...this.settings.displayWindow },
       channelRendering: this.channelRendering,
-      rawDisplayExposure: this.rawDisplayExposure,
-      demosaicDisplayExposure: this.demosaicDisplayExposure,
+      displayExposure: this.displayExposure,
       missingPixelAppearance: { ...this.missingPixelAppearance },
     };
   }
@@ -1112,14 +1105,7 @@ export class RawViewport {
     gl.uniform1f(this.zoomLocation, this.zoom);
     const tint = channelTint(this.settings.mode, this.channelRendering);
     gl.uniform3f(this.channelTintLocation, tint[0], tint[1], tint[2]);
-    gl.uniform1f(
-      this.displayExposureLocation,
-      effectiveDisplayExposure(
-        this.settings.mode,
-        this.rawDisplayExposure,
-        this.demosaicDisplayExposure,
-      ),
-    );
+    gl.uniform1f(this.displayExposureLocation, this.displayExposure);
     gl.uniform1i(
       this.missingPatternLocation,
       missingPixelPatternIndex(this.missingPixelAppearance.pattern),
@@ -1158,8 +1144,7 @@ export class RawViewport {
       displayMode: this.settings.mode,
       processing: this.settings.processing,
       displayWindow: this.settings.displayWindow,
-      rawDisplayExposure: this.rawDisplayExposure,
-      demosaicDisplayExposure: this.demosaicDisplayExposure,
+      displayExposure: this.displayExposure,
       transform: this.transform,
       width: this.width,
       height: this.height,

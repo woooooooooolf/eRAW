@@ -693,14 +693,9 @@ fn validate_display_window(
 
 fn resolve_display_window(
     descriptor: &RawDescriptor,
-    mode: DisplayMode,
     window: &DisplayWindow,
 ) -> Result<(u16, u16), String> {
-    if matches!(mode, DisplayMode::Raw | DisplayMode::Bayer) {
-        validate_display_window(descriptor, window)
-    } else {
-        Ok((0, descriptor_full_scale(descriptor.bit_depth)))
-    }
+    validate_display_window(descriptor, window)
 }
 
 fn remosaic_output_site(d: &RawDescriptor, x: u32, y: u32) -> CfaSite {
@@ -1176,8 +1171,7 @@ pub fn render_tile_cancellable(
         .checked_mul(u64::from(tile_size))
         .and_then(|v| v.checked_mul(u64::from(scale)))
         .ok_or("瓦片坐标溢出")?;
-    let (display_black, display_white) =
-        resolve_display_window(d, request.mode, &request.display_window)?;
+    let (display_black, display_white) = resolve_display_window(d, &request.display_window)?;
     let mut output = vec![0u8; tile_size as usize * tile_size as usize * 4];
     for oy in 0..tile_size {
         if !is_current() {
@@ -2240,10 +2234,29 @@ mod tests {
                 white_point: 192,
             },
         };
-        let tile = render_tile(&bytes, &descriptor, &layout, &request).unwrap();
-        assert_eq!(&tile[0..4], &[0, 0, 0, 255]);
-        assert_eq!(&tile[4..8], &[128, 128, 128, 255]);
-        assert_eq!(&tile[8..12], &[255, 255, 255, 255]);
+        for mode in [
+            DisplayMode::Raw,
+            DisplayMode::Bayer,
+            DisplayMode::Remosaic,
+            DisplayMode::Demosaic,
+            DisplayMode::Red,
+            DisplayMode::Green,
+            DisplayMode::Blue,
+        ] {
+            let tile = render_tile(
+                &bytes,
+                &descriptor,
+                &layout,
+                &TileRequest {
+                    mode,
+                    ..request.clone()
+                },
+            )
+            .unwrap();
+            assert_eq!(&tile[0..4], &[0, 0, 0, 255]);
+            assert_eq!(&tile[4..8], &[128, 128, 128, 255]);
+            assert_eq!(&tile[8..12], &[255, 255, 255, 255]);
+        }
     }
 
     #[test]
@@ -2280,7 +2293,7 @@ mod tests {
     }
 
     #[test]
-    fn processed_modes_ignore_raw_display_window() {
+    fn all_display_modes_share_the_same_display_window() {
         let descriptor = RawDescriptor {
             bit_depth: 10,
             ..RawDescriptor::default()
@@ -2290,21 +2303,9 @@ mod tests {
             white_point: 900,
         };
         assert_eq!(
-            resolve_display_window(&descriptor, DisplayMode::Raw, &custom).unwrap(),
+            resolve_display_window(&descriptor, &custom).unwrap(),
             (100, 900)
         );
-        for mode in [
-            DisplayMode::Remosaic,
-            DisplayMode::Demosaic,
-            DisplayMode::Red,
-            DisplayMode::Green,
-            DisplayMode::Blue,
-        ] {
-            assert_eq!(
-                resolve_display_window(&descriptor, mode, &custom).unwrap(),
-                (0, 1023)
-            );
-        }
     }
 
     #[test]

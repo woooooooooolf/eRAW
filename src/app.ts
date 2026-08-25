@@ -36,23 +36,16 @@ import {
   parseRawDescriptor,
 } from "./descriptor-input";
 import {
-  DEMOSAIC_DISPLAY_EXPOSURE_STEP,
-  MAX_DEMOSAIC_DISPLAY_EXPOSURE,
-  MIN_DEMOSAIC_DISPLAY_EXPOSURE,
-  normalizeDemosaicDisplayExposure,
-} from "./display-exposure";
-import {
   DISPLAY_EXPOSURE_STEP,
   MAX_DISPLAY_EXPOSURE,
   MIN_DISPLAY_EXPOSURE,
   automaticDisplayWindow,
   defaultDisplayWindow,
-  effectiveDisplayWindow,
-  isRawDisplayMode,
   normalizeDisplayExposure,
+  normalizeDisplayWindow,
   updateDisplayWindow,
   type DisplayWindowField,
-} from "./raw-display-adjustment";
+} from "./display-adjustment";
 import { ExportDialog, exportDialogTemplate } from "./export-dialog";
 import { packingControlState } from "./packing-controls";
 import {
@@ -274,11 +267,10 @@ export class ErawApp {
   private document: DocumentInfo | null = null;
   private frame = 0;
   private displayMode: DisplayMode = "bayer";
-  private rawDisplayExposure = 0;
-  private rawDisplayWindow: DisplayWindow = defaultDisplayWindow(this.descriptor.bitDepth);
-  private rawDisplayRangeRevision = 0;
-  private rawDisplayRangeLoading = false;
-  private demosaicDisplayExposure = 0;
+  private displayExposure = 0;
+  private displayWindow: DisplayWindow = defaultDisplayWindow(this.descriptor.bitDepth);
+  private displayRangeRevision = 0;
+  private displayRangeLoading = false;
   private committing = false;
   private commitRevision = 0;
   private fileOperationInProgress = false;
@@ -322,7 +314,7 @@ export class ErawApp {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(this.descriptor));
       }
     }
-    this.rawDisplayWindow = defaultDisplayWindow(this.descriptor.bitDepth);
+    this.displayWindow = defaultDisplayWindow(this.descriptor.bitDepth);
     this.exportDialog = new ExportDialog(root, {
       onSuccess: (message) => this.showToast(message, "success", 6000),
     });
@@ -475,35 +467,27 @@ export class ErawApp {
                     <span class="field-label" data-help="仅改变 R/G/B 通道视图的着色，不改变重建 DN 或导出数据">RGB 通道渲染</span>
                     <select id="presentation-channel-rendering"><option value="color">通道颜色</option><option value="grayscale">灰度（仅强度）</option></select>
                   </label>
-                  <div class="parameter-row presentation-exposure-row presentation-disabled" id="presentation-raw-exposure-row">
-                    <span class="field-label" data-help="只改变 RAW 强度与 CFA 点阵的显示亮度和 PNG 抓拍，不改变原始 DN、统计或导出">RAW 显示曝光</span>
+                  <div class="parameter-row presentation-exposure-row presentation-disabled" id="presentation-display-exposure-row">
+                    <span class="field-label" data-help="对所有显示模式及 PNG 抓拍应用同一亮度增益，不改变 DN、统计、处理或导出">显示曝光</span>
                     <div class="stepper-control presentation-exposure-control">
-                      <button id="decrease-raw-exposure" type="button" data-raw-exposure-step="-${DISPLAY_EXPOSURE_STEP}" aria-label="减小 RAW 显示曝光">−</button>
-                      <div class="number-input"><input id="presentation-raw-exposure" type="number" min="${MIN_DISPLAY_EXPOSURE}" max="${MAX_DISPLAY_EXPOSURE}" step="${DISPLAY_EXPOSURE_STEP}" value="0.0" aria-label="RAW 显示曝光"/><b>EV</b></div>
-                      <button id="increase-raw-exposure" type="button" data-raw-exposure-step="${DISPLAY_EXPOSURE_STEP}" aria-label="增加 RAW 显示曝光">+</button>
+                      <button id="decrease-display-exposure" type="button" data-display-exposure-step="-${DISPLAY_EXPOSURE_STEP}" aria-label="减小显示曝光">−</button>
+                      <div class="number-input"><input id="presentation-display-exposure" type="number" min="${MIN_DISPLAY_EXPOSURE}" max="${MAX_DISPLAY_EXPOSURE}" step="${DISPLAY_EXPOSURE_STEP}" value="0.0" aria-label="显示曝光"/><b>EV</b></div>
+                      <button id="increase-display-exposure" type="button" data-display-exposure-step="${DISPLAY_EXPOSURE_STEP}" aria-label="增加显示曝光">+</button>
                     </div>
                   </div>
-                  <div class="parameter-row presentation-disabled" id="presentation-raw-window-row">
-                    <span class="field-label" data-help="将黑点与白点之间的原始 DN 映射到完整预览亮度范围；映射在 8-bit 预览量化之前完成">RAW 黑点 / 白点</span>
+                  <div class="parameter-row presentation-disabled" id="presentation-display-window-row">
+                    <span class="field-label" data-help="将所有显示模式生成的 DN 按同一黑点与白点映射到完整预览亮度范围；映射在 8-bit 量化之前完成">显示黑点 / 白点</span>
                     <div class="presentation-window-control">
-                      <div class="number-input"><input id="presentation-raw-black-point" type="number" min="0" step="1" value="0" aria-label="RAW 显示黑点"/><b>DN</b></div>
+                      <div class="number-input"><input id="presentation-display-black-point" type="number" min="0" step="1" value="0" aria-label="显示黑点"/><b>DN</b></div>
                       <i>–</i>
-                      <div class="number-input"><input id="presentation-raw-white-point" type="number" min="1" step="1" value="1023" aria-label="RAW 显示白点"/><b>DN</b></div>
+                      <div class="number-input"><input id="presentation-display-white-point" type="number" min="1" step="1" value="1023" aria-label="显示白点"/><b>DN</b></div>
                     </div>
                   </div>
-                  <div class="parameter-row presentation-disabled" id="presentation-raw-auto-row">
-                    <span class="field-label" data-help="精确扫描当前整帧全部 L0 原始 DN，忽略缺失像素，并使用 All 组 P1/P99 设置黑点与白点">RAW 自动归一化</span>
+                  <div class="parameter-row presentation-disabled" id="presentation-display-auto-row">
+                    <span class="field-label" data-help="精确扫描当前整帧全部 L0 原始 DN，忽略缺失像素，并将 All 组 P1/P99 作为所有显示模式共用的黑点与白点">显示自动归一化</span>
                     <div class="presentation-window-actions">
-                      <button id="auto-normalize-raw" type="button">P1–P99</button>
-                      <button id="reset-raw-display" type="button">重置</button>
-                    </div>
-                  </div>
-                  <div class="parameter-row presentation-exposure-row presentation-disabled" id="presentation-demosaic-exposure-row">
-                    <span class="field-label" data-help="只改变 Demosaic 全彩图及其 PNG 抓拍，不改变 DN、统计或 RAW/RGB48 导出">Demosaic 显示曝光</span>
-                    <div class="stepper-control presentation-exposure-control">
-                      <button id="decrease-demosaic-exposure" type="button" data-exposure-step="-${DEMOSAIC_DISPLAY_EXPOSURE_STEP}" aria-label="减小 Demosaic 显示曝光">−</button>
-                      <div class="number-input"><input id="presentation-demosaic-exposure" type="number" min="${MIN_DEMOSAIC_DISPLAY_EXPOSURE}" max="${MAX_DEMOSAIC_DISPLAY_EXPOSURE}" step="${DEMOSAIC_DISPLAY_EXPOSURE_STEP}" value="0.0" aria-label="Demosaic 显示曝光"/><b>EV</b></div>
-                      <button id="increase-demosaic-exposure" type="button" data-exposure-step="${DEMOSAIC_DISPLAY_EXPOSURE_STEP}" aria-label="增加 Demosaic 显示曝光">+</button>
+                      <button id="auto-normalize-display" type="button">P1–P99</button>
+                      <button id="reset-display-adjustment" type="button">重置</button>
                     </div>
                   </div>
                   <label class="parameter-row processing-toggle-row">
@@ -783,20 +767,16 @@ export class ErawApp {
     attribute("#demosaic-processing-row .field-label", "help", "runtime.demosaicHelp");
     attribute("#remosaic-processing-row .field-label", "help", "runtime.sameColorHelp");
     field("presentation-channel-rendering", "settings.channelRendering", "settings.channelRenderingHint");
-    field("presentation-raw-exposure", "presentation.rawExposure", "presentation.rawExposureHint");
-    attribute("#presentation-raw-exposure", "aria-label", "presentation.rawExposure");
-    attribute("#decrease-raw-exposure", "aria-label", "presentation.decreaseRawExposure");
-    attribute("#increase-raw-exposure", "aria-label", "presentation.increaseRawExposure");
-    field("presentation-raw-black-point", "presentation.rawWindow", "presentation.rawWindowHint");
-    attribute("#presentation-raw-black-point", "aria-label", "presentation.rawBlackPoint");
-    attribute("#presentation-raw-white-point", "aria-label", "presentation.rawWhitePoint");
-    field("auto-normalize-raw", "presentation.rawAuto", "presentation.rawAutoHint");
-    text("#auto-normalize-raw", "presentation.autoNormalize");
-    text("#reset-raw-display", "presentation.resetRaw");
-    field("presentation-demosaic-exposure", "presentation.demosaicExposure", "presentation.demosaicExposureHint");
-    attribute("#presentation-demosaic-exposure", "aria-label", "presentation.demosaicExposure");
-    attribute("#decrease-demosaic-exposure", "aria-label", "presentation.decreaseExposure");
-    attribute("#increase-demosaic-exposure", "aria-label", "presentation.increaseExposure");
+    field("presentation-display-exposure", "presentation.displayExposure", "presentation.displayExposureHint");
+    attribute("#presentation-display-exposure", "aria-label", "presentation.displayExposure");
+    attribute("#decrease-display-exposure", "aria-label", "presentation.decreaseDisplayExposure");
+    attribute("#increase-display-exposure", "aria-label", "presentation.increaseDisplayExposure");
+    field("presentation-display-black-point", "presentation.displayWindow", "presentation.displayWindowHint");
+    attribute("#presentation-display-black-point", "aria-label", "presentation.displayBlackPoint");
+    attribute("#presentation-display-white-point", "aria-label", "presentation.displayWhitePoint");
+    field("auto-normalize-display", "presentation.displayAuto", "presentation.displayAutoHint");
+    text("#auto-normalize-display", "presentation.autoNormalize");
+    text("#reset-display-adjustment", "presentation.resetDisplay");
     field("presentation-pixel-values", "settings.showPixelValues", "settings.showPixelValuesHint");
     field("presentation-pixel-grid-color", "presentation.pixelGridColor", "presentation.pixelGridColorHint");
     field("presentation-demosaic-pixel-values", "settings.demosaicValues", "settings.demosaicValuesHint");
@@ -1255,50 +1235,36 @@ export class ErawApp {
     this.get("confirm-settings").addEventListener("click", () => this.saveSettingsFromDialog());
     this.get("reset-settings").addEventListener("click", () => this.writeSettingsForm(DEFAULT_SETTINGS));
     this.get<HTMLSelectElement>("presentation-channel-rendering").addEventListener("change", () => this.savePresentationSettings());
-    const rawExposureInput = this.get<HTMLInputElement>("presentation-raw-exposure");
-    rawExposureInput.addEventListener("change", () => this.setRawDisplayExposure(Number(rawExposureInput.value)));
-    rawExposureInput.addEventListener("keydown", (event) => {
+    const displayExposureInput = this.get<HTMLInputElement>("presentation-display-exposure");
+    displayExposureInput.addEventListener("change", () => this.setDisplayExposure(Number(displayExposureInput.value)));
+    displayExposureInput.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;
       event.preventDefault();
-      rawExposureInput.blur();
+      displayExposureInput.blur();
     });
-    this.root.querySelectorAll<HTMLButtonElement>("[data-raw-exposure-step]").forEach((button) => {
+    this.root.querySelectorAll<HTMLButtonElement>("[data-display-exposure-step]").forEach((button) => {
       button.addEventListener("click", () => {
-        this.setRawDisplayExposure(
-          this.rawDisplayExposure + Number(button.dataset.rawExposureStep),
+        this.setDisplayExposure(
+          this.displayExposure + Number(button.dataset.displayExposureStep),
         );
       });
     });
     (["blackPoint", "whitePoint"] as const).forEach((field) => {
       const input = this.get<HTMLInputElement>(
-        field === "blackPoint" ? "presentation-raw-black-point" : "presentation-raw-white-point",
+        field === "blackPoint" ? "presentation-display-black-point" : "presentation-display-white-point",
       );
-      input.addEventListener("change", () => this.setRawDisplayWindowField(field, input.value));
+      input.addEventListener("change", () => this.setDisplayWindowField(field, input.value));
       input.addEventListener("keydown", (event) => {
         if (event.key !== "Enter") return;
         event.preventDefault();
         input.blur();
       });
     });
-    this.get("auto-normalize-raw").addEventListener("click", () => void this.autoNormalizeRawDisplay());
-    this.get("reset-raw-display").addEventListener("click", () => {
-      this.cancelRawDisplayRangeCalculation();
-      this.resetRawDisplayAdjustment();
+    this.get("auto-normalize-display").addEventListener("click", () => void this.autoNormalizeDisplay());
+    this.get("reset-display-adjustment").addEventListener("click", () => {
+      this.cancelDisplayRangeCalculation();
+      this.resetDisplayAdjustment();
       this.updateDisplay();
-    });
-    const exposureInput = this.get<HTMLInputElement>("presentation-demosaic-exposure");
-    exposureInput.addEventListener("change", () => this.setDemosaicDisplayExposure(Number(exposureInput.value)));
-    exposureInput.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter") return;
-      event.preventDefault();
-      exposureInput.blur();
-    });
-    this.root.querySelectorAll<HTMLButtonElement>("[data-exposure-step]").forEach((button) => {
-      button.addEventListener("click", () => {
-        this.setDemosaicDisplayExposure(
-          this.demosaicDisplayExposure + Number(button.dataset.exposureStep),
-        );
-      });
     });
     this.get<HTMLInputElement>("presentation-pixel-values").addEventListener("change", () => this.savePresentationSettings());
     this.get<HTMLInputElement>("presentation-pixel-grid-color").addEventListener("input", () => this.savePresentationSettings());
@@ -1470,9 +1436,8 @@ export class ErawApp {
       this.document = info;
       this.descriptor = info.descriptor;
       this.frame = 0;
-      this.cancelRawDisplayRangeCalculation();
-      this.resetRawDisplayAdjustment(info.descriptor.bitDepth);
-      this.setDemosaicDisplayExposure(0);
+      this.cancelDisplayRangeCalculation();
+      this.resetDisplayAdjustment(info.descriptor.bitDepth);
       this.viewport.setDocument(info);
       this.updateDisplay();
       this.statisticsResult = null;
@@ -1509,9 +1474,8 @@ export class ErawApp {
       this.lastSample = null;
       this.clearRuntimeDiagnostics(["webgl"]);
       this.viewport.clearDocument();
-      this.cancelRawDisplayRangeCalculation();
-      this.resetRawDisplayAdjustment(this.descriptor.bitDepth);
-      this.setDemosaicDisplayExposure(0);
+      this.cancelDisplayRangeCalculation();
+      this.resetDisplayAdjustment(this.descriptor.bitDepth);
       this.statisticsRevision += 1;
       void cancelRawAnalysis(this.statisticsRevision);
       this.statisticsResult = null;
@@ -1584,7 +1548,7 @@ export class ErawApp {
         if (!this.document) {
           const bitDepthChanged = descriptor.bitDepth !== this.descriptor.bitDepth;
           this.descriptor = descriptor;
-          if (bitDepthChanged) this.resetRawDisplayAdjustment(descriptor.bitDepth);
+          if (bitDepthChanged) this.resetDisplayAdjustment(descriptor.bitDepth);
           if (localChanged && this.settings.rememberDescriptor) {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(descriptor));
           }
@@ -1595,9 +1559,9 @@ export class ErawApp {
             const resetStatisticsView = !imageFormatDescriptorsEqual(previousDescriptor, info.descriptor);
             this.document = info;
             this.descriptor = info.descriptor;
-            this.cancelRawDisplayRangeCalculation();
+            this.cancelDisplayRangeCalculation();
             if (previousDescriptor.bitDepth !== info.descriptor.bitDepth) {
-              this.rawDisplayWindow = defaultDisplayWindow(info.descriptor.bitDepth);
+              this.displayWindow = defaultDisplayWindow(info.descriptor.bitDepth);
             }
             this.clearRuntimeDiagnostic("descriptor");
             if (this.settings.rememberDescriptor) {
@@ -1975,9 +1939,6 @@ export class ErawApp {
     const cfa = this.descriptorFieldValue("cfa") as CfaPattern;
     if (mode === "remosaic" && !isQuadCfa(cfa)) return;
     if (["demosaic", "red", "green", "blue"].includes(mode) && !isColorCfa(cfa)) return;
-    if (isRawDisplayMode(this.displayMode) && !isRawDisplayMode(mode)) {
-      this.cancelRawDisplayRangeCalculation();
-    }
     this.displayMode = mode;
     this.root.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => button.classList.toggle("active", button.dataset.mode === mode));
     this.updateDisplay();
@@ -2411,11 +2372,7 @@ export class ErawApp {
     this.viewport.setDisplay({
       mode: this.displayMode,
       processing: this.processing,
-      displayWindow: effectiveDisplayWindow(
-        this.displayMode,
-        this.rawDisplayWindow,
-        bitDepth,
-      ),
+      displayWindow: normalizeDisplayWindow(this.displayWindow, bitDepth),
     });
     this.updatePresentationAvailability();
     this.updateRoiPresentation();
@@ -2426,7 +2383,7 @@ export class ErawApp {
     if (!count) return;
     const nextFrame = Math.max(0, Math.min(Math.trunc(frame), count - 1));
     if (nextFrame === this.frame) return;
-    this.cancelRawDisplayRangeCalculation();
+    this.cancelDisplayRangeCalculation();
     this.frame = nextFrame;
     this.viewport.setFrame(this.frame);
     this.get<HTMLInputElement>("frame-input").value = String(this.frame + 1);
@@ -2894,72 +2851,66 @@ export class ErawApp {
     this.get<HTMLSelectElement>("presentation-demosaic-pixel-values").value = this.settings.demosaicPixelValues;
     this.get<HTMLSelectElement>("presentation-missing-pixel-pattern").value = this.settings.missingPixelPattern;
     this.get<HTMLInputElement>("presentation-missing-pixel-color").value = this.settings.missingPixelColor;
-    this.writeRawDisplayAdjustmentControls();
-    this.writeDemosaicDisplayExposureControls();
+    this.writeDisplayAdjustmentControls();
     this.updatePresentationAvailability();
   }
 
-  private writeDemosaicDisplayExposureControls(): void {
-    this.get<HTMLInputElement>("presentation-demosaic-exposure").value =
-      this.demosaicDisplayExposure.toFixed(1);
-  }
-
-  private writeRawDisplayAdjustmentControls(): void {
+  private writeDisplayAdjustmentControls(): void {
     const bitDepth = this.document?.descriptor.bitDepth ?? this.descriptor.bitDepth;
     const fullScale = defaultDisplayWindow(bitDepth).whitePoint;
-    this.rawDisplayWindow = effectiveDisplayWindow("raw", this.rawDisplayWindow, bitDepth);
-    this.get<HTMLInputElement>("presentation-raw-exposure").value =
-      this.rawDisplayExposure.toFixed(1);
-    const blackPoint = this.get<HTMLInputElement>("presentation-raw-black-point");
-    const whitePoint = this.get<HTMLInputElement>("presentation-raw-white-point");
-    blackPoint.max = String(Math.max(0, this.rawDisplayWindow.whitePoint - 1));
+    this.displayWindow = normalizeDisplayWindow(this.displayWindow, bitDepth);
+    this.get<HTMLInputElement>("presentation-display-exposure").value =
+      this.displayExposure.toFixed(1);
+    const blackPoint = this.get<HTMLInputElement>("presentation-display-black-point");
+    const whitePoint = this.get<HTMLInputElement>("presentation-display-white-point");
+    blackPoint.max = String(Math.max(0, this.displayWindow.whitePoint - 1));
     whitePoint.max = String(fullScale);
-    whitePoint.min = String(Math.min(fullScale, this.rawDisplayWindow.blackPoint + 1));
-    blackPoint.value = String(this.rawDisplayWindow.blackPoint);
-    whitePoint.value = String(this.rawDisplayWindow.whitePoint);
+    whitePoint.min = String(Math.min(fullScale, this.displayWindow.blackPoint + 1));
+    blackPoint.value = String(this.displayWindow.blackPoint);
+    whitePoint.value = String(this.displayWindow.whitePoint);
   }
 
-  private setRawDisplayExposure(value: number): void {
-    this.rawDisplayExposure = normalizeDisplayExposure(value);
-    this.writeRawDisplayAdjustmentControls();
-    this.viewport.setRawDisplayExposure(this.rawDisplayExposure);
+  private setDisplayExposure(value: number): void {
+    this.displayExposure = normalizeDisplayExposure(value);
+    this.writeDisplayAdjustmentControls();
+    this.viewport.setDisplayExposure(this.displayExposure);
     this.updatePresentationAvailability();
   }
 
-  private setRawDisplayWindowField(field: DisplayWindowField, value: unknown): void {
-    this.cancelRawDisplayRangeCalculation();
+  private setDisplayWindowField(field: DisplayWindowField, value: unknown): void {
+    this.cancelDisplayRangeCalculation();
     const bitDepth = this.document?.descriptor.bitDepth ?? this.descriptor.bitDepth;
-    this.rawDisplayWindow = updateDisplayWindow(
-      this.rawDisplayWindow,
+    this.displayWindow = updateDisplayWindow(
+      this.displayWindow,
       field,
       value,
       bitDepth,
     );
-    this.writeRawDisplayAdjustmentControls();
+    this.writeDisplayAdjustmentControls();
     this.updateDisplay();
   }
 
-  private resetRawDisplayAdjustment(bitDepth = this.document?.descriptor.bitDepth ?? this.descriptor.bitDepth): void {
-    this.rawDisplayExposure = 0;
-    this.rawDisplayWindow = defaultDisplayWindow(bitDepth);
-    this.viewport.setRawDisplayExposure(0);
-    this.writeRawDisplayAdjustmentControls();
+  private resetDisplayAdjustment(bitDepth = this.document?.descriptor.bitDepth ?? this.descriptor.bitDepth): void {
+    this.displayExposure = 0;
+    this.displayWindow = defaultDisplayWindow(bitDepth);
+    this.viewport.setDisplayExposure(0);
+    this.writeDisplayAdjustmentControls();
   }
 
-  private cancelRawDisplayRangeCalculation(): void {
-    if (!this.rawDisplayRangeLoading) return;
-    this.rawDisplayRangeRevision += 1;
-    this.rawDisplayRangeLoading = false;
-    void cancelRawDisplayRange(this.rawDisplayRangeRevision);
+  private cancelDisplayRangeCalculation(): void {
+    if (!this.displayRangeLoading) return;
+    this.displayRangeRevision += 1;
+    this.displayRangeLoading = false;
+    void cancelRawDisplayRange(this.displayRangeRevision);
     this.updatePresentationAvailability();
   }
 
-  private async autoNormalizeRawDisplay(): Promise<void> {
+  private async autoNormalizeDisplay(): Promise<void> {
     const info = this.document;
-    if (!info || !isRawDisplayMode(this.displayMode) || this.rawDisplayRangeLoading) return;
-    const revision = ++this.rawDisplayRangeRevision;
+    if (!info || this.displayRangeLoading) return;
+    const revision = ++this.displayRangeRevision;
     const frame = this.frame;
-    this.rawDisplayRangeLoading = true;
+    this.displayRangeLoading = true;
     this.updatePresentationAvailability();
     try {
       const result = await calculateRawDisplayRange({
@@ -2968,23 +2919,22 @@ export class ErawApp {
         frame,
       });
       if (
-        revision !== this.rawDisplayRangeRevision
+        revision !== this.displayRangeRevision
         || this.document?.generation !== info.generation
         || this.frame !== frame
-        || !isRawDisplayMode(this.displayMode)
         || result.generation !== info.generation
         || result.displayRangeRevision !== revision
         || result.frame !== frame
       ) return;
       const window = automaticDisplayWindow(result, info.descriptor.bitDepth);
       if (!window) {
-        this.showToast(t("presentation.rawAutoUnavailable"), "error");
+        this.showToast(t("presentation.displayAutoUnavailable"), "error");
         return;
       }
-      this.rawDisplayWindow = window;
-      this.writeRawDisplayAdjustmentControls();
+      this.displayWindow = window;
+      this.writeDisplayAdjustmentControls();
       this.updateDisplay();
-      this.showToast(t("presentation.rawAutoApplied", {
+      this.showToast(t("presentation.displayAutoApplied", {
         blackPoint: window.blackPoint,
         whitePoint: window.whitePoint,
       }), "success");
@@ -2994,18 +2944,11 @@ export class ErawApp {
         this.reportRuntimeError(error, undefined, 5000, "display-range");
       }
     } finally {
-      if (revision === this.rawDisplayRangeRevision) {
-        this.rawDisplayRangeLoading = false;
+      if (revision === this.displayRangeRevision) {
+        this.displayRangeLoading = false;
         this.updatePresentationAvailability();
       }
     }
-  }
-
-  private setDemosaicDisplayExposure(value: number): void {
-    this.demosaicDisplayExposure = normalizeDemosaicDisplayExposure(value);
-    this.writeDemosaicDisplayExposureControls();
-    this.viewport.setDemosaicDisplayExposure(this.demosaicDisplayExposure);
-    this.updatePresentationAvailability();
   }
 
   private savePresentationSettings(): void {
@@ -3038,30 +2981,23 @@ export class ErawApp {
   }
 
   private updatePresentationAvailability(): void {
-    const rawAvailable = Boolean(this.document) && isRawDisplayMode(this.displayMode);
-    this.get("presentation-raw-exposure-row").classList.toggle("presentation-disabled", !rawAvailable);
-    this.get("presentation-raw-window-row").classList.toggle("presentation-disabled", !rawAvailable);
-    this.get("presentation-raw-auto-row").classList.toggle("presentation-disabled", !rawAvailable);
-    this.get<HTMLInputElement>("presentation-raw-exposure").disabled = !rawAvailable;
-    this.get<HTMLInputElement>("presentation-raw-black-point").disabled = !rawAvailable;
-    this.get<HTMLInputElement>("presentation-raw-white-point").disabled = !rawAvailable;
-    this.get<HTMLButtonElement>("decrease-raw-exposure").disabled = !rawAvailable
-      || this.rawDisplayExposure <= MIN_DISPLAY_EXPOSURE;
-    this.get<HTMLButtonElement>("increase-raw-exposure").disabled = !rawAvailable
-      || this.rawDisplayExposure >= MAX_DISPLAY_EXPOSURE;
-    const autoButton = this.get<HTMLButtonElement>("auto-normalize-raw");
-    autoButton.disabled = !rawAvailable || this.rawDisplayRangeLoading;
+    const displayAvailable = Boolean(this.document);
+    this.get("presentation-display-exposure-row").classList.toggle("presentation-disabled", !displayAvailable);
+    this.get("presentation-display-window-row").classList.toggle("presentation-disabled", !displayAvailable);
+    this.get("presentation-display-auto-row").classList.toggle("presentation-disabled", !displayAvailable);
+    this.get<HTMLInputElement>("presentation-display-exposure").disabled = !displayAvailable;
+    this.get<HTMLInputElement>("presentation-display-black-point").disabled = !displayAvailable;
+    this.get<HTMLInputElement>("presentation-display-white-point").disabled = !displayAvailable;
+    this.get<HTMLButtonElement>("decrease-display-exposure").disabled = !displayAvailable
+      || this.displayExposure <= MIN_DISPLAY_EXPOSURE;
+    this.get<HTMLButtonElement>("increase-display-exposure").disabled = !displayAvailable
+      || this.displayExposure >= MAX_DISPLAY_EXPOSURE;
+    const autoButton = this.get<HTMLButtonElement>("auto-normalize-display");
+    autoButton.disabled = !displayAvailable || this.displayRangeLoading;
     autoButton.textContent = t(
-      this.rawDisplayRangeLoading ? "presentation.normalizing" : "presentation.autoNormalize",
+      this.displayRangeLoading ? "presentation.normalizing" : "presentation.autoNormalize",
     );
-    this.get<HTMLButtonElement>("reset-raw-display").disabled = !rawAvailable;
-    const exposureAvailable = Boolean(this.document) && this.displayMode === "demosaic";
-    this.get("presentation-demosaic-exposure-row").classList.toggle("presentation-disabled", !exposureAvailable);
-    this.get<HTMLInputElement>("presentation-demosaic-exposure").disabled = !exposureAvailable;
-    this.get<HTMLButtonElement>("decrease-demosaic-exposure").disabled = !exposureAvailable
-      || this.demosaicDisplayExposure <= MIN_DEMOSAIC_DISPLAY_EXPOSURE;
-    this.get<HTMLButtonElement>("increase-demosaic-exposure").disabled = !exposureAvailable
-      || this.demosaicDisplayExposure >= MAX_DEMOSAIC_DISPLAY_EXPOSURE;
+    this.get<HTMLButtonElement>("reset-display-adjustment").disabled = !displayAvailable;
     const pixelValuesEnabled = this.get<HTMLInputElement>("presentation-pixel-values").checked;
     this.get<HTMLSelectElement>("presentation-demosaic-pixel-values").disabled = !pixelValuesEnabled;
     this.get("presentation-demosaic-values-row").classList.toggle("presentation-disabled", !pixelValuesEnabled);

@@ -14,8 +14,7 @@ import {
 } from "./pixel-value-display";
 import {
   displayValueToUnit,
-  effectiveDisplayExposure,
-} from "./raw-display-adjustment";
+} from "./display-adjustment";
 import type {
   DemosaicPixelValueMode,
   DisplayMode,
@@ -52,8 +51,7 @@ export interface PixelOverlayView {
   displayMode: DisplayMode;
   processing: ProcessingSettings;
   displayWindow: DisplayWindow;
-  rawDisplayExposure: number;
-  demosaicDisplayExposure: number;
+  displayExposure: number;
   transform: ViewportTransform;
   width: number;
   height: number;
@@ -254,15 +252,10 @@ export class PixelValueOverlay {
     this.context.textAlign = "center";
     this.context.textBaseline = "middle";
     this.context.lineJoin = "round";
-    const displayExposure = effectiveDisplayExposure(
-      view.displayMode,
-      view.rawDisplayExposure,
-      view.demosaicDisplayExposure,
-    );
     const normalize = (value: number) => displayValueToUnit(
       value,
       view.displayWindow,
-      displayExposure,
+      view.displayExposure,
     );
     const linearize = (value: number) => value <= 0.04045
       ? value / 12.92
