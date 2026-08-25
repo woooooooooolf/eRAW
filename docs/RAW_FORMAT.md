@@ -57,7 +57,7 @@ flowchart LR
     CFA -->|标准 Bayer| DEM
 ```
 
-Remosaic 只负责重排或同色站点重建，不包含颜色校正。预览归一化和 CFA 着色不会修改源 DN。
+Remosaic 只负责重排或同色站点重建，不包含颜色校正。RAW 强度与 CFA 点阵可用黑点/白点在 8-bit 预览量化前映射 DN，并在最终呈现时应用 EV；自动 P1/P99 范围只扫描当前整帧 L0 All DN。所有这些都属于预览状态，不修改源 DN、统计或导出，也不进入 Remosaic/Demosaic 算法。
 
 ## 多帧与不完整数据
 

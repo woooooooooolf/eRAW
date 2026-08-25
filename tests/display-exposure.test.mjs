@@ -3,8 +3,9 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
 
-const [source, appSource, viewportSource] = await Promise.all([
+const [source, rawExposureSource, appSource, viewportSource] = await Promise.all([
   readFile(new URL("../src/display-exposure.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/raw-display-adjustment.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/app.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/viewport.ts", import.meta.url), "utf8"),
 ]);
@@ -14,8 +15,18 @@ const { outputText } = ts.transpileModule(source, {
     target: ts.ScriptTarget.ES2022,
   },
 });
+const { outputText: rawExposureOutput } = ts.transpileModule(rawExposureSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const runnableSource = outputText.replace(
+  '"./raw-display-adjustment"',
+  JSON.stringify(`data:text/javascript;base64,${Buffer.from(rawExposureOutput).toString("base64")}`),
+);
 const exposure = await import(
-  `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`
+  `data:text/javascript;base64,${Buffer.from(runnableSource).toString("base64")}`
 );
 
 test("Demosaic display exposure clamps and rounds user input", () => {
@@ -48,10 +59,10 @@ test("the exposure control is continuous, temporary, and resets for a new docume
   assert.doesNotMatch(appSource, /localStorage[^\n]*demosaicDisplayExposure/);
 });
 
-test("WebGL applies exposure as a redraw-only Demosaic presentation uniform", () => {
-  assert.match(viewportSource, /uniform float u_demosaic_exposure/);
-  assert.match(viewportSource, /clamp\(tinted \* exp2\(u_demosaic_exposure\), 0\.0, 1\.0\)/);
-  assert.match(viewportSource, /effectiveDemosaicDisplayExposure\(this\.settings\.mode, this\.demosaicDisplayExposure\)/);
+test("WebGL applies exposure as a redraw-only presentation uniform", () => {
+  assert.match(viewportSource, /uniform float u_display_exposure/);
+  assert.match(viewportSource, /clamp\(tinted \* exp2\(u_display_exposure\), 0\.0, 1\.0\)/);
+  assert.match(viewportSource, /effectiveDisplayExposure\([\s\S]*?this\.rawDisplayExposure,[\s\S]*?this\.demosaicDisplayExposure/);
   const setter = viewportSource.match(/setDemosaicDisplayExposure\(exposure: number\)[\s\S]*?\n  \}/)?.[0] ?? "";
   assert.match(setter, /this\.requestDraw\(\)/);
   assert.doesNotMatch(setter, /clearTextures|renderRevision|renderTile/);

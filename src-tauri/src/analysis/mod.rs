@@ -22,6 +22,29 @@ pub struct AnalysisRequest {
     pub roi: Option<AnalysisRect>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawDisplayRangeRequest {
+    pub generation: u64,
+    pub display_range_revision: u64,
+    pub frame: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawDisplayRangeResult {
+    pub generation: u64,
+    pub display_range_revision: u64,
+    pub frame: u64,
+    pub expected_count: u64,
+    pub valid_count: u64,
+    pub missing_count: u64,
+    pub minimum: Option<u16>,
+    pub maximum: Option<u16>,
+    pub p1: Option<u16>,
+    pub p99: Option<u16>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalysisSnapshot {
@@ -412,6 +435,47 @@ pub fn analyze_image(
     })
 }
 
+pub fn calculate_raw_display_range(
+    data: &[u8],
+    descriptor: &RawDescriptor,
+    layout: &RawLayout,
+    request: &RawDisplayRangeRequest,
+    should_continue: impl Fn() -> bool,
+) -> Result<RawDisplayRangeResult, String> {
+    if request.frame >= layout.frame_count {
+        return Err("display_range_invalid_frame".into());
+    }
+    let bin_count = 1usize << descriptor.bit_depth.min(16);
+    let mut accumulator = Accumulator::new(bin_count);
+    for y in 0..descriptor.height {
+        if y % 32 == 0 && !should_continue() {
+            return Err("stale_display_range".into());
+        }
+        for x in 0..descriptor.width {
+            accumulator.expect();
+            if let Some(value) = read_pixel(data, descriptor, layout, request.frame, x, y) {
+                accumulator.push(value);
+            }
+        }
+    }
+    if !should_continue() {
+        return Err("stale_display_range".into());
+    }
+    let summary = accumulator.summary();
+    Ok(RawDisplayRangeResult {
+        generation: request.generation,
+        display_range_revision: request.display_range_revision,
+        frame: request.frame,
+        expected_count: summary.expected_count,
+        valid_count: summary.valid_count,
+        missing_count: summary.missing_count,
+        minimum: summary.minimum,
+        maximum: summary.maximum,
+        p1: summary.p1,
+        p99: summary.p99,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -451,6 +515,22 @@ mod tests {
         .unwrap()
     }
 
+    fn display_range(data: &[u8], descriptor: &RawDescriptor) -> RawDisplayRangeResult {
+        let (layout, _) = calculate_layout(descriptor, data.len() as u64);
+        calculate_raw_display_range(
+            data,
+            descriptor,
+            &layout,
+            &RawDisplayRangeRequest {
+                generation: 1,
+                display_range_revision: 2,
+                frame: 0,
+            },
+            || true,
+        )
+        .unwrap()
+    }
+
     #[test]
     fn mono_summary_histogram_and_population_variance_are_exact() {
         let descriptor = descriptor(3, 2, CfaPattern::Mono);
@@ -480,6 +560,34 @@ mod tests {
         assert_eq!(all.summary.mean, Some(20.0));
         assert_eq!(all.row_profile[1].valid_count, 0);
         assert_eq!(all.row_profile[1].mean, None);
+    }
+
+    #[test]
+    fn raw_display_range_uses_exact_full_frame_all_dn_percentiles() {
+        let descriptor = descriptor(100, 1, CfaPattern::Mono);
+        let data = (0..100).collect::<Vec<u8>>();
+        let result = display_range(&data, &descriptor);
+        assert_eq!(result.generation, 1);
+        assert_eq!(result.display_range_revision, 2);
+        assert_eq!(result.frame, 0);
+        assert_eq!(result.expected_count, 100);
+        assert_eq!(result.valid_count, 100);
+        assert_eq!(result.missing_count, 0);
+        assert_eq!(result.minimum, Some(0));
+        assert_eq!(result.maximum, Some(99));
+        assert_eq!(result.p1, Some(0));
+        assert_eq!(result.p99, Some(98));
+    }
+
+    #[test]
+    fn raw_display_range_ignores_missing_samples() {
+        let descriptor = descriptor(4, 2, CfaPattern::Mono);
+        let result = display_range(&[10, 20, 30], &descriptor);
+        assert_eq!(result.expected_count, 8);
+        assert_eq!(result.valid_count, 3);
+        assert_eq!(result.missing_count, 5);
+        assert_eq!(result.minimum, Some(10));
+        assert_eq!(result.maximum, Some(30));
     }
 
     #[test]
@@ -546,5 +654,24 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error, "stale_analysis");
+    }
+
+    #[test]
+    fn cancellation_stops_raw_display_range_scan_cooperatively() {
+        let descriptor = descriptor(64, 64, CfaPattern::Mono);
+        let (layout, _) = calculate_layout(&descriptor, 4096);
+        let error = calculate_raw_display_range(
+            &[0; 4096],
+            &descriptor,
+            &layout,
+            &RawDisplayRangeRequest {
+                generation: 1,
+                display_range_revision: 2,
+                frame: 0,
+            },
+            || false,
+        )
+        .unwrap_err();
+        assert_eq!(error, "stale_display_range");
     }
 }

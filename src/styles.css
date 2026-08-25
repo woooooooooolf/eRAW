@@ -776,6 +776,13 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
 .presentation-color-row input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
 .presentation-color-row input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
 .presentation-exposure-control .number-input input { padding-right: 26px; font-family: var(--font-mono); }
+.presentation-window-control { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 5px; min-width: 0; }
+.presentation-window-control > i { color: var(--dim); font-style: normal; font-size: var(--font-sm); }
+.presentation-window-control input { padding-right: 28px; font-family: var(--font-mono); }
+.presentation-window-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; min-width: 0; }
+.presentation-window-actions > button { min-width: 0; height: 29px; padding: 0 8px; overflow: hidden; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); background: var(--control-surface); font-size: var(--font-xs); text-overflow: ellipsis; white-space: nowrap; }
+.presentation-window-actions > button:hover:not(:disabled) { color: var(--text); border-color: rgb(var(--accent-rgb) / .4); background: rgb(var(--accent-rgb) / .1); }
+.presentation-window-actions > button:disabled { opacity: .45; cursor: default; }
 .parameter-row.presentation-disabled { opacity: .46; }
 
 .warning-item { display: flex; gap: 8px; padding: 8px; border-radius: 5px; background: rgba(255, 255, 255, .018); }

@@ -54,6 +54,15 @@ const runnableSource = outputText
   .replaceAll(
     '"./pixel-grid-rendering"',
     JSON.stringify(dataUrl(pixelGridSource)),
+  )
+  .replaceAll(
+    '"./raw-display-adjustment"',
+    JSON.stringify(dataUrl(`
+      export function effectiveDisplayExposure() { return 0; }
+      export function displayValueToUnit(value, window) {
+        return Math.max(0, Math.min(1, (value - window.blackPoint) / (window.whitePoint - window.blackPoint)));
+      }
+    `)),
   );
 const [{ PixelValueOverlay }, api] = await Promise.all([
   import(dataUrl(runnableSource)),

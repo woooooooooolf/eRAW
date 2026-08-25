@@ -10,6 +10,8 @@ import type {
   ExportResult,
   PixelInspectionRequest,
   PixelSample,
+  RawDisplayRangeRequest,
+  RawDisplayRangeResult,
   RawDescriptor,
   TileRequest,
 } from "./types";
@@ -78,6 +80,16 @@ export function analyzeRawImage(request: AnalysisRequest): Promise<AnalysisResul
 
 export function cancelRawAnalysis(analysisRevision: number): Promise<void> {
   return invoke("cancel_raw_analysis", { analysisRevision });
+}
+
+export function calculateRawDisplayRange(
+  request: RawDisplayRangeRequest,
+): Promise<RawDisplayRangeResult> {
+  return invoke("calculate_raw_display_range", { request });
+}
+
+export function cancelRawDisplayRange(displayRangeRevision: number): Promise<void> {
+  return invoke("cancel_raw_display_range", { displayRangeRevision });
 }
 
 export function exportDocument(

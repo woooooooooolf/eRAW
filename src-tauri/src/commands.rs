@@ -1,4 +1,7 @@
-use crate::analysis::{AnalysisRequest, AnalysisResult, analyze_image};
+use crate::analysis::{
+    AnalysisRequest, AnalysisResult, RawDisplayRangeRequest, RawDisplayRangeResult, analyze_image,
+    calculate_raw_display_range as calculate_raw_display_range_impl,
+};
 use crate::raw::{
     ExportRequest, ExportResult, PixelInspectionRequest, PixelSample, RawDescriptor, RawLayout,
     RawWarning, TileRequest, calculate_layout, cfa_name_at, export_raw_cancellable, inspect_pixels,
@@ -51,9 +54,12 @@ impl From<String> for CommandError {
             "stale_generation" => "stale_generation",
             "stale_render" => "stale_render",
             "stale_analysis" => "stale_analysis",
+            "stale_display_range" => "stale_display_range",
             "export_cancelled" => "export_cancelled",
             "analysis_invalid_roi" => "analysis_invalid_roi",
             "analysis_invalid_frame" => "analysis_invalid_frame",
+            "display_range_invalid_frame" => "display_range_invalid_frame",
+            "display_invalid_window" => "display_invalid_window",
             "裁剪宽度和高度必须大于 0" => "export_invalid_crop",
             "裁剪区域超出有效图像范围" => "export_crop_outside",
             "输出位深必须在 8 到 16 bit 之间" => "export_invalid_depth",
@@ -128,6 +134,7 @@ pub struct AppState {
     generation_clock: Arc<AtomicU64>,
     preview_revision: Arc<AtomicU64>,
     analysis_revision: Arc<AtomicU64>,
+    display_range_revision: Arc<AtomicU64>,
     export_revision: Arc<AtomicU64>,
     preview_cache: Arc<Mutex<PreviewCache>>,
 }
@@ -139,6 +146,7 @@ impl Default for AppState {
             generation_clock: Arc::new(AtomicU64::new(0)),
             preview_revision: Arc::new(AtomicU64::new(0)),
             analysis_revision: Arc::new(AtomicU64::new(0)),
+            display_range_revision: Arc::new(AtomicU64::new(0)),
             export_revision: Arc::new(AtomicU64::new(0)),
             preview_cache: Arc::new(Mutex::new(PreviewCache::default())),
         }
@@ -304,8 +312,8 @@ pub async fn render_raw_tile(
         request.frame,
         request.mode,
         request.processing,
-        request.display_min,
-        request.display_max,
+        request.display_window.black_point,
+        request.display_window.white_point,
         request.level,
         request.tile_x,
         request.tile_y,
@@ -436,6 +444,65 @@ pub fn cancel_raw_analysis(analysis_revision: u64, state: State<'_, AppState>) {
     state
         .analysis_revision
         .fetch_max(analysis_revision, Ordering::AcqRel);
+}
+
+#[tauri::command]
+pub async fn calculate_raw_display_range(
+    request: RawDisplayRangeRequest,
+    state: State<'_, AppState>,
+) -> Result<RawDisplayRangeResult, CommandError> {
+    let previous_revision = state
+        .display_range_revision
+        .fetch_max(request.display_range_revision, Ordering::AcqRel);
+    if previous_revision > request.display_range_revision {
+        return Err(CommandError::new("stale_display_range"));
+    }
+    let (map, descriptor, layout, generation) = {
+        let guard = lock_document(&state)?;
+        let document = guard
+            .as_ref()
+            .ok_or_else(|| CommandError::new("document_not_open"))?;
+        (
+            document.map.clone(),
+            document.descriptor.clone(),
+            document.layout,
+            document.generation,
+        )
+    };
+    if request.generation != generation {
+        return Err(CommandError::new("stale_generation"));
+    }
+    let generation_clock = state.generation_clock.clone();
+    let display_range_revision = state.display_range_revision.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes: &[u8] = match map.as_ref() {
+            Some(value) => value.as_ref(),
+            None => &[],
+        };
+        let result =
+            calculate_raw_display_range_impl(bytes, &descriptor, &layout, &request, || {
+                generation_clock.load(Ordering::Acquire) == request.generation
+                    && display_range_revision.load(Ordering::Acquire)
+                        == request.display_range_revision
+            })
+            .map_err(CommandError::from)?;
+        if generation_clock.load(Ordering::Acquire) != request.generation {
+            return Err(CommandError::new("stale_generation"));
+        }
+        if display_range_revision.load(Ordering::Acquire) != request.display_range_revision {
+            return Err(CommandError::new("stale_display_range"));
+        }
+        Ok(result)
+    })
+    .await
+    .map_err(|error| CommandError::new("display_range_task_failed").with_cause(error))?
+}
+
+#[tauri::command]
+pub fn cancel_raw_display_range(display_range_revision: u64, state: State<'_, AppState>) {
+    state
+        .display_range_revision
+        .fetch_max(display_range_revision, Ordering::AcqRel);
 }
 
 #[tauri::command]

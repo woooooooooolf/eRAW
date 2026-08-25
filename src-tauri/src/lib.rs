@@ -3,9 +3,10 @@ mod commands;
 mod raw;
 
 use commands::{
-    AppState, analyze_raw_image, cancel_raw_analysis, cancel_raw_export, close_document,
-    export_document, inspect_raw_pixels, open_document, render_raw_tile, sample_raw_pixel,
-    save_png, update_descriptor,
+    AppState, analyze_raw_image, calculate_raw_display_range, cancel_raw_analysis,
+    cancel_raw_display_range, cancel_raw_export, close_document, export_document,
+    inspect_raw_pixels, open_document, render_raw_tile, sample_raw_pixel, save_png,
+    update_descriptor,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -22,6 +23,8 @@ pub fn run() {
             inspect_raw_pixels,
             analyze_raw_image,
             cancel_raw_analysis,
+            calculate_raw_display_range,
+            cancel_raw_display_range,
             cancel_raw_export,
             sample_raw_pixel,
             export_document,

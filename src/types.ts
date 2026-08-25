@@ -16,6 +16,11 @@ export type DisplayMode = "raw" | "bayer" | "remosaic" | "demosaic" | "red" | "g
 export type DemosaicPixelValueMode = "rawDn" | "rgb";
 export type DemosaicAlgorithm = "bilinear";
 
+export interface DisplayWindow {
+  blackPoint: number;
+  whitePoint: number;
+}
+
 export interface RemosaicOptions {
   sameColorReconstruction: boolean;
 }
@@ -79,8 +84,7 @@ export interface TileRequest {
   tileSize: number;
   mode: DisplayMode;
   processing: ProcessingSettings;
-  displayMin: number;
-  displayMax: number;
+  displayWindow: DisplayWindow;
 }
 
 export interface PixelInspectionRequest {
@@ -113,6 +117,25 @@ export interface AnalysisRequest {
   analysisRevision: number;
   frame: number;
   roi: AnalysisRect | null;
+}
+
+export interface RawDisplayRangeRequest {
+  generation: number;
+  displayRangeRevision: number;
+  frame: number;
+}
+
+export interface RawDisplayRangeResult {
+  generation: number;
+  displayRangeRevision: number;
+  frame: number;
+  expectedCount: number;
+  validCount: number;
+  missingCount: number;
+  minimum: number | null;
+  maximum: number | null;
+  p1: number | null;
+  p99: number | null;
 }
 
 export interface StatisticalSummary {

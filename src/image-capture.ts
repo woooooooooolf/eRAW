@@ -3,13 +3,14 @@ import {
   channelTint,
   type ChannelRenderingMode,
 } from "./channel-rendering";
-import { effectiveDemosaicDisplayExposure } from "./display-exposure";
+import { effectiveDisplayExposure } from "./raw-display-adjustment";
 import {
   normalizeMissingPixelColor,
   type MissingPixelAppearance,
 } from "./missing-pixel-rendering";
 import type {
   DisplayMode,
+  DisplayWindow,
   ProcessingSettings,
   TileRequest,
 } from "./types";
@@ -35,9 +36,9 @@ export interface PreviewCaptureSnapshot {
   imageHeight: number;
   mode: DisplayMode;
   processing: ProcessingSettings;
-  displayMin: number;
-  displayMax: number;
+  displayWindow: DisplayWindow;
   channelRendering: ChannelRenderingMode;
+  rawDisplayExposure: number;
   demosaicDisplayExposure: number;
   missingPixelAppearance: MissingPixelAppearance;
 }
@@ -91,11 +92,17 @@ export function applyPreviewPresentation(
   mode: DisplayMode,
   rendering: ChannelRenderingMode,
   missing: MissingPixelAppearance,
+  rawDisplayExposure = 0,
   demosaicDisplayExposure = 0,
   tileSize = CAPTURE_TILE_SIZE,
 ): Uint8Array {
   const tint = channelTint(mode, rendering);
-  const exposureGain = 2 ** effectiveDemosaicDisplayExposure(mode, demosaicDisplayExposure);
+  const displayExposure = effectiveDisplayExposure(
+    mode,
+    rawDisplayExposure,
+    demosaicDisplayExposure,
+  );
+  const exposureGain = 2 ** displayExposure;
   const solid = solidColor(missing.color);
   for (let offset = 0; offset + 3 < bytes.length; offset += 4) {
     const alpha = bytes[offset + 3];
@@ -122,7 +129,7 @@ export function applyPreviewPresentation(
       bytes[offset + 1] = Math.round(bytes[offset + 1] * tint[1]);
       bytes[offset + 2] = Math.round(bytes[offset + 2] * tint[2]);
     }
-    if (alpha !== 0 && mode === "demosaic" && demosaicDisplayExposure !== 0) {
+    if (alpha !== 0 && displayExposure !== 0) {
       bytes[offset] = Math.min(255, Math.round(bytes[offset] * exposureGain));
       bytes[offset + 1] = Math.min(255, Math.round(bytes[offset + 1] * exposureGain));
       bytes[offset + 2] = Math.min(255, Math.round(bytes[offset + 2] * exposureGain));
@@ -162,8 +169,7 @@ export async function renderPreviewCanvas(
         tileSize: CAPTURE_TILE_SIZE,
         mode: snapshot.mode,
         processing: snapshot.processing,
-        displayMin: snapshot.displayMin,
-        displayMax: snapshot.displayMax,
+        displayWindow: snapshot.displayWindow,
       });
       applyPreviewPresentation(
         bytes,
@@ -172,6 +178,7 @@ export async function renderPreviewCanvas(
         snapshot.mode,
         snapshot.channelRendering,
         snapshot.missingPixelAppearance,
+        snapshot.rawDisplayExposure,
         snapshot.demosaicDisplayExposure,
       );
       context.putImageData(

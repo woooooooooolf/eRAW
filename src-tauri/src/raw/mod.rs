@@ -433,6 +433,13 @@ impl Default for ProcessingSettings {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DisplayWindow {
+    pub black_point: u16,
+    pub white_point: u16,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TileRequest {
     pub generation: u64,
     pub render_revision: u64,
@@ -443,8 +450,7 @@ pub struct TileRequest {
     pub tile_size: u16,
     pub mode: DisplayMode,
     pub processing: ProcessingSettings,
-    pub display_min: u16,
-    pub display_max: u16,
+    pub display_window: DisplayWindow,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -664,6 +670,37 @@ fn normalize(value: u16, low: u16, high: u16) -> u8 {
     }
     let value = value.clamp(low, high);
     (((u32::from(value - low) * 255) + u32::from(high - low) / 2) / u32::from(high - low)) as u8
+}
+
+fn descriptor_full_scale(bit_depth: u8) -> u16 {
+    if bit_depth >= 16 {
+        u16::MAX
+    } else {
+        (1u16 << bit_depth.max(1)) - 1
+    }
+}
+
+fn validate_display_window(
+    descriptor: &RawDescriptor,
+    window: &DisplayWindow,
+) -> Result<(u16, u16), String> {
+    let full_scale = descriptor_full_scale(descriptor.bit_depth);
+    if window.black_point >= window.white_point || window.white_point > full_scale {
+        return Err("display_invalid_window".into());
+    }
+    Ok((window.black_point, window.white_point))
+}
+
+fn resolve_display_window(
+    descriptor: &RawDescriptor,
+    mode: DisplayMode,
+    window: &DisplayWindow,
+) -> Result<(u16, u16), String> {
+    if matches!(mode, DisplayMode::Raw | DisplayMode::Bayer) {
+        validate_display_window(descriptor, window)
+    } else {
+        Ok((0, descriptor_full_scale(descriptor.bit_depth)))
+    }
 }
 
 fn remosaic_output_site(d: &RawDescriptor, x: u32, y: u32) -> CfaSite {
@@ -1139,15 +1176,8 @@ pub fn render_tile_cancellable(
         .checked_mul(u64::from(tile_size))
         .and_then(|v| v.checked_mul(u64::from(scale)))
         .ok_or("瓦片坐标溢出")?;
-    let max_value = if request.display_max == 0 {
-        if d.bit_depth >= 16 {
-            u16::MAX
-        } else {
-            (1u16 << d.bit_depth.max(1)) - 1
-        }
-    } else {
-        request.display_max
-    };
+    let (display_black, display_white) =
+        resolve_display_window(d, request.mode, &request.display_window)?;
     let mut output = vec![0u8; tile_size as usize * tile_size as usize * 4];
     for oy in 0..tile_size {
         if !is_current() {
@@ -1207,9 +1237,9 @@ pub fn render_tile_cancellable(
                 )
             };
             if let Some(rgb) = rgba {
-                output[index] = normalize(rgb[0], request.display_min, max_value);
-                output[index + 1] = normalize(rgb[1], request.display_min, max_value);
-                output[index + 2] = normalize(rgb[2], request.display_min, max_value);
+                output[index] = normalize(rgb[0], display_black, display_white);
+                output[index + 1] = normalize(rgb[1], display_black, display_white);
+                output[index + 2] = normalize(rgb[2], display_black, display_white);
                 output[index + 3] = 255;
             } else {
                 // Alpha 254 is an internal preview marker. The WebGL shader
@@ -2151,8 +2181,10 @@ mod tests {
             tile_size: 64,
             mode: DisplayMode::Raw,
             processing: ProcessingSettings::default(),
-            display_min: 0,
-            display_max: 255,
+            display_window: DisplayWindow {
+                black_point: 0,
+                white_point: 255,
+            },
         };
         let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
         assert_eq!(&tile[0..4], &[128, 128, 128, 255]);
@@ -2182,6 +2214,100 @@ mod tests {
     }
 
     #[test]
+    fn tile_renderer_maps_explicit_display_window_before_preview_quantization() {
+        let descriptor = RawDescriptor {
+            width: 64,
+            height: 1,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Mono,
+            ..RawDescriptor::default()
+        };
+        let bytes = [0, 128, 255];
+        let (layout, _) = calculate_layout(&descriptor, bytes.len() as u64);
+        let request = TileRequest {
+            generation: 1,
+            render_revision: 1,
+            frame: 0,
+            level: 0,
+            tile_x: 0,
+            tile_y: 0,
+            tile_size: 64,
+            mode: DisplayMode::Raw,
+            processing: ProcessingSettings::default(),
+            display_window: DisplayWindow {
+                black_point: 64,
+                white_point: 192,
+            },
+        };
+        let tile = render_tile(&bytes, &descriptor, &layout, &request).unwrap();
+        assert_eq!(&tile[0..4], &[0, 0, 0, 255]);
+        assert_eq!(&tile[4..8], &[128, 128, 128, 255]);
+        assert_eq!(&tile[8..12], &[255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn tile_renderer_rejects_invalid_display_window() {
+        let descriptor = RawDescriptor {
+            width: 64,
+            height: 1,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Mono,
+            ..RawDescriptor::default()
+        };
+        let bytes = [0; 64];
+        let (layout, _) = calculate_layout(&descriptor, bytes.len() as u64);
+        let request = TileRequest {
+            generation: 1,
+            render_revision: 1,
+            frame: 0,
+            level: 0,
+            tile_x: 0,
+            tile_y: 0,
+            tile_size: 64,
+            mode: DisplayMode::Raw,
+            processing: ProcessingSettings::default(),
+            display_window: DisplayWindow {
+                black_point: 100,
+                white_point: 100,
+            },
+        };
+        assert_eq!(
+            render_tile(&bytes, &descriptor, &layout, &request).unwrap_err(),
+            "display_invalid_window"
+        );
+    }
+
+    #[test]
+    fn processed_modes_ignore_raw_display_window() {
+        let descriptor = RawDescriptor {
+            bit_depth: 10,
+            ..RawDescriptor::default()
+        };
+        let custom = DisplayWindow {
+            black_point: 100,
+            white_point: 900,
+        };
+        assert_eq!(
+            resolve_display_window(&descriptor, DisplayMode::Raw, &custom).unwrap(),
+            (100, 900)
+        );
+        for mode in [
+            DisplayMode::Remosaic,
+            DisplayMode::Demosaic,
+            DisplayMode::Red,
+            DisplayMode::Green,
+            DisplayMode::Blue,
+        ] {
+            assert_eq!(
+                resolve_display_window(&descriptor, mode, &custom).unwrap(),
+                (0, 1023)
+            );
+        }
+    }
+
+    #[test]
     fn raw_preview_levels_average_the_complete_source_region() {
         let d = RawDescriptor {
             width: 64,
@@ -2205,8 +2331,10 @@ mod tests {
             tile_size: 64,
             mode: DisplayMode::Raw,
             processing: ProcessingSettings::default(),
-            display_min: 0,
-            display_max: 255,
+            display_window: DisplayWindow {
+                black_point: 0,
+                white_point: 255,
+            },
         };
         let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
         assert_eq!(&tile[0..4], &[128, 128, 128, 255]);
@@ -2246,8 +2374,10 @@ mod tests {
                 tile_size: 64,
                 mode: DisplayMode::Bayer,
                 processing: ProcessingSettings::default(),
-                display_min: 0,
-                display_max: 255,
+                display_window: DisplayWindow {
+                    black_point: 0,
+                    white_point: 255,
+                },
             };
             let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
             let pixel = |x: usize, y: usize| {
@@ -2319,8 +2449,10 @@ mod tests {
                         tile_size: 64,
                         mode,
                         processing: ProcessingSettings::default(),
-                        display_min: 0,
-                        display_max: 255,
+                        display_window: DisplayWindow {
+                            black_point: 0,
+                            white_point: 255,
+                        },
                     },
                 )
                 .unwrap();
@@ -2374,8 +2506,10 @@ mod tests {
                     tile_size: 64,
                     mode: DisplayMode::Remosaic,
                     processing: ProcessingSettings::default(),
-                    display_min: 0,
-                    display_max: 255,
+                    display_window: DisplayWindow {
+                        black_point: 0,
+                        white_point: 255,
+                    },
                 },
             )
             .unwrap();
@@ -2457,8 +2591,10 @@ mod tests {
                     tile_size: 64,
                     mode: DisplayMode::Bayer,
                     processing: ProcessingSettings::default(),
-                    display_min: 0,
-                    display_max: 255,
+                    display_window: DisplayWindow {
+                        black_point: 0,
+                        white_point: 255,
+                    },
                 },
             )
             .unwrap()
@@ -2514,8 +2650,10 @@ mod tests {
                         tile_size: 256,
                         mode,
                         processing: ProcessingSettings::default(),
-                        display_min: 0,
-                        display_max: 0x3fff,
+                        display_window: DisplayWindow {
+                            black_point: 0,
+                            white_point: 0x3fff,
+                        },
                     },
                 )
                 .unwrap()
@@ -2588,8 +2726,10 @@ mod tests {
                     tile_size: 64,
                     mode: DisplayMode::Demosaic,
                     processing: ProcessingSettings::default(),
-                    display_min: 0,
-                    display_max: 255,
+                    display_window: DisplayWindow {
+                        black_point: 0,
+                        white_point: 255,
+                    },
                 },
             )
             .unwrap()
@@ -2621,8 +2761,10 @@ mod tests {
             tile_size: 64,
             mode: DisplayMode::Raw,
             processing: ProcessingSettings::default(),
-            display_min: 0,
-            display_max: 255,
+            display_window: DisplayWindow {
+                black_point: 0,
+                white_point: 255,
+            },
         };
         let result = render_tile_cancellable(&bytes, &d, &layout, &request, || false);
         assert_eq!(result.unwrap_err(), "stale_generation");
@@ -2665,8 +2807,10 @@ mod tests {
             tile_size: 64,
             mode: DisplayMode::Demosaic,
             processing: ProcessingSettings::default(),
-            display_min: 0,
-            display_max: 1023,
+            display_window: DisplayWindow {
+                black_point: 0,
+                white_point: 1023,
+            },
         };
         let tile = render_tile(&bytes, &d, &layout, &request).unwrap();
         assert_eq!(tile.len(), 64 * 64 * 4);

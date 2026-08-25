@@ -4,7 +4,7 @@ import {
   channelTint,
   type ChannelRenderingMode,
 } from "./channel-rendering";
-import { effectiveDemosaicDisplayExposure } from "./display-exposure";
+import { effectiveDisplayExposure } from "./raw-display-adjustment";
 import {
   drawViewportBackground,
   renderPreviewCanvas,
@@ -22,6 +22,7 @@ import {
   DEFAULT_PROCESSING_SETTINGS,
   type DemosaicPixelValueMode,
   type DisplayMode,
+  type DisplayWindow,
   type DocumentInfo,
   type ProcessingSettings,
   type TileRequest,
@@ -45,8 +46,7 @@ const MAX_ZOOM = 64;
 interface DisplaySettings {
   mode: DisplayMode;
   processing: ProcessingSettings;
-  displayMin: number;
-  displayMax: number;
+  displayWindow: DisplayWindow;
 }
 
 interface TextureEntry {
@@ -102,7 +102,7 @@ uniform sampler2D u_texture;
 uniform vec4 u_rect;
 uniform float u_opacity;
 uniform vec3 u_channel_tint;
-uniform float u_demosaic_exposure;
+uniform float u_display_exposure;
 uniform int u_missing_pattern;
 uniform vec3 u_missing_color;
 in vec2 v_image_point;
@@ -132,7 +132,7 @@ void main() {
   }
   float spread = max(max(abs(color.r - color.g), abs(color.g - color.b)), abs(color.r - color.b));
   vec3 tinted = mix(color.rgb * u_channel_tint, color.rgb, step(0.5 / 255.0, spread));
-  vec3 exposed = clamp(tinted * exp2(u_demosaic_exposure), 0.0, 1.0);
+  vec3 exposed = clamp(tinted * exp2(u_display_exposure), 0.0, 1.0);
   outColor = vec4(exposed, color.a * u_opacity);
 }`;
 
@@ -179,7 +179,7 @@ export class RawViewport {
   private zoomLocation!: WebGLUniformLocation;
   private opacityLocation!: WebGLUniformLocation;
   private channelTintLocation!: WebGLUniformLocation;
-  private demosaicExposureLocation!: WebGLUniformLocation;
+  private displayExposureLocation!: WebGLUniformLocation;
   private missingPatternLocation!: WebGLUniformLocation;
   private missingColorLocation!: WebGLUniformLocation;
   private readonly horizontalScrollbar: HTMLElement;
@@ -195,8 +195,7 @@ export class RawViewport {
   private settings: DisplaySettings = {
     mode: "bayer",
     processing: DEFAULT_PROCESSING_SETTINGS,
-    displayMin: 0,
-    displayMax: 0,
+    displayWindow: { blackPoint: 0, whitePoint: 1023 },
   };
   private textures = new Map<string, TextureEntry>();
   private inFlight = new Map<string, number>();
@@ -221,6 +220,7 @@ export class RawViewport {
   private maxTextures = DEFAULT_MAX_TEXTURES;
   private wheelSensitivity = 0.0015;
   private channelRendering: ChannelRenderingMode = "color";
+  private rawDisplayExposure = 0;
   private demosaicDisplayExposure = 0;
   private missingPixelAppearance: MissingPixelAppearance = {
     pattern: "darkCheckerboard",
@@ -292,7 +292,7 @@ export class RawViewport {
     this.zoomLocation = this.requireUniform(this.program, "u_zoom");
     this.opacityLocation = this.requireUniform(this.program, "u_opacity");
     this.channelTintLocation = this.requireUniform(this.program, "u_channel_tint");
-    this.demosaicExposureLocation = this.requireUniform(this.program, "u_demosaic_exposure");
+    this.displayExposureLocation = this.requireUniform(this.program, "u_display_exposure");
     this.missingPatternLocation = this.requireUniform(this.program, "u_missing_pattern");
     this.missingColorLocation = this.requireUniform(this.program, "u_missing_color");
     const buffer = gl.createBuffer();
@@ -413,8 +413,8 @@ export class RawViewport {
   setDisplay(settings: DisplaySettings): void {
     if (
       settings.mode === this.settings.mode
-      && settings.displayMin === this.settings.displayMin
-      && settings.displayMax === this.settings.displayMax
+      && settings.displayWindow.blackPoint === this.settings.displayWindow.blackPoint
+      && settings.displayWindow.whitePoint === this.settings.displayWindow.whitePoint
       && settings.processing.demosaicAlgorithm === this.settings.processing.demosaicAlgorithm
       && settings.processing.remosaic.sameColorReconstruction
         === this.settings.processing.remosaic.sameColorReconstruction
@@ -433,6 +433,12 @@ export class RawViewport {
   setChannelRendering(mode: ChannelRenderingMode): void {
     if (mode === this.channelRendering) return;
     this.channelRendering = mode;
+    this.requestDraw();
+  }
+
+  setRawDisplayExposure(exposure: number): void {
+    if (exposure === this.rawDisplayExposure) return;
+    this.rawDisplayExposure = exposure;
     this.requestDraw();
   }
 
@@ -512,9 +518,9 @@ export class RawViewport {
         ...this.settings.processing,
         remosaic: { ...this.settings.processing.remosaic },
       },
-      displayMin: this.settings.displayMin,
-      displayMax: this.settings.displayMax,
+      displayWindow: { ...this.settings.displayWindow },
       channelRendering: this.channelRendering,
+      rawDisplayExposure: this.rawDisplayExposure,
       demosaicDisplayExposure: this.demosaicDisplayExposure,
       missingPixelAppearance: { ...this.missingPixelAppearance },
     };
@@ -1054,7 +1060,7 @@ export class RawViewport {
 
   private tileKey(level: number, x: number, y: number): string {
     if (!this.document) return "";
-    return `${this.document.generation}:${this.frame}:${this.settings.mode}:${this.settings.processing.demosaicAlgorithm}:${this.settings.processing.remosaic.sameColorReconstruction}:${this.settings.displayMin}:${this.settings.displayMax}:${level}:${x}:${y}`;
+    return `${this.document.generation}:${this.frame}:${this.settings.mode}:${this.settings.processing.demosaicAlgorithm}:${this.settings.processing.remosaic.sameColorReconstruction}:${this.settings.displayWindow.blackPoint}:${this.settings.displayWindow.whitePoint}:${level}:${x}:${y}`;
   }
 
   private visibleTiles(level: number): Array<{ x: number; y: number }> {
@@ -1107,8 +1113,12 @@ export class RawViewport {
     const tint = channelTint(this.settings.mode, this.channelRendering);
     gl.uniform3f(this.channelTintLocation, tint[0], tint[1], tint[2]);
     gl.uniform1f(
-      this.demosaicExposureLocation,
-      effectiveDemosaicDisplayExposure(this.settings.mode, this.demosaicDisplayExposure),
+      this.displayExposureLocation,
+      effectiveDisplayExposure(
+        this.settings.mode,
+        this.rawDisplayExposure,
+        this.demosaicDisplayExposure,
+      ),
     );
     gl.uniform1i(
       this.missingPatternLocation,
@@ -1147,6 +1157,9 @@ export class RawViewport {
       frame: this.frame,
       displayMode: this.settings.mode,
       processing: this.settings.processing,
+      displayWindow: this.settings.displayWindow,
+      rawDisplayExposure: this.rawDisplayExposure,
+      demosaicDisplayExposure: this.demosaicDisplayExposure,
       transform: this.transform,
       width: this.width,
       height: this.height,
@@ -1202,8 +1215,7 @@ export class RawViewport {
       tileSize: TILE_SIZE,
       mode: this.settings.mode,
       processing: this.settings.processing,
-      displayMin: this.settings.displayMin,
-      displayMax: this.settings.displayMax,
+      displayWindow: this.settings.displayWindow,
     };
     void renderTile(request).then((bytes) => {
       if (!this.document || revision !== this.renderRevision || key !== this.tileKey(level, tileX, tileY)) return;
