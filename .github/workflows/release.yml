@@ -80,7 +80,7 @@ jobs:
       - name: Build release executable
         run: npm.cmd run release
 
-      - name: Prepare release asset
+      - name: Prepare release package
         shell: pwsh
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -88,13 +88,15 @@ jobs:
         run: |
           $tag = $env:RELEASE_TAG
           $assetDirectory = "artifacts"
-          $assetPath = "$assetDirectory/eRAW-$tag-windows-x64.exe"
-          $licensePath = "$assetDirectory/THIRD_PARTY_LICENSES.txt"
-          $sbomPath = "$assetDirectory/eRAW-$tag.spdx.json"
-          $checksumPath = "$assetDirectory/eRAW-$tag-SHA256SUMS.txt"
+          $packageDirectory = "$assetDirectory/package"
+          $packagePath = "$assetDirectory/eRAW-$tag-windows-x64.zip"
+          $executablePath = "$packageDirectory/eRAW-$tag-windows-x64.exe"
+          $licensePath = "$packageDirectory/THIRD_PARTY_LICENSES.txt"
+          $sbomPath = "$packageDirectory/eRAW-$tag.spdx.json"
+          $checksumPath = "$packageDirectory/eRAW-$tag-SHA256SUMS.txt"
 
-          New-Item -ItemType Directory -Force -Path $assetDirectory | Out-Null
-          Copy-Item -LiteralPath "src-tauri/target/release/eraw.exe" -Destination $assetPath
+          New-Item -ItemType Directory -Force -Path $packageDirectory | Out-Null
+          Copy-Item -LiteralPath "src-tauri/target/release/eraw.exe" -Destination $executablePath
           npm.cmd run notices -- --licenses $licensePath
           if ($LASTEXITCODE -ne 0) {
             throw "Third-party license collection failed."
@@ -106,21 +108,23 @@ jobs:
           }
           $sbomResponse.sbom | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $sbomPath -Encoding utf8
 
-          @($assetPath, $licensePath, $sbomPath) | ForEach-Object {
+          @($executablePath, $licensePath, $sbomPath) | ForEach-Object {
             $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_).Hash.ToLowerInvariant()
             "$hash  $(Split-Path -Leaf $_)"
           } | Set-Content -LiteralPath $checksumPath -Encoding ascii
 
-          "RELEASE_ASSET=$assetPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "RELEASE_LICENSES=$licensePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "RELEASE_SBOM=$sbomPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "RELEASE_CHECKSUMS=$checksumPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Compress-Archive -Path "$packageDirectory/*" -DestinationPath $packagePath -CompressionLevel Optimal -Force
+          if (-not (Test-Path -LiteralPath $packagePath)) {
+            throw "Release package creation failed."
+          }
 
-      - name: Attest release executable
+          "RELEASE_PACKAGE=$packagePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Attest release package
         if: github.event.repository.visibility == 'public'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: ${{ env.RELEASE_ASSET }}
+          subject-path: ${{ env.RELEASE_PACKAGE }}
 
       - name: Create GitHub release
         shell: pwsh
@@ -132,9 +136,9 @@ jobs:
           gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
 
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $env:RELEASE_ASSET $env:RELEASE_CHECKSUMS $env:RELEASE_SBOM $env:RELEASE_LICENSES --clobber --repo $env:GITHUB_REPOSITORY
+            gh release upload $tag $env:RELEASE_PACKAGE --clobber --repo $env:GITHUB_REPOSITORY
           } else {
-            gh release create $tag $env:RELEASE_ASSET $env:RELEASE_CHECKSUMS $env:RELEASE_SBOM $env:RELEASE_LICENSES `
+            gh release create $tag $env:RELEASE_PACKAGE `
               --repo $env:GITHUB_REPOSITORY `
               --verify-tag `
               --title "eRAW $tag" `

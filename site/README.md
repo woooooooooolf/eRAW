@@ -1,6 +1,6 @@
 # eRAW 项目站点
 
-该目录是与 Tauri 应用分离的中英文静态展示站点。站点不显示或读取 eRAW 软件版本；下载入口在浏览器中解析 GitHub 最新 Release 的 Windows x64 EXE，因此站点迭代与软件版本更新彼此独立。
+该目录是与 Tauri 应用分离的中英文静态展示站点。站点不显示或读取 eRAW 软件版本；下载入口在浏览器中优先解析 GitHub 最新 Release 的 Windows x64 ZIP，并兼容仅提供独立 EXE 的历史版本，因此站点迭代与软件版本更新彼此独立。
 
 ```powershell
 npm.cmd run dev:site

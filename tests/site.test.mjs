@@ -56,7 +56,7 @@ test("the Chinese page follows the agreed reading order and links to English", (
     "data-screenshot-dark",
     "data-screenshot-light",
     "<p>基于 Tauri 的极简轻量化 RAW 图像查看器",
-    "下载 Windows x64 EXE",
+    "下载 Windows x64",
     "page-divider",
     "project-info",
     "site-footer",
@@ -81,7 +81,7 @@ test("the English page mirrors the Chinese structure and links back", () => {
     "data-screenshot-dark",
     "data-screenshot-light",
     "A minimal, lightweight RAW image viewer built with Tauri",
-    "Download Windows x64 EXE",
+    "Download Windows x64",
     "page-divider",
     "project-info",
     "site-footer",
@@ -117,7 +117,10 @@ test("both locales use replaceable theme captures and a release-resolved x64 dow
   assert.match(enScriptSource, /app-main-dark-en\.png/);
   assert.match(enScriptSource, /app-main-light-en\.png/);
   assert.match(runtimeSource, /api\.github\.com\/repos\/woooooooooolf\/eRAW\/releases\/latest/);
+  assert.match(runtimeSource, /windows-x64\\\.zip/);
   assert.match(runtimeSource, /windows-x64\\\.exe/);
+  assert.match(runtimeSource, /packageAsset \?\? legacyExecutableAsset/);
+  assert.match(`${zhHtmlSource}\n${enHtmlSource}`, /data-download-package/);
   assert.match(runtimeSource, /LATEST_RELEASE_URL/);
   assert.match(styleSource, /perspective: 1800px/);
   assert.match(styleSource, /shot-reflection/);

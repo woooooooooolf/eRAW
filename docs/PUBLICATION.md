@@ -7,7 +7,7 @@
 - `master`、tag、Release 与 Actions 状态已核对，远端仅保留需要公开的分支。
 - 当前源码与历史中不包含凭据、客户 RAW、专有样本或无权公开的资源。
 - `LICENSE`、`THIRD_PARTY_NOTICES.md`、安全/贡献/支持说明及 Issue/PR 模板随源码提供。
-- Release 工作流生成 EXE、SHA-256、SPDX SBOM 与第三方许可证文本；公开仓库额外生成 GitHub 构建来源证明。
+- Release 工作流生成 EXE、SHA-256、SPDX SBOM 与第三方许可证文本，并将它们打包为唯一的 Windows x64 ZIP 资产；公开仓库额外为该 ZIP 生成 GitHub 构建来源证明。
 - Dependabot 漏洞提醒和自动安全更新已启用；npm、Cargo 与 GitHub Actions 每周检查更新。
 - 仓库保持维护优先：鼓励缺陷、兼容性、安全、测试和文档改进，不主动扩张架构、处理语义和用户行为。
 
@@ -42,7 +42,7 @@ GitHub 免费私有仓库不开放以下配置；可见性切换后应在同一�
 - GitHub Actions 使用允许列表并固定到完整 commit SHA；Dependabot 负责跟踪 Action 更新。
 - 默认 `GITHUB_TOKEN` 为只读；只有 Release job 获得 `contents: write`，公开时的 attestation step 另获 `id-token: write` 与 `attestations: write`。
 - Pages 工作流仅获得 `contents: read`、`pages: write` 与 `id-token: write`，只部署静态站点产物，不创建 tag 或 Release。
-- Release EXE 目前没有商业代码签名证书。SHA-256、SBOM 与构建来源证明用于完整性和来源核验，但不能替代 Windows Authenticode。
+- Release EXE 目前没有商业代码签名证书。包内 SHA-256 与 SBOM、针对 ZIP 的构建来源证明用于完整性和来源核验，但不能替代 Windows Authenticode。
 - 历史 Release 保留用于追溯；新用户应下载 Latest Release。
 
 ## 定期复核

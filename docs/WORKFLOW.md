@@ -76,7 +76,7 @@ npm.cmd run release
 - `.github/workflows/ci.yml` 在 `master` 推送、面向 `master` 的 Pull Request 和手动触发时运行前后端检查、测试与生产构建。
 - 发布标签使用 `Vx.y.z` 格式，并且必须与仓库中的软件版本严格一致。
 - 推送发布标签后，`.github/workflows/release.yml` 自动运行完整检查和 Tauri Release 构建，创建对应的 GitHub Release。
-- Windows x64 成果物固定命名为 `eRAW-Vx.y.z-windows-x64.exe`。
+- 后续 Windows x64 Release 只上传 `eRAW-Vx.y.z-windows-x64.zip`；包内根目录包含同名 EXE、SHA-256 清单、SPDX SBOM 与第三方许可证文本。V0.6.0 及更早版本的现有资产保持不变。
 - 普通提交和未推送的本地标签不会创建 GitHub Release。
 
 ## 发布验收

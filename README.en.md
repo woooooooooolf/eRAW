@@ -25,7 +25,7 @@
 
 Download the latest Windows x64 build and read its release notes from [GitHub Releases](https://github.com/woooooooooolf/eRAW/releases/latest).
 
-Release EXEs are not Authenticode-signed, so Windows may show a SmartScreen warning. Download only from the Latest Release and verify files against the provided SHA-256 manifest.
+Future Releases provide the EXE, SHA-256 manifest, SPDX SBOM, and third-party licenses in one Windows x64 ZIP; V0.6.0 and earlier retain their existing standalone assets. EXEs are not Authenticode-signed, so Windows may show a SmartScreen warning. Download only from the Latest Release and verify the extracted files against the manifest inside the package.
 
 ## Highlights
 
