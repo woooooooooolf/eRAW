@@ -6,25 +6,26 @@ It records the complete locked dependency inventory and each package's declared 
 
 eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain with their respective owners.
 
-## npm dependencies (60)
+## npm dependencies (61)
 
 | Package | Version | Scope | Declared license |
 | --- | --- | --- | --- |
-| @oxc-project/types | 0.143.0 | development | MIT |
-| @rolldown/binding-android-arm64 | 1.2.3 | development | MIT |
-| @rolldown/binding-darwin-arm64 | 1.2.3 | development | MIT |
-| @rolldown/binding-darwin-x64 | 1.2.3 | development | MIT |
-| @rolldown/binding-freebsd-x64 | 1.2.3 | development | MIT |
-| @rolldown/binding-linux-arm-gnueabihf | 1.2.3 | development | MIT |
-| @rolldown/binding-linux-arm64-gnu | 1.2.3 | development | MIT |
-| @rolldown/binding-linux-arm64-musl | 1.2.3 | development | MIT |
-| @rolldown/binding-linux-ppc64-gnu | 1.2.3 | development | MIT |
-| @rolldown/binding-linux-s390x-gnu | 1.2.3 | development | MIT |
-| @rolldown/binding-linux-x64-gnu | 1.2.3 | development | MIT |
-| @rolldown/binding-linux-x64-musl | 1.2.3 | development | MIT |
-| @rolldown/binding-openharmony-arm64 | 1.2.3 | development | MIT |
-| @rolldown/binding-win32-arm64-msvc | 1.2.3 | development | MIT |
-| @rolldown/binding-win32-x64-msvc | 1.2.3 | development | MIT |
+| @oxc-project/types | 0.146.0 | development | MIT |
+| @rolldown/binding-android-arm-eabi | 1.2.5 | development | MIT |
+| @rolldown/binding-android-arm64 | 1.2.5 | development | MIT |
+| @rolldown/binding-darwin-arm64 | 1.2.5 | development | MIT |
+| @rolldown/binding-darwin-x64 | 1.2.5 | development | MIT |
+| @rolldown/binding-freebsd-x64 | 1.2.5 | development | MIT |
+| @rolldown/binding-linux-arm-gnueabihf | 1.2.5 | development | MIT |
+| @rolldown/binding-linux-arm64-gnu | 1.2.5 | development | MIT |
+| @rolldown/binding-linux-arm64-musl | 1.2.5 | development | MIT |
+| @rolldown/binding-linux-ppc64-gnu | 1.2.5 | development | MIT |
+| @rolldown/binding-linux-s390x-gnu | 1.2.5 | development | MIT |
+| @rolldown/binding-linux-x64-gnu | 1.2.5 | development | MIT |
+| @rolldown/binding-linux-x64-musl | 1.2.5 | development | MIT |
+| @rolldown/binding-openharmony-arm64 | 1.2.5 | development | MIT |
+| @rolldown/binding-win32-arm64-msvc | 1.2.5 | development | MIT |
+| @rolldown/binding-win32-x64-msvc | 1.2.5 | development | MIT |
 | @rolldown/pluginutils | 1.0.1 | development | MIT |
 | @tauri-apps/api | 2.11.1 | runtime | Apache-2.0 OR MIT |
 | @tauri-apps/cli | 2.11.4 | development | Apache-2.0 OR MIT |
@@ -63,12 +64,12 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | picocolors | 1.1.1 | development | ISC |
 | picomatch | 4.0.5 | development | MIT |
 | postcss | 8.5.26 | development | MIT |
-| rolldown | 1.2.3 | development | MIT |
+| rolldown | 1.2.5 | development | MIT |
 | source-map-js | 1.2.1 | development | BSD-3-Clause |
 | tinyglobby | 0.2.17 | development | MIT |
 | tslib | 2.3.0 | runtime | 0BSD |
 | typescript | 6.0.3 | development | Apache-2.0 |
-| vite | 8.2.1 | development | MIT |
+| vite | 8.2.2 | development | MIT |
 | zrender | 6.1.0 | runtime | BSD-3-Clause |
 
 ## Cargo dependencies (469)
