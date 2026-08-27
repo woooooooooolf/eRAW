@@ -90,9 +90,11 @@ import {
 } from "./statistics-panel";
 import type { StatisticsLayout } from "./statistics-view-state";
 import {
+  emptyCoordinateLinkState,
   linkedPixelForResult,
+  updateCoordinateLinkState,
+  type CoordinateLinkInteractionState,
   type StatisticsLinkedPixel,
-  type StatisticsProfileHover,
   type StatisticsWindowHoverMessage,
   type ViewportCoordinateHighlight,
 } from "./statistics-link";
@@ -290,10 +292,8 @@ export class ErawApp {
   private settingsFormSidebarWidth = this.settings.sidebarWidth;
   private runtimeDiagnostics: RuntimeDiagnostic[] = [];
   private lastSample: ImagePoint | null = null;
-  private pointerPixel: ImagePoint | null = null;
-  private locatedPixel: ImagePoint | null = null;
+  private coordinateLinkState: CoordinateLinkInteractionState = emptyCoordinateLinkState();
   private coordinateHighlightVisible = false;
-  private statisticsProfileHover: StatisticsProfileHover | null = null;
   private coordinateLinkFrame = 0;
   private roiSource: "mouse" | "coordinates" | null = null;
   private statisticsOpen = false;
@@ -339,7 +339,10 @@ export class ErawApp {
       },
       onSampleChange: (sample) => this.updateSample(sample),
       onPointerPixelChange: (point) => {
-        this.pointerPixel = point;
+        this.coordinateLinkState = updateCoordinateLinkState(
+          this.coordinateLinkState,
+          { type: "pointer", point },
+        );
         this.scheduleCoordinateLinkSync();
       },
       onRenderStats: (levelLabel, loaded, pending, timing) => {
@@ -354,7 +357,10 @@ export class ErawApp {
       layout: this.statisticsDockPlacement,
       onAction: (action) => this.onStatisticsAction(action),
       onProfileHover: (hover) => {
-        this.statisticsProfileHover = hover;
+        this.coordinateLinkState = updateCoordinateLinkState(
+          this.coordinateLinkState,
+          { type: "profile", hover },
+        );
         this.scheduleCoordinateLinkSync();
       },
       onChartError: (error) => this.reportRuntimeError(error, "statistics.chartRenderFailed", 5000, "statistics-chart"),
@@ -2027,7 +2033,10 @@ export class ErawApp {
     });
     await listen<StatisticsWindowHoverMessage>("statistics:hover", (event) => {
       if (!this.statisticsOpen || !this.statisticsDetached || event.payload.source !== "detached") return;
-      this.statisticsProfileHover = event.payload.hover;
+      this.coordinateLinkState = updateCoordinateLinkState(
+        this.coordinateLinkState,
+        { type: "profile", hover: event.payload.hover },
+      );
       this.scheduleCoordinateLinkSync();
     });
     await listen("statistics:ready", () => {
@@ -2117,8 +2126,8 @@ export class ErawApp {
 
   private syncCoordinateLinkNow(): void {
     const enabled = this.coordinateHighlightVisible && !!this.document;
-    const activePixel = this.pointerPixel ?? this.locatedPixel;
-    const profileHover = this.pointerPixel ? null : this.statisticsProfileHover;
+    const { pointerPixel, locatedPixel, profileHover } = this.coordinateLinkState;
+    const activePixel = profileHover ? null : pointerPixel ?? locatedPixel;
     let viewportHighlight: ViewportCoordinateHighlight | null = null;
     if (enabled) {
       if (profileHover) {
@@ -2141,9 +2150,12 @@ export class ErawApp {
     if (
       !this.coordinateHighlightVisible
       || !this.statisticsOpen
-      || (this.statisticsProfileHover && !this.pointerPixel)
+      || this.coordinateLinkState.profileHover
     ) return null;
-    return linkedPixelForResult(this.pointerPixel ?? this.locatedPixel, this.statisticsResult);
+    return linkedPixelForResult(
+      this.coordinateLinkState.pointerPixel ?? this.coordinateLinkState.locatedPixel,
+      this.statisticsResult,
+    );
   }
 
   private async emitStatisticsLink(link: StatisticsLinkedPixel | null): Promise<void> {
@@ -2156,9 +2168,10 @@ export class ErawApp {
   }
 
   private resetCoordinateLinkState(): void {
-    this.pointerPixel = null;
-    this.locatedPixel = null;
-    this.statisticsProfileHover = null;
+    this.coordinateLinkState = updateCoordinateLinkState(
+      this.coordinateLinkState,
+      { type: "reset" },
+    );
     this.scheduleCoordinateLinkSync();
   }
 
@@ -2304,7 +2317,10 @@ export class ErawApp {
     source: "main" | "detached" = "main",
   ): void {
     if (action === "close") {
-      this.statisticsProfileHover = null;
+      this.coordinateLinkState = updateCoordinateLinkState(
+        this.coordinateLinkState,
+        { type: "profile", hover: null },
+      );
       this.statisticsOpen = false;
       this.statisticsRevision += 1;
       void cancelRawAnalysis(this.statisticsRevision);
@@ -2317,7 +2333,10 @@ export class ErawApp {
       return;
     }
     if (action === "detach") {
-      this.statisticsProfileHover = null;
+      this.coordinateLinkState = updateCoordinateLinkState(
+        this.coordinateLinkState,
+        { type: "profile", hover: null },
+      );
       this.statisticsDetached = true;
       this.saveStatisticsPresentation();
       this.updateStatisticsDock();
@@ -2326,7 +2345,10 @@ export class ErawApp {
       return;
     }
     if (action === "dock") {
-      this.statisticsProfileHover = null;
+      this.coordinateLinkState = updateCoordinateLinkState(
+        this.coordinateLinkState,
+        { type: "profile", hover: null },
+      );
       this.statisticsDetached = false;
       this.saveStatisticsPresentation();
       this.updateStatisticsDock();
@@ -2645,7 +2667,10 @@ export class ErawApp {
     }
     const point = { x, y };
     this.lastSample = point;
-    this.locatedPixel = point;
+    this.coordinateLinkState = updateCoordinateLinkState(
+      this.coordinateLinkState,
+      { type: "locate", point },
+    );
     this.updateSample(point);
     this.viewport.focusPixel(point);
     this.scheduleCoordinateLinkSync();

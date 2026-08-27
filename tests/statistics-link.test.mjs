@@ -59,6 +59,43 @@ test("coordinate linking starts at a fixed high-zoom threshold", () => {
   assert.equal(link.coordinateHighlightEnabled(Number.NaN), false);
 });
 
+test("the latest hover source wins and manual locations do not return after pointer interaction", () => {
+  let state = link.emptyCoordinateLinkState();
+  state = link.updateCoordinateLinkState(state, { type: "locate", point: { x: 12, y: 21 } });
+  assert.deepEqual(state, {
+    pointerPixel: null,
+    locatedPixel: { x: 12, y: 21 },
+    profileHover: null,
+  });
+
+  state = link.updateCoordinateLinkState(state, { type: "pointer", point: { x: 11, y: 20 } });
+  assert.deepEqual(state, {
+    pointerPixel: { x: 11, y: 20 },
+    locatedPixel: null,
+    profileHover: null,
+  });
+  state = link.updateCoordinateLinkState(state, { type: "pointer", point: null });
+  assert.deepEqual(state, link.emptyCoordinateLinkState());
+
+  state = link.updateCoordinateLinkState(state, { type: "pointer", point: { x: 11, y: 20 } });
+  state = link.updateCoordinateLinkState(state, { type: "profile", hover: { axis: "row", coordinate: 21 } });
+  assert.deepEqual(state, {
+    pointerPixel: null,
+    locatedPixel: null,
+    profileHover: { axis: "row", coordinate: 21 },
+  });
+  state = link.updateCoordinateLinkState(state, { type: "pointer", point: null });
+  assert.deepEqual(state.profileHover, { axis: "row", coordinate: 21 });
+
+  state = link.updateCoordinateLinkState(state, { type: "pointer", point: { x: 13, y: 22 } });
+  state = link.updateCoordinateLinkState(state, { type: "profile", hover: null });
+  assert.deepEqual(state, {
+    pointerPixel: { x: 13, y: 22 },
+    locatedPixel: null,
+    profileHover: null,
+  });
+});
+
 test("linked pixels are scoped to the exact analysis snapshot and ROI", () => {
   const current = result();
   const linked = link.linkedPixelForResult({ x: 11, y: 21 }, current);
@@ -85,8 +122,8 @@ test("profile markers recover exact source coordinates instead of sampled chart 
 
 test("high-zoom canvas linking uses soft row and column overlays without changing the viewport", () => {
   assert.match(appSource, /class="coordinate-highlight-overlay"/);
-  assert.match(appSource, /this\.locatedPixel = point/);
-  assert.match(appSource, /this\.pointerPixel \? null : this\.statisticsProfileHover/);
+  assert.match(appSource, /\{ type: "locate", point \}/);
+  assert.match(appSource, /\{ type: "pointer", point \}/);
   assert.match(viewportSource, /coordinateHighlightEnabled\(this\.zoom\)/);
   assert.match(viewportSource, /onPointerPixelChange\(point\)/);
   assert.match(overlaySource, /width: imageWidth, height: 1/);

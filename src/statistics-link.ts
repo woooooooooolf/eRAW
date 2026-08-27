@@ -27,6 +27,52 @@ export interface StatisticsWindowHoverMessage {
   source: "detached";
 }
 
+export interface CoordinateLinkInteractionState {
+  pointerPixel: ImagePoint | null;
+  locatedPixel: ImagePoint | null;
+  profileHover: StatisticsProfileHover | null;
+}
+
+export type CoordinateLinkInteraction =
+  | { type: "pointer"; point: ImagePoint | null }
+  | { type: "profile"; hover: StatisticsProfileHover | null }
+  | { type: "locate"; point: ImagePoint }
+  | { type: "reset" };
+
+export function emptyCoordinateLinkState(): CoordinateLinkInteractionState {
+  return { pointerPixel: null, locatedPixel: null, profileHover: null };
+}
+
+export function updateCoordinateLinkState(
+  state: CoordinateLinkInteractionState,
+  interaction: CoordinateLinkInteraction,
+): CoordinateLinkInteractionState {
+  if (interaction.type === "reset") return emptyCoordinateLinkState();
+  if (interaction.type === "locate") {
+    return {
+      pointerPixel: null,
+      locatedPixel: { x: interaction.point.x, y: interaction.point.y },
+      profileHover: null,
+    };
+  }
+  if (interaction.type === "pointer") {
+    return {
+      pointerPixel: interaction.point
+        ? { x: interaction.point.x, y: interaction.point.y }
+        : null,
+      locatedPixel: null,
+      profileHover: interaction.point ? null : state.profileHover,
+    };
+  }
+  return interaction.hover
+    ? {
+      pointerPixel: null,
+      locatedPixel: null,
+      profileHover: { ...interaction.hover },
+    }
+    : { ...state, profileHover: null };
+}
+
 export function coordinateHighlightEnabled(zoom: number): boolean {
   return Number.isFinite(zoom) && zoom >= MIN_COORDINATE_HIGHLIGHT_ZOOM;
 }
