@@ -19,6 +19,10 @@ import {
 import { PixelValueOverlay } from "./pixel-overlay";
 import { hasExceededRoiDragThreshold } from "./roi-selection";
 import {
+  coordinateHighlightEnabled,
+  type ViewportCoordinateHighlight,
+} from "./statistics-link";
+import {
   DEFAULT_PROCESSING_SETTINGS,
   type DemosaicPixelValueMode,
   type DisplayMode,
@@ -71,8 +75,9 @@ export interface TileTimingStats {
 }
 
 export interface ViewportCallbacks {
-  onZoomChange(zoom: number): void;
+  onZoomChange(zoom: number, coordinateHighlightVisible: boolean): void;
   onSampleChange(sample: ImagePoint | null): void;
+  onPointerPixelChange(sample: ImagePoint | null): void;
   onRenderStats(levelLabel: string, loaded: number, pending: number, timing: TileTimingStats): void;
   onSelectionChange(selection: ImageRect | null): void;
   onError(error: unknown, messageKey: MessageKey, scope: ViewportDiagnosticScope): void;
@@ -228,6 +233,7 @@ export class RawViewport {
   private animationFrame = 0;
   private contextLost = false;
   private lastSampleKey = "";
+  private lastPointerKey = "";
   private renderCounter = 0;
   private renderRevision = 1;
   private lodPlanKey = "";
@@ -268,6 +274,7 @@ export class RawViewport {
     this.overlayLayer = new ViewportOverlayLayer(
       container.querySelector<SVGSVGElement>(".image-boundary")!,
       container.querySelector<HTMLElement>(".image-selection-overlay")!,
+      container.querySelector<HTMLElement>(".coordinate-highlight-overlay")!,
     );
     this.initializeGl();
     this.bindEvents();
@@ -389,9 +396,11 @@ export class RawViewport {
     this.callbacks.onSelectionChange(null);
     this.overlayLayer.hide();
     this.lastSampleKey = "";
+    this.lastPointerKey = "";
     this.clearTextures();
     this.callbacks.onSampleChange(null);
-    this.callbacks.onZoomChange(this.zoom);
+    this.callbacks.onPointerPixelChange(null);
+    this.callbacks.onZoomChange(this.zoom, coordinateHighlightEnabled(this.zoom));
     this.callbacks.onRenderStats("L0", 0, 0, {
       samples: 0,
       lastMs: 0,
@@ -679,6 +688,11 @@ export class RawViewport {
     this.requestDraw();
   }
 
+  setCoordinateHighlight(highlight: ViewportCoordinateHighlight | null): void {
+    this.overlayLayer.setCoordinateHighlight(highlight);
+    this.updateImageBoundary();
+  }
+
   cancelSelection(): boolean {
     if (this.selectionPointerId === null) return false;
     this.abortSelectionGesture();
@@ -708,7 +722,7 @@ export class RawViewport {
     this.cameraX = (this.width - this.document.descriptor.width * this.zoom) / 2;
     this.cameraY = (this.height - this.document.descriptor.height * this.zoom) / 2;
     this.alignCameraAtActualSize();
-    this.callbacks.onZoomChange(this.zoom);
+    this.callbacks.onZoomChange(this.zoom, coordinateHighlightEnabled(this.zoom));
     this.requestDraw();
   }
 
@@ -725,8 +739,8 @@ export class RawViewport {
     this.cameraX = this.width / 2 - (point.x + 0.5) * this.zoom;
     this.cameraY = this.height / 2 - (point.y + 0.5) * this.zoom;
     this.constrainCamera();
-    this.updatePointerPosition(point);
-    this.callbacks.onZoomChange(this.zoom);
+    this.updateSamplePosition(point);
+    this.callbacks.onZoomChange(this.zoom, coordinateHighlightEnabled(this.zoom));
     this.requestDraw();
   }
 
@@ -745,7 +759,7 @@ export class RawViewport {
     this.cameraY = center.y - imagePoint.y * this.zoom;
     this.alignCameraAtActualSize();
     this.constrainCamera();
-    this.callbacks.onZoomChange(this.zoom);
+    this.callbacks.onZoomChange(this.zoom, coordinateHighlightEnabled(this.zoom));
     this.requestDraw();
   }
 
@@ -798,7 +812,7 @@ export class RawViewport {
     this.alignCameraAtActualSize();
     this.constrainCamera();
     this.updatePointerPosition(this.updateCrosshair(event));
-    this.callbacks.onZoomChange(this.zoom);
+    this.callbacks.onZoomChange(this.zoom, coordinateHighlightEnabled(this.zoom));
     this.requestDraw();
   }
 
@@ -859,7 +873,7 @@ export class RawViewport {
       this.cameraY = this.dragCameraY + event.clientY - this.dragY;
       this.constrainCamera();
       this.alignCameraAtActualSize();
-      this.updateCrosshair(event);
+      this.updatePointerPosition(this.updateCrosshair(event));
       this.requestDraw();
       return;
     }
@@ -966,6 +980,15 @@ export class RawViewport {
   }
 
   private updatePointerPosition(point: ImagePoint | null): void {
+    const pointerKey = point ? `${this.frame}:${point.x}:${point.y}` : "";
+    if (pointerKey !== this.lastPointerKey) {
+      this.lastPointerKey = pointerKey;
+      this.callbacks.onPointerPixelChange(point);
+    }
+    this.updateSamplePosition(point);
+  }
+
+  private updateSamplePosition(point: ImagePoint | null): void {
     if (!point) {
       if (!this.lastSampleKey) return;
       this.lastSampleKey = "";
@@ -1182,6 +1205,7 @@ export class RawViewport {
       this.transform,
       this.document.descriptor.width,
       this.document.descriptor.height,
+      coordinateHighlightEnabled(this.zoom),
     );
   }
 

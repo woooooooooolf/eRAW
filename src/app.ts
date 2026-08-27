@@ -89,6 +89,13 @@ import {
   type StatisticsWindowActionMessage,
 } from "./statistics-panel";
 import type { StatisticsLayout } from "./statistics-view-state";
+import {
+  linkedPixelForResult,
+  type StatisticsLinkedPixel,
+  type StatisticsProfileHover,
+  type StatisticsWindowHoverMessage,
+  type ViewportCoordinateHighlight,
+} from "./statistics-link";
 import type {
   AnalysisResult,
   BitAlignment,
@@ -283,6 +290,11 @@ export class ErawApp {
   private settingsFormSidebarWidth = this.settings.sidebarWidth;
   private runtimeDiagnostics: RuntimeDiagnostic[] = [];
   private lastSample: ImagePoint | null = null;
+  private pointerPixel: ImagePoint | null = null;
+  private locatedPixel: ImagePoint | null = null;
+  private coordinateHighlightVisible = false;
+  private statisticsProfileHover: StatisticsProfileHover | null = null;
+  private coordinateLinkFrame = 0;
   private roiSource: "mouse" | "coordinates" | null = null;
   private statisticsOpen = false;
   private statisticsPresentation = loadStatisticsPresentation();
@@ -320,8 +332,16 @@ export class ErawApp {
       onSuccess: (message) => this.showToast(message, "success", 6000),
     });
     this.viewport = new RawViewport(this.get("viewport"), {
-      onZoomChange: (zoom) => this.updateZoomStatus(zoom),
+      onZoomChange: (zoom, coordinateHighlightVisible) => {
+        this.coordinateHighlightVisible = coordinateHighlightVisible;
+        this.updateZoomStatus(zoom);
+        this.scheduleCoordinateLinkSync();
+      },
       onSampleChange: (sample) => this.updateSample(sample),
+      onPointerPixelChange: (point) => {
+        this.pointerPixel = point;
+        this.scheduleCoordinateLinkSync();
+      },
       onRenderStats: (levelLabel, loaded, pending, timing) => {
         this.updateRenderStatus(levelLabel, loaded, pending, timing);
       },
@@ -333,6 +353,10 @@ export class ErawApp {
       detached: false,
       layout: this.statisticsDockPlacement,
       onAction: (action) => this.onStatisticsAction(action),
+      onProfileHover: (hover) => {
+        this.statisticsProfileHover = hover;
+        this.scheduleCoordinateLinkSync();
+      },
       onChartError: (error) => this.reportRuntimeError(error, "statistics.chartRenderFailed", 5000, "statistics-chart"),
       onChartRecovery: () => this.clearRuntimeDiagnostic("statistics-chart"),
     });
@@ -539,6 +563,10 @@ export class ErawApp {
                 <rect class="image-boundary-rect image-boundary-line"></rect>
               </svg>
               <div class="image-selection-overlay" aria-hidden="true"></div>
+              <div class="coordinate-highlight-overlay" aria-hidden="true">
+                <i class="coordinate-highlight-row"></i>
+                <i class="coordinate-highlight-column"></i>
+              </div>
               <div class="canvas-crosshair" aria-hidden="true"><i class="crosshair-horizontal"></i><i class="crosshair-vertical"></i></div>
               <div class="empty-state" id="empty-state">
                 <div class="empty-grid"><span></span><span></span><span></span><span></span></div>
@@ -1440,6 +1468,7 @@ export class ErawApp {
       this.document = info;
       this.descriptor = info.descriptor;
       this.frame = 0;
+      this.resetCoordinateLinkState();
       this.cancelDisplayRangeCalculation();
       this.resetDisplayAdjustment(info.descriptor.bitDepth);
       this.viewport.setDocument(info);
@@ -1476,6 +1505,7 @@ export class ErawApp {
       this.document = null;
       this.frame = 0;
       this.lastSample = null;
+      this.resetCoordinateLinkState();
       this.clearRuntimeDiagnostics(["webgl"]);
       this.viewport.clearDocument();
       this.cancelDisplayRangeCalculation();
@@ -1573,6 +1603,7 @@ export class ErawApp {
             }
             if (revision === this.commitRevision) this.writeDescriptor(info.descriptor);
             this.frame = Math.min(this.frame, Math.max(0, info.layout.frameCount - 1));
+            this.resetCoordinateLinkState();
             this.viewport.setDocument(info, true);
             this.updateDisplay();
             this.statisticsResult = null;
@@ -1994,6 +2025,11 @@ export class ErawApp {
     await listen<StatisticsWindowActionMessage>("statistics:action", (event) => {
       this.onStatisticsAction(event.payload.action, event.payload.source);
     });
+    await listen<StatisticsWindowHoverMessage>("statistics:hover", (event) => {
+      if (!this.statisticsOpen || !this.statisticsDetached || event.payload.source !== "detached") return;
+      this.statisticsProfileHover = event.payload.hover;
+      this.scheduleCoordinateLinkSync();
+    });
     await listen("statistics:ready", () => {
       void this.emitStatisticsState();
     });
@@ -2054,6 +2090,7 @@ export class ErawApp {
     const state = this.statisticsState();
     this.statisticsPanel.setState(state);
     if (this.statisticsDetached) void this.emitStatisticsState();
+    this.scheduleCoordinateLinkSync();
   }
 
   private async emitStatisticsState(): Promise<void> {
@@ -2064,9 +2101,65 @@ export class ErawApp {
         language: this.settings.language,
         theme: this.settings.theme,
       });
+      await this.emitStatisticsLink(this.currentStatisticsLink());
     } catch {
       // 独立窗口可能尚未完成初始化；statistics:ready 会再次同步。
     }
+  }
+
+  private scheduleCoordinateLinkSync(): void {
+    if (this.coordinateLinkFrame) return;
+    this.coordinateLinkFrame = requestAnimationFrame(() => {
+      this.coordinateLinkFrame = 0;
+      this.syncCoordinateLinkNow();
+    });
+  }
+
+  private syncCoordinateLinkNow(): void {
+    const enabled = this.coordinateHighlightVisible && !!this.document;
+    const activePixel = this.pointerPixel ?? this.locatedPixel;
+    const profileHover = this.pointerPixel ? null : this.statisticsProfileHover;
+    let viewportHighlight: ViewportCoordinateHighlight | null = null;
+    if (enabled) {
+      if (profileHover) {
+        viewportHighlight = profileHover.axis === "row"
+          ? { x: null, y: profileHover.coordinate }
+          : { x: profileHover.coordinate, y: null };
+      } else if (activePixel) {
+        viewportHighlight = { x: activePixel.x, y: activePixel.y };
+      }
+    }
+    this.viewport.setCoordinateHighlight(viewportHighlight);
+    const link = enabled && this.statisticsOpen && !profileHover
+      ? linkedPixelForResult(activePixel, this.statisticsResult)
+      : null;
+    this.statisticsPanel.setLinkedPixel(link);
+    if (this.statisticsDetached) void this.emitStatisticsLink(link);
+  }
+
+  private currentStatisticsLink(): StatisticsLinkedPixel | null {
+    if (
+      !this.coordinateHighlightVisible
+      || !this.statisticsOpen
+      || (this.statisticsProfileHover && !this.pointerPixel)
+    ) return null;
+    return linkedPixelForResult(this.pointerPixel ?? this.locatedPixel, this.statisticsResult);
+  }
+
+  private async emitStatisticsLink(link: StatisticsLinkedPixel | null): Promise<void> {
+    if (!this.statisticsOpen || !this.statisticsDetached || !isTauri()) return;
+    try {
+      await emitTo("statistics", "statistics:link", link);
+    } catch {
+      // 独立窗口可能尚未完成初始化；statistics:ready 会重发完整状态与当前联动点。
+    }
+  }
+
+  private resetCoordinateLinkState(): void {
+    this.pointerPixel = null;
+    this.locatedPixel = null;
+    this.statisticsProfileHover = null;
+    this.scheduleCoordinateLinkSync();
   }
 
   private updateStatisticsDock(): void {
@@ -2211,17 +2304,20 @@ export class ErawApp {
     source: "main" | "detached" = "main",
   ): void {
     if (action === "close") {
+      this.statisticsProfileHover = null;
       this.statisticsOpen = false;
       this.statisticsRevision += 1;
       void cancelRawAnalysis(this.statisticsRevision);
       this.statisticsLoading = false;
       this.updateStatisticsDock();
+      this.scheduleCoordinateLinkSync();
       if (source === "main") {
         void WebviewWindow.getByLabel("statistics").then((window) => window?.close());
       }
       return;
     }
     if (action === "detach") {
+      this.statisticsProfileHover = null;
       this.statisticsDetached = true;
       this.saveStatisticsPresentation();
       this.updateStatisticsDock();
@@ -2230,6 +2326,7 @@ export class ErawApp {
       return;
     }
     if (action === "dock") {
+      this.statisticsProfileHover = null;
       this.statisticsDetached = false;
       this.saveStatisticsPresentation();
       this.updateStatisticsDock();
@@ -2389,6 +2486,7 @@ export class ErawApp {
     if (nextFrame === this.frame) return;
     this.cancelDisplayRangeCalculation();
     this.frame = nextFrame;
+    this.resetCoordinateLinkState();
     this.viewport.setFrame(this.frame);
     this.get<HTMLInputElement>("frame-input").value = String(this.frame + 1);
     this.statisticsResult = null;
@@ -2547,8 +2645,10 @@ export class ErawApp {
     }
     const point = { x, y };
     this.lastSample = point;
+    this.locatedPixel = point;
     this.updateSample(point);
     this.viewport.focusPixel(point);
+    this.scheduleCoordinateLinkSync();
     this.get<HTMLDialogElement>("pixel-locator-dialog").close();
   }
 
