@@ -292,6 +292,8 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
         <article><h3>采样标记</h3><p>只有可见真实点不超过 512，且平均屏幕间距至少 5 px 时才显示标记，避免标记覆盖曲线。</p></article>
         <article><h3>滚轮约定</h3><p>普通滚轮滚动页面；<kbd>Ctrl</kbd>+滚轮缩放横轴，<kbd>Shift</kbd>+滚轮缩放纵轴，同时按下则缩放双轴。</p></article>
         <article><h3>曲线与状态</h3><p>各图表的曲线显隐、横纵范围和布局高度独立保存。切换载体不会重新扫描 RAW，也不会改变 ROI。</p></article>
+        <article><h3>像素联动</h3><p>主画布达到 12× 后，鼠标像素或 <kbd>P</kbd> 输入的坐标会以行列柔光显示，并在 Row 与 Column Profile 同时标出精确点。鼠标进入画布时临时覆盖手动定位，离开后恢复后者；ROI 外没有统计标记。</p></article>
+        <article><h3>Profile 反向定位</h3><p>悬停 Row 或 Column Profile 会在画布上高亮对应物理行或列。联动不改变画布或图表的缩放、平移和轴范围，目标在可见范围外时不自动追踪；低于 12× 时关闭，Histogram 不参与。</p></article>
       </div>
       ${admonition("supplement", "显示降采样不改变摘要", "均值、方差、百分位和计数始终来自精确统计；图表聚合只控制送入绘图库的点数，不回写统计结果。")}`,
   },
