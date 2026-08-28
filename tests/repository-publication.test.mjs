@@ -108,7 +108,12 @@ test("workflows pin actions and protect build and release integrity", () => {
   assert.match(releaseSource, /SHA256SUMS/);
   assert.match(releaseSource, /dependency-graph\/sbom/);
   assert.match(releaseSource, /THIRD_PARTY_LICENSES\.txt/);
+  assert.match(releaseSource, /eRAW-\$tag-windows-x64\.zip/);
+  assert.match(releaseSource, /Compress-Archive/);
+  assert.match(releaseSource, /gh release (?:upload|create) \$tag \$env:RELEASE_PACKAGE/);
+  assert.doesNotMatch(releaseSource, /gh release (?:upload|create) \$tag \$env:RELEASE_(?:ASSET|CHECKSUMS|SBOM|LICENSES)/);
   assert.match(releaseSource, /attest-build-provenance@[0-9a-f]{40}/);
+  assert.match(releaseSource, /subject-path:\s*\$\{\{ env\.RELEASE_PACKAGE \}\}/);
   assert.match(releaseSource, /repository\.visibility == 'public'/);
   assert.match(pagesSource, /pages:\s*write/);
   assert.match(pagesSource, /id-token:\s*write/);

@@ -35,10 +35,10 @@ export function configureSite(screenshots: {
     element.textContent = String(new Date().getFullYear());
   });
 
-  void resolveWindowsDownload();
+  void resolveWindowsPackageDownload();
 }
 
-async function resolveWindowsDownload(): Promise<void> {
+async function resolveWindowsPackageDownload(): Promise<void> {
   let downloadUrl = LATEST_RELEASE_URL;
   try {
     const response = await fetch(LATEST_RELEASE_API, {
@@ -46,11 +46,18 @@ async function resolveWindowsDownload(): Promise<void> {
     });
     if (response.ok) {
       const release = await response.json() as GitHubRelease;
-      const asset = release.assets?.find((candidate) => (
+      const assets = release.assets ?? [];
+      const packageAsset = assets.find((candidate) => (
+        typeof candidate.name === "string"
+        && /windows-x64\.zip$/i.test(candidate.name)
+        && typeof candidate.browser_download_url === "string"
+      ));
+      const legacyExecutableAsset = assets.find((candidate) => (
         typeof candidate.name === "string"
         && /windows-x64\.exe$/i.test(candidate.name)
         && typeof candidate.browser_download_url === "string"
       ));
+      const asset = packageAsset ?? legacyExecutableAsset;
       if (asset && typeof asset.browser_download_url === "string") {
         downloadUrl = asset.browser_download_url;
       }
@@ -59,7 +66,7 @@ async function resolveWindowsDownload(): Promise<void> {
     // 私有仓库、离线环境或 API 限流时保留 Latest Release 页面作为可用回退。
   }
 
-  document.querySelectorAll<HTMLAnchorElement>("[data-download-exe]").forEach((link) => {
+  document.querySelectorAll<HTMLAnchorElement>("[data-download-package]").forEach((link) => {
     link.href = downloadUrl;
   });
 }

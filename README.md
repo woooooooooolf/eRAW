@@ -25,7 +25,7 @@
 
 请从 [GitHub Releases](https://github.com/woooooooooolf/eRAW/releases/latest) 下载最新 Windows x64 版本并查看对应更新说明。
 
-Release EXE 暂未使用 Authenticode 签名，Windows 可能显示 SmartScreen 提示。请仅从 Latest Release 下载，并使用随版本提供的 SHA-256 清单核验文件。
+后续 Release 以单个 Windows x64 ZIP 提供 EXE、SHA-256 清单、SPDX SBOM 与第三方许可证；V0.6.0 及更早版本保留原有独立资产。EXE 暂未使用 Authenticode 签名，Windows 可能显示 SmartScreen 提示。请仅从 Latest Release 下载，解压后使用包内 SHA-256 清单核验文件。
 
 ## 核心特性
 
