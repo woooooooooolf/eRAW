@@ -356,13 +356,7 @@ export class ErawApp {
       detached: false,
       layout: this.statisticsDockPlacement,
       onAction: (action) => this.onStatisticsAction(action),
-      onProfileHover: (hover) => {
-        this.coordinateLinkState = updateCoordinateLinkState(
-          this.coordinateLinkState,
-          { type: "profile", hover },
-        );
-        this.scheduleCoordinateLinkSync();
-      },
+      onProfileHover: (hover) => this.updateStatisticsProfileHover(hover),
       onChartError: (error) => this.reportRuntimeError(error, "statistics.chartRenderFailed", 5000, "statistics-chart"),
       onChartRecovery: () => this.clearRuntimeDiagnostic("statistics-chart"),
     });
@@ -2033,11 +2027,7 @@ export class ErawApp {
     });
     await listen<StatisticsWindowHoverMessage>("statistics:hover", (event) => {
       if (!this.statisticsOpen || !this.statisticsDetached || event.payload.source !== "detached") return;
-      this.coordinateLinkState = updateCoordinateLinkState(
-        this.coordinateLinkState,
-        { type: "profile", hover: event.payload.hover },
-      );
-      this.scheduleCoordinateLinkSync();
+      this.updateStatisticsProfileHover(event.payload.hover);
     });
     await listen("statistics:ready", () => {
       void this.emitStatisticsState();
@@ -2122,6 +2112,15 @@ export class ErawApp {
       this.coordinateLinkFrame = 0;
       this.syncCoordinateLinkNow();
     });
+  }
+
+  private updateStatisticsProfileHover(hover: StatisticsWindowHoverMessage["hover"]): void {
+    this.coordinateLinkState = updateCoordinateLinkState(
+      this.coordinateLinkState,
+      { type: "profile", hover },
+    );
+    // 独立统计窗口获得焦点后，主 WebView 的动画帧可能被节流；反向联动必须立即落到画布。
+    this.syncCoordinateLinkNow();
   }
 
   private syncCoordinateLinkNow(): void {

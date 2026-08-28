@@ -155,6 +155,9 @@ test("row and column profiles exchange lightweight hover state and exact linked 
   assert.match(appSource, /listen<StatisticsWindowHoverMessage>\("statistics:hover"/);
   assert.match(windowSource, /listen<StatisticsLinkedPixel \| null>\("statistics:link"/);
   assert.match(windowSource, /emitTo\("main", "statistics:hover", message\)/);
+  const reverseSync = appSource.match(/private updateStatisticsProfileHover[\s\S]*?\n  \}/)?.[0] ?? "";
+  assert.match(reverseSync, /this\.syncCoordinateLinkNow\(\)/);
+  assert.doesNotMatch(reverseSync, /scheduleCoordinateLinkSync/);
   assert.match(panelSource, /resolveLinkedPixel\(link, this\.state\.result\)/);
   assert.match(chartSource, /profilePointAtCoordinate\(group\[context\.profile\], coordinate!\)/);
   assert.match(chartSource, /`\$\{chartKey\}-link-guide`/);
