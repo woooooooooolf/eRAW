@@ -1,7 +1,7 @@
 {
   "name": "eraw",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Windows RAW sensor-data viewer, diagnostic tool, and converter for Bayer and Quad CFA workflows",
   "license": "GPL-3.0-or-later",
   "author": "eRAW contributors",
