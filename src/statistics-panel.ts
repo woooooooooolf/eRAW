@@ -19,6 +19,11 @@ import type {
   StatisticalSummary,
 } from "./types";
 import type { ImageRect } from "./viewport-transform";
+import {
+  resolveLinkedPixel,
+  type StatisticsLinkedPixel,
+  type StatisticsProfileHover,
+} from "./statistics-link";
 
 export type StatisticsPanelAction =
   | "close"
@@ -49,6 +54,7 @@ interface StatisticsPanelOptions {
   detached: boolean;
   layout?: StatisticsLayout;
   onAction(action: StatisticsPanelAction): void;
+  onProfileHover?(hover: StatisticsProfileHover | null): void;
   onChartError?(error: unknown): void;
   onChartRecovery?(): void;
 }
@@ -117,6 +123,7 @@ export class StatisticsPanel {
   private resizeStartHeight = 0;
   private appliedViewResetRevision = 0;
   private readonly chartFailures = new Set<StatisticsChartKey>();
+  private linkedPixel: StatisticsLinkedPixel | null = null;
 
   constructor(root: HTMLElement, options: StatisticsPanelOptions) {
     this.root = root;
@@ -128,6 +135,7 @@ export class StatisticsPanel {
         this.viewState.charts[chart][axis === "x" ? "xRange" : "yRange"] = range;
         saveStatisticsViewState(this.viewState);
       },
+      onProfileHover: (hover) => this.options.onProfileHover?.(hover),
       onRenderStart: () => {
         this.chartFailures.clear();
         this.options.onChartRecovery?.();
@@ -151,6 +159,7 @@ export class StatisticsPanel {
       && state.viewResetLayout === this.layout;
     this.appliedViewResetRevision = Math.max(this.appliedViewResetRevision, state.viewResetRevision);
     this.state = state;
+    this.charts.setLinkedPixel(resolveLinkedPixel(this.linkedPixel, state.result));
     if (shouldReset) {
       resetStatisticsViewState(this.viewState, this.layout);
       saveStatisticsViewState(this.viewState);
@@ -158,6 +167,11 @@ export class StatisticsPanel {
     }
     this.sanitizeViewState();
     this.render(!shouldReset);
+  }
+
+  setLinkedPixel(link: StatisticsLinkedPixel | null): void {
+    this.linkedPixel = link;
+    this.charts.setLinkedPixel(resolveLinkedPixel(link, this.state.result));
   }
 
   setLayout(layout: StatisticsLayout): void {

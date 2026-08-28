@@ -1,5 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { emit, listen } from "@tauri-apps/api/event";
+import { emit, emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   setLanguagePreference,
@@ -13,6 +13,10 @@ import {
   type StatisticsWindowActionMessage,
 } from "./statistics-panel";
 import type { AppTheme } from "./theme-catalog";
+import type {
+  StatisticsLinkedPixel,
+  StatisticsWindowHoverMessage,
+} from "./statistics-link";
 
 interface StatisticsWindowPayload {
   state: StatisticsPanelState;
@@ -32,6 +36,7 @@ export class StatisticsWindowApp {
       {
         detached: true,
         onAction: (action) => void this.handleAction(action),
+        onProfileHover: (hover) => void this.emitProfileHover(hover),
       },
     );
     if (isTauri()) void this.initialize();
@@ -46,6 +51,9 @@ export class StatisticsWindowApp {
         ? `${event.payload.state.documentName} — ${t("statistics.title")}`
         : t("statistics.title");
     });
+    await listen<StatisticsLinkedPixel | null>("statistics:link", (event) => {
+      this.panel.setLinkedPixel(event.payload);
+    });
     await this.appWindow.onCloseRequested((event) => {
       event.preventDefault();
       void this.handleAction("close");
@@ -56,6 +64,11 @@ export class StatisticsWindowApp {
   private emitAction(action: StatisticsPanelAction): Promise<void> {
     const message: StatisticsWindowActionMessage = { action, source: "detached" };
     return emit("statistics:action", message);
+  }
+
+  private emitProfileHover(hover: StatisticsWindowHoverMessage["hover"]): Promise<void> {
+    const message: StatisticsWindowHoverMessage = { hover, source: "detached" };
+    return emitTo("main", "statistics:hover", message);
   }
 
   private async handleAction(action: StatisticsPanelAction): Promise<void> {

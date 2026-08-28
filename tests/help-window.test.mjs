@@ -97,6 +97,10 @@ test("all seven interface locales provide a complete localized manual", () => {
   assert.match(windowSource, /if \(getResolvedLocale\(\) !== previousLocale\)/);
   assert.match(windowSource, /this\.render\(\)/);
   assert.doesNotMatch(windowSource, /help-language-notice|helpWindow\.chineseReview/);
+  assert.match(contentSource, /主画布达到 12× 后/);
+  for (const heading of ["Pixel/Profile linking", "像素與 Profile 聯動", "Pixel/Profile 連動", "Enlace píxel/Profile", "Lien pixel/Profile", "Pixel/Profile-Kopplung"]) {
+    assert.match(localizedContentSource, new RegExp(heading), `${heading} is documented`);
+  }
 });
 
 test("the manual uses paper-like full-width typography and semantic admonitions", () => {

@@ -839,6 +839,28 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { margin: 0; 
   pointer-events: none;
 }
 .image-selection-overlay.visible { opacity: 1; }
+.coordinate-highlight-overlay {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.coordinate-highlight-overlay.visible { opacity: 1; }
+.coordinate-highlight-overlay i {
+  position: absolute;
+  display: block;
+  box-sizing: border-box;
+  opacity: 0;
+  border: 2px solid rgb(var(--accent-rgb) / .96);
+  background: rgb(var(--accent-rgb) / .065);
+  box-shadow:
+    inset 0 0 12px rgb(var(--accent-rgb) / .52),
+    0 0 10px rgb(var(--accent-rgb) / .82),
+    0 0 22px rgb(var(--accent-rgb) / .4);
+}
+.coordinate-highlight-overlay i.visible { opacity: 1; }
 .canvas-crosshair { position: absolute; z-index: 6; inset: 0; opacity: 0; transition: opacity .08s ease; pointer-events: none; }
 .canvas-crosshair.visible { opacity: 1; }
 .canvas-crosshair i { position: absolute; display: block; margin: 0; background: rgb(var(--accent-rgb) / .34); box-shadow: 0 0 5px rgb(var(--accent-rgb) / .13); }

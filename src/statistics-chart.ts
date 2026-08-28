@@ -13,11 +13,17 @@ import {
   type HistogramDatum,
 } from "./statistics-chart-data";
 import {
+  profileHoverAtCoordinate,
+  profilePointAtCoordinate,
+  type StatisticsProfileHover,
+} from "./statistics-link";
+import {
   normalizeStatisticsRange,
   type StatisticsAxisRange,
   type StatisticsChartKey,
   type StatisticsViewState,
 } from "./statistics-view-state";
+import type { ImagePoint } from "./viewport-transform";
 
 type EChartsRuntime = typeof import("./statistics-chart-runtime")["echarts"];
 type ChartInstance = ReturnType<EChartsRuntime["init"]>;
@@ -55,8 +61,17 @@ interface DataZoomEvent extends DataZoomEventItem {
   batch?: DataZoomEventItem[];
 }
 
+interface AxisPointerUpdateEvent {
+  axesInfo?: Array<{
+    axisDim?: string;
+    axisIndex?: number;
+    value?: unknown;
+  }>;
+}
+
 interface StatisticsChartCallbacks {
   onRangeChange(chart: StatisticsChartKey, axis: StatisticsAxis, range: StatisticsAxisRange | null): void;
+  onProfileHover(hover: StatisticsProfileHover | null): void;
   onRenderStart(): void;
   onRenderError(chart: StatisticsChartKey, error: unknown): void;
   onRenderRecovery(chart: StatisticsChartKey): void;
@@ -171,7 +186,11 @@ export class StatisticsCharts {
   private readonly profileContexts = new Map<"row" | "column", ProfileRenderContext>();
   private readonly pendingProfileRanges = new Map<"row" | "column", StatisticsAxisRange>();
   private readonly renderedProfileRanges = new Map<"row" | "column", StatisticsAxisRange>();
+  private readonly profileHoverCleanups = new Map<"row" | "column", () => void>();
   private profileRefreshFrame = 0;
+  private linkedPixelFrame = 0;
+  private linkedPixel: ImagePoint | null = null;
+  private profileHoverKey = "";
   private renderRevision = 0;
 
   constructor(root: HTMLElement, callbacks: StatisticsChartCallbacks) {
@@ -226,7 +245,10 @@ export class StatisticsCharts {
       this.instances.get(chartKey)?.dispose();
       this.instances.delete(chartKey);
       this.domains.delete(chartKey);
-      if (chartKey !== "histogram") this.profileContexts.delete(chartKey);
+      if (chartKey !== "histogram") {
+        this.profileContexts.delete(chartKey);
+        this.clearProfileHoverBinding(chartKey);
+      }
       element.classList.add("failed");
       const detail = error instanceof Error ? error.message : String(error);
       element.textContent = t("statistics.chartRenderFailed", { detail });
@@ -281,16 +303,31 @@ export class StatisticsCharts {
     });
   }
 
+  setLinkedPixel(point: ImagePoint | null): void {
+    this.linkedPixel = point ? { x: point.x, y: point.y } : null;
+    if (this.linkedPixelFrame) return;
+    this.linkedPixelFrame = requestAnimationFrame(() => {
+      this.linkedPixelFrame = 0;
+      this.applyLinkedPixel("row");
+      this.applyLinkedPixel("column");
+    });
+  }
+
   dispose(): void {
     this.renderRevision += 1;
     if (this.profileRefreshFrame) cancelAnimationFrame(this.profileRefreshFrame);
+    if (this.linkedPixelFrame) cancelAnimationFrame(this.linkedPixelFrame);
     this.profileRefreshFrame = 0;
+    this.linkedPixelFrame = 0;
     this.pendingProfileRanges.clear();
     this.profileContexts.clear();
     this.renderedProfileRanges.clear();
+    this.profileHoverCleanups.forEach((cleanup) => cleanup());
+    this.profileHoverCleanups.clear();
     this.instances.forEach((instance) => instance.dispose());
     this.instances.clear();
     this.domains.clear();
+    this.emitProfileHover(null);
   }
 
   private commonOption(colors: Record<string, string>): ChartOption {
@@ -444,6 +481,118 @@ export class StatisticsCharts {
     this.renderedProfileRanges.set(chartKey, range);
   }
 
+  private applyLinkedPixel(chartKey: "row" | "column"): void {
+    const context = this.profileContexts.get(chartKey);
+    if (!context) return;
+    context.chart.setOption({
+      series: this.profileLinkSeries(chartKey, context),
+    });
+  }
+
+  private profileLinkSeries(
+    chartKey: "row" | "column",
+    context: ProfileRenderContext,
+  ): object[] {
+    const domains = this.domains.get(chartKey);
+    const coordinate = this.linkedPixel
+      ? chartKey === "row" ? this.linkedPixel.y : this.linkedPixel.x
+      : null;
+    const coordinateVisible = coordinate !== null
+      && !!domains
+      && coordinate >= domains.x.start
+      && coordinate <= domains.x.end;
+    const guideColor = context.colors.all;
+    const guideData: Array<[number, number]> = coordinateVisible && domains
+      ? [[coordinate, domains.y.start], [coordinate, domains.y.end]]
+      : [];
+    return [
+      {
+        id: `${chartKey}-link-guide`,
+        name: "",
+        type: "line",
+        data: guideData,
+        silent: true,
+        showSymbol: false,
+        animation: false,
+        tooltip: { show: false },
+        lineStyle: {
+          width: 1.4,
+          type: "dashed",
+          color: guideColor,
+          opacity: 0.72,
+          shadowBlur: 8,
+          shadowColor: guideColor,
+        },
+        emphasis: { disabled: true },
+        z: 90,
+      },
+      ...context.groups.map((group) => {
+        const point = coordinateVisible
+          ? profilePointAtCoordinate(group[context.profile], coordinate!)
+          : null;
+        const color = context.colors[group.key] ?? guideColor;
+        return {
+          id: `${chartKey}-link-${group.key}`,
+          name: groupLabel(group.key),
+          type: "line",
+          data: point?.mean === null || point?.mean === undefined
+            ? []
+            : [[point.coordinate, point.mean]],
+          silent: true,
+          animation: false,
+          showSymbol: true,
+          symbol: "circle",
+          symbolSize: 9,
+          tooltip: { show: false },
+          lineStyle: { width: 0, opacity: 0 },
+          itemStyle: {
+            color: context.markerFill,
+            borderColor: color,
+            borderWidth: 2,
+            shadowBlur: 8,
+            shadowColor: color,
+          },
+          emphasis: { disabled: true },
+          z: 100,
+        };
+      }),
+    ];
+  }
+
+  private bindProfileHover(chartKey: "row" | "column", chart: ChartInstance): void {
+    this.clearProfileHoverBinding(chartKey);
+    const element = chart.getDom();
+    const update = (rawEvent: unknown): void => {
+      const event = rawEvent as AxisPointerUpdateEvent;
+      const xAxis = event.axesInfo?.find((axis) => (
+        axis.axisDim === "x" && (axis.axisIndex ?? 0) === 0
+      ));
+      const domain = this.domains.get(chartKey)?.x;
+      this.emitProfileHover(domain && xAxis
+        ? profileHoverAtCoordinate(chartKey, xAxis.value, domain.start, domain.end)
+        : null);
+    };
+    const leave = (): void => this.emitProfileHover(null);
+    chart.on("updateAxisPointer", update);
+    element.addEventListener("pointerleave", leave, { capture: true, passive: true });
+    this.profileHoverCleanups.set(chartKey, () => {
+      chart.off("updateAxisPointer", update);
+      element.removeEventListener("pointerleave", leave, true);
+    });
+  }
+
+  private clearProfileHoverBinding(chartKey: "row" | "column"): void {
+    this.profileHoverCleanups.get(chartKey)?.();
+    this.profileHoverCleanups.delete(chartKey);
+  }
+
+  private emitProfileHover(hover: StatisticsProfileHover | null): void {
+    const key = hover ? `${hover.axis}:${hover.coordinate}` : "";
+    if (key === this.profileHoverKey) return;
+    this.profileHoverKey = key;
+    this.callbacks.onProfileHover(hover);
+  }
+
   private updateRangeInputs(chartKey: StatisticsChartKey, range: StatisticsAxisRange): void {
     const start = this.root.querySelector<HTMLInputElement>(`[data-stat-range-chart="${chartKey}"][data-stat-range-edge="start"]`);
     const end = this.root.querySelector<HTMLInputElement>(`[data-stat-range-chart="${chartKey}"][data-stat-range-edge="end"]`);
@@ -537,6 +686,7 @@ export class StatisticsCharts {
     this.registerChart(chartKey, chart, domains);
     const markerFill = cssValue(getComputedStyle(this.root), "--modal-surface", "#17222b");
     this.profileContexts.set(chartKey, { chart, groups, profile, colors, markerFill });
+    this.bindProfileHover(chartKey, chart);
     const renderedRange = state.xRange ?? domains.x;
     this.renderedProfileRanges.set(chartKey, renderedRange);
     const plotWidth = Math.max(1, chart.getWidth() - 116);
@@ -555,7 +705,7 @@ export class StatisticsCharts {
       yAxis: {
         ...(common.yAxis as object), name: t("statistics.meanDn"), min: domains.y.start, max: domains.y.end,
       },
-      series: groups.map((group) => {
+      series: [...groups.map((group) => {
         const width = group.key === "all" ? 2.3 : group.key === "G" ? 1.9 : 1.3;
         const opacity = group.key === "all" ? 1 : 0.86;
         const type = group.key === "G" ? "dashed" : "solid";
@@ -578,7 +728,7 @@ export class StatisticsCharts {
           emphasis: { disabled: true, lineStyle: { width, type, color, opacity } },
           blur: { lineStyle: { width, type, color, opacity } },
         };
-      }),
+      }), ...this.profileLinkSeries(chartKey, this.profileContexts.get(chartKey)!)],
     });
     this.updateRangeInputs(chartKey, state.xRange ?? domains.x);
   }
