@@ -61,6 +61,14 @@ interface DataZoomEvent extends DataZoomEventItem {
   batch?: DataZoomEventItem[];
 }
 
+interface AxisPointerUpdateEvent {
+  axesInfo?: Array<{
+    axisDim?: string;
+    axisIndex?: number;
+    value?: unknown;
+  }>;
+}
+
 interface StatisticsChartCallbacks {
   onRangeChange(chart: StatisticsChartKey, axis: StatisticsAxis, range: StatisticsAxisRange | null): void;
   onProfileHover(hover: StatisticsProfileHover | null): void;
@@ -554,25 +562,21 @@ export class StatisticsCharts {
   private bindProfileHover(chartKey: "row" | "column", chart: ChartInstance): void {
     this.clearProfileHoverBinding(chartKey);
     const element = chart.getDom();
-    const move = (event: PointerEvent): void => {
-      const rect = element.getBoundingClientRect();
-      const point: [number, number] = [event.clientX - rect.left, event.clientY - rect.top];
-      if (!chart.containPixel({ gridIndex: 0 }, point)) {
-        this.emitProfileHover(null);
-        return;
-      }
-      const converted = chart.convertFromPixel({ xAxisIndex: 0 }, point);
-      const rawCoordinate = Array.isArray(converted) ? converted[0] : converted;
+    const update = (rawEvent: unknown): void => {
+      const event = rawEvent as AxisPointerUpdateEvent;
+      const xAxis = event.axesInfo?.find((axis) => (
+        axis.axisDim === "x" && (axis.axisIndex ?? 0) === 0
+      ));
       const domain = this.domains.get(chartKey)?.x;
-      this.emitProfileHover(domain
-        ? profileHoverAtCoordinate(chartKey, rawCoordinate, domain.start, domain.end)
+      this.emitProfileHover(domain && xAxis
+        ? profileHoverAtCoordinate(chartKey, xAxis.value, domain.start, domain.end)
         : null);
     };
     const leave = (): void => this.emitProfileHover(null);
-    element.addEventListener("pointermove", move, { capture: true, passive: true });
+    chart.on("updateAxisPointer", update);
     element.addEventListener("pointerleave", leave, { capture: true, passive: true });
     this.profileHoverCleanups.set(chartKey, () => {
-      element.removeEventListener("pointermove", move, true);
+      chart.off("updateAxisPointer", update);
       element.removeEventListener("pointerleave", leave, true);
     });
   }

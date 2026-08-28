@@ -162,11 +162,11 @@ test("row and column profiles exchange lightweight hover state and exact linked 
   assert.match(chartSource, /profilePointAtCoordinate\(group\[context\.profile\], coordinate!\)/);
   assert.match(chartSource, /`\$\{chartKey\}-link-guide`/);
   assert.match(chartSource, /`\$\{chartKey\}-link-\$\{group\.key\}`/);
-  assert.match(chartSource, /chart\.containPixel\(\{ gridIndex: 0 \}, point\)/);
-  assert.match(chartSource, /chart\.convertFromPixel\(\{ xAxisIndex: 0 \}, point\)/);
-  assert.match(chartSource, /addEventListener\("pointermove", move, \{ capture: true, passive: true \}\)/);
+  assert.match(chartSource, /chart\.on\("updateAxisPointer", update\)/);
+  assert.match(chartSource, /axis\.axisDim === "x"/);
+  assert.match(chartSource, /profileHoverAtCoordinate\(chartKey, xAxis\.value/);
   assert.match(chartSource, /addEventListener\("pointerleave", leave, \{ capture: true, passive: true \}\)/);
-  assert.doesNotMatch(chartSource, /zrender\.on\("mousemove"/);
+  assert.doesNotMatch(chartSource, /containPixel|convertFromPixel|zrender\.on\("mousemove"/);
   const apply = chartSource.match(/private applyLinkedPixel[\s\S]*?\n  \}/)?.[0] ?? "";
   assert.doesNotMatch(apply, /dispatchAction|dataZoom/);
 });
