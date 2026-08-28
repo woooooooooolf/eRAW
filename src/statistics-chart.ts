@@ -13,6 +13,7 @@ import {
   type HistogramDatum,
 } from "./statistics-chart-data";
 import {
+  profileHoverAtCoordinate,
   profilePointAtCoordinate,
   type StatisticsProfileHover,
 } from "./statistics-link";
@@ -177,6 +178,7 @@ export class StatisticsCharts {
   private readonly profileContexts = new Map<"row" | "column", ProfileRenderContext>();
   private readonly pendingProfileRanges = new Map<"row" | "column", StatisticsAxisRange>();
   private readonly renderedProfileRanges = new Map<"row" | "column", StatisticsAxisRange>();
+  private readonly profileHoverCleanups = new Map<"row" | "column", () => void>();
   private profileRefreshFrame = 0;
   private linkedPixelFrame = 0;
   private linkedPixel: ImagePoint | null = null;
@@ -235,7 +237,10 @@ export class StatisticsCharts {
       this.instances.get(chartKey)?.dispose();
       this.instances.delete(chartKey);
       this.domains.delete(chartKey);
-      if (chartKey !== "histogram") this.profileContexts.delete(chartKey);
+      if (chartKey !== "histogram") {
+        this.profileContexts.delete(chartKey);
+        this.clearProfileHoverBinding(chartKey);
+      }
       element.classList.add("failed");
       const detail = error instanceof Error ? error.message : String(error);
       element.textContent = t("statistics.chartRenderFailed", { detail });
@@ -309,6 +314,8 @@ export class StatisticsCharts {
     this.pendingProfileRanges.clear();
     this.profileContexts.clear();
     this.renderedProfileRanges.clear();
+    this.profileHoverCleanups.forEach((cleanup) => cleanup());
+    this.profileHoverCleanups.clear();
     this.instances.forEach((instance) => instance.dispose());
     this.instances.clear();
     this.domains.clear();
@@ -545,24 +552,34 @@ export class StatisticsCharts {
   }
 
   private bindProfileHover(chartKey: "row" | "column", chart: ChartInstance): void {
-    const zrender = chart.getZr();
-    zrender.on("mousemove", (event) => {
-      const point = [event.offsetX, event.offsetY];
+    this.clearProfileHoverBinding(chartKey);
+    const element = chart.getDom();
+    const move = (event: PointerEvent): void => {
+      const rect = element.getBoundingClientRect();
+      const point: [number, number] = [event.clientX - rect.left, event.clientY - rect.top];
       if (!chart.containPixel({ gridIndex: 0 }, point)) {
         this.emitProfileHover(null);
         return;
       }
       const converted = chart.convertFromPixel({ xAxisIndex: 0 }, point);
       const rawCoordinate = Array.isArray(converted) ? converted[0] : converted;
-      const coordinate = Math.round(Number(rawCoordinate));
       const domain = this.domains.get(chartKey)?.x;
-      if (!domain || !Number.isFinite(coordinate) || coordinate < domain.start || coordinate > domain.end) {
-        this.emitProfileHover(null);
-        return;
-      }
-      this.emitProfileHover({ axis: chartKey, coordinate });
+      this.emitProfileHover(domain
+        ? profileHoverAtCoordinate(chartKey, rawCoordinate, domain.start, domain.end)
+        : null);
+    };
+    const leave = (): void => this.emitProfileHover(null);
+    element.addEventListener("pointermove", move, { capture: true, passive: true });
+    element.addEventListener("pointerleave", leave, { capture: true, passive: true });
+    this.profileHoverCleanups.set(chartKey, () => {
+      element.removeEventListener("pointermove", move, true);
+      element.removeEventListener("pointerleave", leave, true);
     });
-    zrender.on("globalout", () => this.emitProfileHover(null));
+  }
+
+  private clearProfileHoverBinding(chartKey: "row" | "column"): void {
+    this.profileHoverCleanups.get(chartKey)?.();
+    this.profileHoverCleanups.delete(chartKey);
   }
 
   private emitProfileHover(hover: StatisticsProfileHover | null): void {

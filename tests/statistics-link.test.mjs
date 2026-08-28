@@ -120,6 +120,20 @@ test("profile markers recover exact source coordinates instead of sampled chart 
   assert.equal(link.profilePointAtCoordinate([], 12), null);
 });
 
+test("profile hover coordinates round to exact source rows or columns and stay in range", () => {
+  assert.deepEqual(link.profileHoverAtCoordinate("row", 21.49, 20, 22), {
+    axis: "row",
+    coordinate: 21,
+  });
+  assert.deepEqual(link.profileHoverAtCoordinate("column", "11.6", 10, 13), {
+    axis: "column",
+    coordinate: 12,
+  });
+  assert.equal(link.profileHoverAtCoordinate("row", Number.NaN, 20, 22), null);
+  assert.equal(link.profileHoverAtCoordinate("row", 19.4, 20, 22), null);
+  assert.equal(link.profileHoverAtCoordinate("column", 13.6, 10, 13), null);
+});
+
 test("high-zoom canvas linking uses soft row and column overlays without changing the viewport", () => {
   assert.match(appSource, /class="coordinate-highlight-overlay"/);
   assert.match(appSource, /\{ type: "locate", point \}/);
@@ -129,7 +143,7 @@ test("high-zoom canvas linking uses soft row and column overlays without changin
   assert.match(overlaySource, /width: imageWidth, height: 1/);
   assert.match(overlaySource, /width: 1, height: imageHeight/);
   const overlayRule = styleSource.match(/\.coordinate-highlight-overlay i \{[\s\S]*?\n\}/)?.[0] ?? "";
-  assert.match(overlayRule, /border:\s*1px solid/);
+  assert.match(overlayRule, /border:\s*2px solid/);
   assert.match(overlayRule, /box-shadow:/);
   const sync = appSource.match(/private syncCoordinateLinkNow\(\): void \{[\s\S]*?\n  \}/)?.[0] ?? "";
   assert.match(sync, /this\.coordinateHighlightVisible/);
@@ -140,13 +154,16 @@ test("row and column profiles exchange lightweight hover state and exact linked 
   assert.match(appSource, /emitTo\("statistics", "statistics:link", link\)/);
   assert.match(appSource, /listen<StatisticsWindowHoverMessage>\("statistics:hover"/);
   assert.match(windowSource, /listen<StatisticsLinkedPixel \| null>\("statistics:link"/);
-  assert.match(windowSource, /emit\("statistics:hover", message\)/);
+  assert.match(windowSource, /emitTo\("main", "statistics:hover", message\)/);
   assert.match(panelSource, /resolveLinkedPixel\(link, this\.state\.result\)/);
   assert.match(chartSource, /profilePointAtCoordinate\(group\[context\.profile\], coordinate!\)/);
   assert.match(chartSource, /`\$\{chartKey\}-link-guide`/);
   assert.match(chartSource, /`\$\{chartKey\}-link-\$\{group\.key\}`/);
   assert.match(chartSource, /chart\.containPixel\(\{ gridIndex: 0 \}, point\)/);
   assert.match(chartSource, /chart\.convertFromPixel\(\{ xAxisIndex: 0 \}, point\)/);
+  assert.match(chartSource, /addEventListener\("pointermove", move, \{ capture: true, passive: true \}\)/);
+  assert.match(chartSource, /addEventListener\("pointerleave", leave, \{ capture: true, passive: true \}\)/);
+  assert.doesNotMatch(chartSource, /zrender\.on\("mousemove"/);
   const apply = chartSource.match(/private applyLinkedPixel[\s\S]*?\n  \}/)?.[0] ?? "";
   assert.doesNotMatch(apply, /dispatchAction|dataZoom/);
 });

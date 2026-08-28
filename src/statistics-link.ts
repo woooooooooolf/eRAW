@@ -77,6 +77,21 @@ export function coordinateHighlightEnabled(zoom: number): boolean {
   return Number.isFinite(zoom) && zoom >= MIN_COORDINATE_HIGHLIGHT_ZOOM;
 }
 
+export function profileHoverAtCoordinate(
+  axis: StatisticsProfileAxis,
+  rawCoordinate: unknown,
+  domainStart: number,
+  domainEnd: number,
+): StatisticsProfileHover | null {
+  const coordinate = Math.round(Number(rawCoordinate));
+  if (
+    !Number.isFinite(coordinate)
+    || coordinate < domainStart
+    || coordinate > domainEnd
+  ) return null;
+  return { axis, coordinate };
+}
+
 export function linkedPixelForResult(
   point: ImagePoint | null,
   result: AnalysisResult | null,

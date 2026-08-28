@@ -1,5 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { emit, listen } from "@tauri-apps/api/event";
+import { emit, emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   setLanguagePreference,
@@ -68,7 +68,7 @@ export class StatisticsWindowApp {
 
   private emitProfileHover(hover: StatisticsWindowHoverMessage["hover"]): Promise<void> {
     const message: StatisticsWindowHoverMessage = { hover, source: "detached" };
-    return emit("statistics:hover", message);
+    return emitTo("main", "statistics:hover", message);
   }
 
   private async handleAction(action: StatisticsPanelAction): Promise<void> {
