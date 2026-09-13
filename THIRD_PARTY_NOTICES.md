@@ -391,9 +391,9 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | tauri-codegen | 2.6.3 | Apache-2.0 OR MIT |
 | tauri-macros | 2.6.3 | Apache-2.0 OR MIT |
 | tauri-plugin | 2.6.3 | Apache-2.0 OR MIT |
-| tauri-plugin-clipboard-manager | 2.3.2 | Apache-2.0 OR MIT |
-| tauri-plugin-dialog | 2.7.2 | Apache-2.0 OR MIT |
-| tauri-plugin-fs | 2.5.1 | Apache-2.0 OR MIT |
+| tauri-plugin-clipboard-manager | 2.3.3 | Apache-2.0 OR MIT |
+| tauri-plugin-dialog | 2.7.3 | Apache-2.0 OR MIT |
+| tauri-plugin-fs | 2.5.2 | Apache-2.0 OR MIT |
 | tauri-runtime | 2.11.3 | Apache-2.0 OR MIT |
 | tauri-runtime-wry | 2.11.4 | Apache-2.0 OR MIT |
 | tauri-utils | 2.9.3 | Apache-2.0 OR MIT |
