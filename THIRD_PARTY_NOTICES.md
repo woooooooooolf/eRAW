@@ -40,14 +40,14 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | @tauri-apps/cli-win32-arm64-msvc | 2.11.4 | development | Apache-2.0 OR MIT |
 | @tauri-apps/cli-win32-ia32-msvc | 2.11.4 | development | Apache-2.0 OR MIT |
 | @tauri-apps/cli-win32-x64-msvc | 2.11.4 | development | Apache-2.0 OR MIT |
-| @tauri-apps/plugin-clipboard-manager | 2.3.2 | runtime | MIT OR Apache-2.0 |
-| @tauri-apps/plugin-dialog | 2.7.2 | runtime | MIT OR Apache-2.0 |
-| commander | 8.3.0 | runtime | MIT |
+| @tauri-apps/plugin-clipboard-manager | 2.3.3 | runtime | MIT OR Apache-2.0 |
+| @tauri-apps/plugin-dialog | 2.7.3 | runtime | MIT OR Apache-2.0 |
+| commander | 15.0.0 | runtime | MIT |
 | detect-libc | 2.1.2 | development | Apache-2.0 |
 | echarts | 6.1.0 | runtime | Apache-2.0 |
 | fdir | 6.5.0 | development | MIT |
 | fsevents | 2.3.3 | development | MIT |
-| katex | 0.18.4 | runtime | MIT |
+| katex | 0.18.5 | runtime | MIT |
 | lightningcss | 1.33.0 | development | MPL-2.0 |
 | lightningcss-android-arm64 | 1.33.0 | development | MPL-2.0 |
 | lightningcss-darwin-arm64 | 1.33.0 | development | MPL-2.0 |
