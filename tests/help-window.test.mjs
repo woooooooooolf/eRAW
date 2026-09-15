@@ -129,7 +129,7 @@ test("the application distributes no named font or font file", () => {
   assert.doesNotMatch(styleSource, /@font-face|Cascadia|Consolas|Segoe|Microsoft YaHei/);
   assert.match(pixelOverlaySource, /ui-monospace, monospace/);
   assert.doesNotMatch(pixelOverlaySource, /Cascadia|Consolas|Segoe|Microsoft YaHei/);
-  assert.equal(JSON.parse(packageSource).dependencies.katex, "^0.18.5");
+  assert.equal(JSON.parse(packageSource).dependencies.katex, "^0.18.7");
   assert.match(appSource, /<strong>KaTeX<\/strong>/);
   assert.match(appSource, /<code>MIT<\/code>/);
   assert.match(fontPolicySource, /MathML/);
