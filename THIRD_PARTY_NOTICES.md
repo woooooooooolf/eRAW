@@ -386,7 +386,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | tao | 0.35.3 | Apache-2.0 |
 | tao-macros | 0.1.3 | MIT OR Apache-2.0 |
 | target-lexicon | 0.12.16 | Apache-2.0 WITH LLVM-exception |
-| tauri | 2.11.5 | Apache-2.0 OR MIT |
+| tauri | 2.11.6 | Apache-2.0 OR MIT |
 | tauri-build | 2.6.3 | Apache-2.0 OR MIT |
 | tauri-codegen | 2.6.3 | Apache-2.0 OR MIT |
 | tauri-macros | 2.6.3 | Apache-2.0 OR MIT |
