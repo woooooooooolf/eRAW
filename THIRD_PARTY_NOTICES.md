@@ -65,7 +65,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | picomatch | 4.0.7 | development | MIT |
 | postcss | 8.5.28 | development | MIT |
 | rolldown | 1.2.12 | development | MIT |
-| source-map-js | 1.2.1 | development | BSD-3-Clause |
+| source-map-js | 1.2.2 | development | BSD-3-Clause |
 | tinyglobby | 0.2.17 | development | MIT |
 | tslib | 2.3.0 | runtime | 0BSD |
 | typescript | 6.0.3 | development | Apache-2.0 |
