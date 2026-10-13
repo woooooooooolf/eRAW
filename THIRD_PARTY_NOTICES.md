@@ -27,7 +27,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | @rolldown/binding-win32-arm64-msvc | 1.2.12 | development | MIT |
 | @rolldown/binding-win32-x64-msvc | 1.2.12 | development | MIT |
 | @rolldown/pluginutils | 1.0.1 | development | MIT |
-| @tauri-apps/api | 2.12.1 | runtime | Apache-2.0 OR MIT |
+| @tauri-apps/api | 2.12.2 | runtime | Apache-2.0 OR MIT |
 | @tauri-apps/cli | 2.12.1 | development | Apache-2.0 OR MIT |
 | @tauri-apps/cli-darwin-arm64 | 2.12.1 | development | Apache-2.0 OR MIT |
 | @tauri-apps/cli-darwin-x64 | 2.12.1 | development | Apache-2.0 OR MIT |
@@ -60,16 +60,16 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | lightningcss-linux-x64-musl | 1.33.0 | development | MPL-2.0 |
 | lightningcss-win32-arm64-msvc | 1.33.0 | development | MPL-2.0 |
 | lightningcss-win32-x64-msvc | 1.33.0 | development | MPL-2.0 |
-| nanoid | 3.3.19 | development | MIT |
+| nanoid | 3.3.20 | development | MIT |
 | picocolors | 1.1.1 | development | ISC |
 | picomatch | 4.0.7 | development | MIT |
-| postcss | 8.5.28 | development | MIT |
+| postcss | 8.5.29 | development | MIT |
 | rolldown | 1.2.12 | development | MIT |
 | source-map-js | 1.2.2 | development | BSD-3-Clause |
 | tinyglobby | 0.2.17 | development | MIT |
 | tslib | 2.3.0 | runtime | 0BSD |
 | typescript | 6.0.3 | development | Apache-2.0 |
-| vite | 8.3.2 | development | MIT |
+| vite | 8.3.4 | development | MIT |
 | zrender | 6.1.0 | runtime | BSD-3-Clause |
 
 ## Cargo dependencies (469)
