@@ -49,6 +49,7 @@ import {
 import { ExportDialog, exportDialogTemplate } from "./export-dialog";
 import { cyclePrimaryDisplayMode, matchesShortcut } from "./keyboard-shortcuts";
 import { packingControlState } from "./packing-controls";
+import { readPreferenceFields, savePreferenceChanges } from "./preference-storage";
 import {
   formatDateTime,
   formatTime,
@@ -227,8 +228,7 @@ function imageFormatDescriptorsEqual(left: RawDescriptor, right: RawDescriptor):
 
 function loadSettings(): AppSettings {
   try {
-    const saved = localStorage.getItem(SETTINGS_KEY);
-    if (saved) return parseAppSettings(JSON.parse(saved));
+    return parseAppSettings(readPreferenceFields(localStorage, SETTINGS_KEY, DEFAULT_SETTINGS));
   } catch { /* 使用安全默认值 */ }
   return { ...DEFAULT_SETTINGS };
 }
@@ -272,6 +272,7 @@ export class ErawApp {
   private readonly exportDialog: ExportDialog;
   private readonly statisticsPanel: StatisticsPanel;
   private settings = loadSettings();
+  private savedSettings = { ...this.settings };
   private descriptor = loadDescriptor(this.settings.rememberDescriptor);
   private processing = loadProcessingSettings();
   private document: DocumentInfo | null = null;
@@ -323,9 +324,6 @@ export class ErawApp {
     const normalizedBitDepth = Number(this.descriptorFieldValue("bitDepth"));
     if (normalizedBitDepth !== this.descriptor.bitDepth) {
       this.descriptor = { ...this.descriptor, bitDepth: normalizedBitDepth };
-      if (this.settings.rememberDescriptor) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.descriptor));
-      }
     }
     this.displayWindow = defaultDisplayWindow(this.descriptor.bitDepth);
     this.exportDialog = new ExportDialog(root, {
@@ -1807,7 +1805,8 @@ export class ErawApp {
   }
 
   private persistSettings(): void {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
+    savePreferenceChanges(localStorage, SETTINGS_KEY, this.savedSettings, this.settings);
+    this.savedSettings = { ...this.settings };
   }
 
   private setLanguage(language: LanguagePreference): void {
@@ -2946,6 +2945,7 @@ export class ErawApp {
   }
 
   private saveSettingsFromDialog(): void {
+    const rememberedBefore = this.settings.rememberDescriptor;
     this.settings = {
       theme: this.settings.theme,
       uiFontSize: this.get<HTMLSelectElement>("setting-font-size").value as UiFontSize,
@@ -2965,8 +2965,10 @@ export class ErawApp {
       missingPixelColor: this.settings.missingPixelColor,
     };
     this.persistSettings();
-    if (this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(this.descriptor));
-    else localStorage.removeItem(STORAGE_KEY);
+    if (rememberedBefore !== this.settings.rememberDescriptor) {
+      if (this.settings.rememberDescriptor) localStorage.setItem(STORAGE_KEY, JSON.stringify(this.descriptor));
+      else localStorage.removeItem(STORAGE_KEY);
+    }
     this.applySettings();
     this.get<HTMLDialogElement>("settings-dialog").close();
     this.showToast(t("settings.saved"), "success");
