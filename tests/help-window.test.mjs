@@ -17,6 +17,8 @@ const [appSource, contentSource, localizedContentSource, windowSource, statistic
   readFile(new URL("../docs/FONT_POLICY.md", import.meta.url), "utf8"),
 ]);
 
+const versionPattern = JSON.parse(packageSource).version.replaceAll(".", "\\.");
+
 test("help is available from the utility menu and F1 through one window lifecycle", () => {
   assert.match(appSource, /id="help-menu-item"/);
   assert.match(appSource, /matchesShortcut\(event, \{ key: "F1" \}\)/);
@@ -52,8 +54,8 @@ test("the technical manual is split into task-oriented pages", () => {
   assert.match(windowSource, /data-help-previous/);
   assert.match(windowSource, /data-help-next/);
   assert.match(windowSource, /window\.history\.pushState/);
-  assert.match(windowSource, /eRAW V0\.6\.1/);
-  assert.match(contentSource, /eRAW V0\.6\.1 当前实现同步/);
+  assert.match(windowSource, new RegExp(`eRAW V${versionPattern}`));
+  assert.match(contentSource, new RegExp(`eRAW V${versionPattern} 当前实现同步`));
 });
 
 test("the technical manual renders implementation-accurate LaTeX as native MathML", () => {
@@ -89,7 +91,7 @@ test("all seven interface locales provide a complete localized manual", () => {
     assert.match(localizedContentSource, new RegExp(`(?:${locale === "zh-TW" ? '"zh-TW"' : locale}): [A-Z_]+_COPY`));
   }
   assert.match(localizedContentSource, /if \(locale === "zh-CN"\)/);
-  assert.match(localizedContentSource, /V0\.6\.1/g);
+  assert.match(localizedContentSource, new RegExp(`V${versionPattern}`, "g"));
   assert.match(windowSource, /data-help-locale="\$\{getResolvedLocale\(\)\}"/);
   assert.match(windowSource, /queryLanguagePreference\(new URLSearchParams/);
   assert.doesNotMatch(windowSource, /isLanguagePreference\(requestedLanguage\)/);
