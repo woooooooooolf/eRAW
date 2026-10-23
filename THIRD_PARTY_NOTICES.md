@@ -27,21 +27,21 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | @rolldown/binding-win32-arm64-msvc | 1.2.12 | development | MIT |
 | @rolldown/binding-win32-x64-msvc | 1.2.12 | development | MIT |
 | @rolldown/pluginutils | 1.0.1 | development | MIT |
-| @tauri-apps/api | 2.12.2 | runtime | Apache-2.0 OR MIT |
-| @tauri-apps/cli | 2.12.1 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-darwin-arm64 | 2.12.1 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-darwin-x64 | 2.12.1 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-arm-gnueabihf | 2.12.1 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-arm64-gnu | 2.12.1 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-arm64-musl | 2.12.1 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-riscv64-gnu | 2.12.1 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-x64-gnu | 2.12.1 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-x64-musl | 2.12.1 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-win32-arm64-msvc | 2.12.1 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-win32-ia32-msvc | 2.12.1 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-win32-x64-msvc | 2.12.1 | development | Apache-2.0 OR MIT |
-| @tauri-apps/plugin-clipboard-manager | 2.4.1 | runtime | MIT OR Apache-2.0 |
-| @tauri-apps/plugin-dialog | 2.8.1 | runtime | MIT OR Apache-2.0 |
+| @tauri-apps/api | 2.12.4 | runtime | Apache-2.0 OR MIT |
+| @tauri-apps/cli | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-darwin-arm64 | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-darwin-x64 | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-arm-gnueabihf | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-arm64-gnu | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-arm64-musl | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-riscv64-gnu | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-x64-gnu | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-x64-musl | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-win32-arm64-msvc | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-win32-ia32-msvc | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-win32-x64-msvc | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/plugin-clipboard-manager | 2.5.0 | runtime | MIT OR Apache-2.0 |
+| @tauri-apps/plugin-dialog | 2.8.3 | runtime | MIT OR Apache-2.0 |
 | commander | 15.0.0 | runtime | MIT |
 | detect-libc | 2.1.2 | development | Apache-2.0 |
 | echarts | 6.1.0 | runtime | Apache-2.0 |
