@@ -56,6 +56,22 @@ Release EXE は Authenticode 署名されていないため、Windows が SmartS
 - 現在のフレームを Remosaic Bayer または RGB48 Interleaved データとしてエクスポート。
 - キャンバスウィンドウまたは完全なプレビューを PNG に保存、もしくはクリップボードへコピー。
 
+## コマンドラインと AI 連携
+
+端末、スクリプト、AI から RAW ファイル、寸法、格納形式、ビット深度、CFA、初期表示を指定できます。呼び出しごとに独立ウィンドウを開きます。以下の EXE 名と入力パスは実際の配布ファイルに置き換えてください。
+
+```powershell
+& '.\eRAW.exe' '.\result.raw' --width 1920 --height 1080 --packing unpacked16 --bit-depth 12 --cfa RGGB --mode demosaic
+& '.\eRAW.exe' --check '.\result.raw' --width 1920 --height 1080 --packing unpacked16 --bit-depth 12 --cfa RGGB
+& '.\eRAW.exe' --skill
+```
+
+`--check` を加えると、画面を開かずに引数、ファイルアクセス、配置を確認します。ヘルプと結果は人間と AI の修正に適した英語です。事前確認成功は描画完了を意味しません。
+
+`--skill` は EXE に埋め込まれた英語の SKILL.md 全文を出力して終了します。skill のインストールや AI 設定の変更はしません。CLI 初期値は自動保存されず、以降の操作は通常の GUI 保存設定に従います。
+
+パラメーターと終了コードは [CLI ガイド](docs/CLI.md)、AI 呼び出し手順は [skill ソース](skill/eraw-viewer/SKILL.md)をご覧ください。
+
 ## プラットフォームと技術スタック
 
 eRAW は現在 Windows を主要ターゲットとし、Tauri 2 で構築されています。
@@ -66,7 +82,7 @@ eRAW は現在 Windows を主要ターゲットとし、Tauri 2 で構築され�
 
 ## ソースから実行
 
-Node.js、安定版 Rust、Windows WebView2、および Tauri 2 が必要とするシステムビルド依存関係を準備してください。
+Node.js、安定版 Rust（最低 1.90）、Windows WebView2、および Tauri 2 が必要とするシステムビルド依存関係を準備してください。
 
 ```powershell
 npm.cmd install
@@ -88,8 +104,6 @@ npm.cmd run release
 ## 技術文書
 
 製品上の判断、システム構成、RAW の意味論、レンダリング、テスト、開発フローについては、[技術文書の索引](docs/README.md)を参照してください。
-
-コマンドラインから画像と RAW パラメーターを指定でき、`--check` で事前確認も行えます。[CLI ガイド](docs/CLI.md)をご覧ください。CLI のヘルプと結果は英語で表示されます。
 
 ## 現在の範囲
 

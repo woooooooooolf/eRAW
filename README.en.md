@@ -56,6 +56,22 @@ The viewer path tolerates truncated or incomplete input where possible and repor
 - Export the current frame as Remosaic Bayer or RGB48 Interleaved data.
 - Save the canvas window or the complete preview as PNG, or copy either to the clipboard.
 
+## Command line and AI callers
+
+A terminal, script, or AI tool can supply the RAW file, dimensions, storage format, bit depth, CFA, and initial view. Each invocation opens an independent viewer. Replace the EXE filename and input path below with the actual distributed files.
+
+```powershell
+& '.\eRAW.exe' '.\result.raw' --width 1920 --height 1080 --packing unpacked16 --bit-depth 12 --cfa RGGB --mode demosaic
+& '.\eRAW.exe' --check '.\result.raw' --width 1920 --height 1080 --packing unpacked16 --bit-depth 12 --cfa RGGB
+& '.\eRAW.exe' --skill
+```
+
+Add `--check` to validate parameters, file access, and layout without a window. Help and feedback are always readable English for people and AI correction; preflight success does not confirm completed rendering.
+
+`--skill` prints the complete English SKILL.md embedded in the EXE and exits. It installs no skill and changes no AI configuration. Initial CLI values are not saved automatically; later user actions follow the normal GUI save settings.
+
+See the [CLI guide](docs/CLI.md) for parameters and exit statuses, and the [skill source](skill/eraw-viewer/SKILL.md) for AI invocation guidance.
+
 ## Platform and stack
 
 eRAW currently targets Windows first and is built with Tauri 2:
@@ -66,7 +82,7 @@ eRAW currently targets Windows first and is built with Tauri 2:
 
 ## Run from source
 
-Install Node.js, stable Rust, Windows WebView2, and the system dependencies required by Tauri 2.
+Install Node.js, stable Rust (minimum 1.90), Windows WebView2, and the system dependencies required by Tauri 2.
 
 ```powershell
 npm.cmd install
@@ -88,8 +104,6 @@ npm.cmd run release
 ## Engineering documentation
 
 See the [engineering documentation index](docs/README.md) for product decisions, architecture, RAW semantics, rendering, testing, and the development workflow.
-
-Open an image with explicit RAW parameters from the command line, or run `--check` before viewing. See the [CLI guide](docs/CLI.md). All CLI help and feedback are English.
 
 ## Current scope
 

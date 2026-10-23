@@ -73,6 +73,10 @@ pub fn run() {
             print_output(cli::HELP, false);
             return;
         }
+        cli::Action::Skill => {
+            print_output(cli::SKILL, false);
+            return;
+        }
         cli::Action::Version => {
             print_output(&format!("eRAW {}\n", env!("CARGO_PKG_VERSION")), false);
             return;

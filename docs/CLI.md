@@ -63,6 +63,7 @@ Numbers must be unsigned decimal integers; byte counts must not exceed
 | `--view` | `fit` (default), `actual` |
 | `--same-color-reconstruction` | `true` or `false` (default); accepted for Quad CFA only |
 | `--check` | Run the same file/layout preflight, print its result, and exit without a window |
+| `--skill` | Print the complete bundled English SKILL.md to stdout and exit; use alone |
 | `-h`, `--help` | Print help and exit; use alone |
 | `-V`, `--version` | Print the application version and exit; use alone |
 
@@ -119,7 +120,7 @@ available, the numeric OS error code. Localized OS error prose is not printed.
 
 | Exit status | Meaning |
 | --- | --- |
-| 0 | `--check` passed, help/version printed, or the viewer closed normally |
+| 0 | `--check` passed, help/skill/version printed, or the viewer closed normally |
 | 1 | Viewer startup or document-session initialization failed |
 | 2 | Invalid arguments |
 | 3 | File or layout preflight failed |
@@ -135,6 +136,43 @@ completed rendering, or user acceptance. A successful normal launch stays runnin
 until the user closes it; its process exit is not a readiness signal. `--check`
 does not initialize WebView2. If a caller runs `--check` and then starts the viewer,
 the viewer checks the file again, since it may have changed between invocations.
+
+## Bundled AI skill
+
+Run the actual distributed executable with `--skill` to print a self-contained
+English skill in Markdown with YAML frontmatter. It covers the input contract,
+preflight/correction workflow, asynchronous invocation, source-file lifetime,
+and readiness evidence. This standalone query takes no image parameters, opens
+no window, does not initialize WebView2, and changes no preferences or AI
+configuration. Do not combine it with `--check` or other options.
+
+```powershell
+& 'D:\Tools\eRAW.exe' --skill
+```
+
+The sole source is [skill/eraw-viewer/SKILL.md](../skill/eraw-viewer/SKILL.md), embedded
+by Rust [`include_str!`](https://doc.rust-lang.org/std/macro.include_str.html) during compilation. No adjacent skill file or repository is
+required. Output contains only that document, without a wrapper or status banner.
+Rebuild after editing it. Release tests compare a detached EXE's output against
+the source and run the skill's command examples through real preflight.
+
+Printing does not install the skill or ensure automatic discovery by an AI client.
+Supply the text as context, or save it in the location chosen for a client that
+supports SKILL.md. Avoid redirection that silently changes encoding, such as the
+default UTF-16 output of [Windows PowerShell 5.1](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_character_encoding?view=powershell-5.1). A process API can export UTF-8 bytes:
+
+```python
+from pathlib import Path
+import subprocess
+
+text = subprocess.check_output([r"D:\Tools\eRAW.exe", "--skill"], timeout=10)
+destination = Path("SKILL.md")  # Use the chosen skill folder.
+with destination.open("xb") as output:  # Do not overwrite an existing skill.
+    output.write(text)
+```
+
+The GUI manual includes a localized **Command line, preflight, and AI workflows**
+article in all seven interface languages. The skill and CLI output remain English.
 
 ## Settings and multiple instances
 

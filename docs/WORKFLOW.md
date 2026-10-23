@@ -96,6 +96,8 @@ npm.cmd run release
 
 ## 翻译目录维护
 
+随软件分发的 AI skill 维护在 `skill/eraw-viewer/SKILL.md`，正文统一英文且自包含；不要引入仅仓库可访问的必需引用。CLI 契约变化时同轮更新 `--help`、`docs/CLI.md`、skill、七语 README 与内置 CLI 帮助页。`--skill` 通过编译期嵌入保持单一来源，构建后以真实 EXE 校验完整输出和示例参数；打印 skill 不等于安装到 AI 客户端。
+
 - 新增或修改用户可见文字时，同步补齐 `src/i18n.ts` 的七种语言，不提交空白占位。
 - 静态界面文字必须通过显式 `data-i18n`、`data-i18n-title`、`data-i18n-aria-label`、`data-i18n-placeholder` 或 `data-i18n-help` 键绑定；不得从中文、英文或其他可见文字反向匹配消息键。
 - 产品名、RAW/CFA/Packing/Remosaic/Demosaic、格式名、单位和按键保持行业惯用写法；普通说明文字应完整翻译。

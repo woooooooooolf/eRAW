@@ -1,13 +1,14 @@
 // Explicit Release-only checks: never launch a development server or leave a viewer running.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, readFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, copyFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
 const exe = resolve("src-tauri/target/release", process.platform === "win32" ? "eraw.exe" : "eraw");
 const version = JSON.parse(readFileSync("package.json", "utf8")).version;
+const skill = readFileSync("skill/eraw-viewer/SKILL.md", "utf8");
 const directory = mkdtempSync(join(tmpdir(), "eraw-cli-release-"));
 const file = join(directory, "图像 capture = 01.bin");
 writeFileSync(file, Buffer.from([0, 32, 64, 96, 128, 160, 192]));
@@ -27,6 +28,32 @@ test("Release help and version return through inherited stdout", () => {
   assert.match(help.stdout, /Preflight checks parameters/);
   assert.equal(help.stderr, "");
   assert.equal(run(["--version"]).stdout.trim(), `eRAW ${version}`);
+});
+
+test("Release prints the self-contained skill from outside the repository", () => {
+  const detached = join(directory, process.platform === "win32" ? "distributed-viewer.exe" : "distributed-viewer");
+  copyFileSync(exe, detached);
+  const result = spawnSync(detached, ["--skill"], {
+    cwd: directory, encoding: "utf8", timeout: 10000, windowsHide: true,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0);
+  assert.equal(result.stderr, "");
+  assert.equal(result.stdout.replaceAll("\r\n", "\n"), skill.replaceAll("\r\n", "\n"));
+  const invalid = run(["--skill", "--check"]);
+  assert.equal(invalid.status, 2);
+  assert.match(invalid.stderr, /must be used alone/);
+});
+
+test("bundled skill command examples pass the actual CLI preflight", () => {
+  const blocks = [...skill.matchAll(/```text\r?\n([\s\S]*?)```/g)];
+  const examples = blocks.flatMap((block) => block[1].trim().split(/\r?\n/)).filter((line) => line.startsWith("eRAW.exe "));
+  assert.ok(examples.length > 0);
+  for (const example of examples) {
+    const [, , ...parameters] = example.split(/\s+/);
+    const result = run(["--check", file, ...parameters]);
+    assert.equal(result.status, 0, `${example}\n${result.stderr}`);
+  }
 });
 
 test("Release preflight accepts Unicode paths and reports partial data without a window", () => {

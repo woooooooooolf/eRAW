@@ -56,6 +56,22 @@
 - 导出当前帧的 Remosaic Bayer 或 RGB48 Interleaved 数据。
 - 将画布窗口或完整预览图保存为 PNG，或复制到剪贴板。
 
+## 命令行与 AI 调用
+
+可由终端、脚本或 AI 指定 RAW 文件、尺寸、存储方式、位深、CFA 和初始视图，每次调用打开独立窗口。以下示例中的 EXE 文件名和输入路径需要按实际分发文件替换。
+
+```powershell
+& '.\eRAW.exe' '.\result.raw' --width 1920 --height 1080 --packing unpacked16 --bit-depth 12 --cfa RGGB --mode demosaic
+& '.\eRAW.exe' --check '.\result.raw' --width 1920 --height 1080 --packing unpacked16 --bit-depth 12 --cfa RGGB
+& '.\eRAW.exe' --skill
+```
+
+增加 `--check` 仅进行参数、文件访问和布局预检，不打开窗口。帮助与反馈统一使用英文，便于人类阅读和 AI 纠错；预检通过不代表画面已绘制。
+
+`--skill` 打印随 EXE 编译嵌入的完整英文 SKILL.md 并退出，不安装 skill 或修改 AI 配置。初始 CLI 参数不自动保存，后续用户操作遵循正常 GUI 的保存规则。
+
+完整参数与退出码见[CLI 说明](docs/CLI.md)，AI 调用流程见[skill 源文件](skill/eraw-viewer/SKILL.md)。
+
 ## 平台与技术栈
 
 eRAW 当前以 Windows 为主要目标平台，基于 Tauri 2 构建：
@@ -88,8 +104,6 @@ npm.cmd run release
 ## 工程文档
 
 设计决策、系统架构、RAW 语义、渲染、测试和迭代流程见 [工程文档索引](docs/README.md)。
-
-也可通过命令行指定图像与 RAW 参数，或使用 `--check` 预检；参见[命令行说明](docs/CLI.md)。CLI 帮助和反馈统一使用英文。
 
 ## 当前边界
 

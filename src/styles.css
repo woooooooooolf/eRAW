@@ -1619,6 +1619,7 @@ html[data-reduce-motion="true"] .empty-grid span::before { content: none; animat
 .help-latex math { display: block; margin: 0 auto; color: var(--text); font-size: clamp(17px, 1.55vw, 23px); }
 .help-example { padding: 15px 0 15px 18px; border: 0; border-left: 2px solid var(--border-strong); background: transparent; }
 .help-example small { display: block; margin-bottom: 6px; color: var(--dim); font-family: system-ui, sans-serif; letter-spacing: .08em; }
+.help-command { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--font-sm); line-height: 1.7; margin: 0; }
 .help-impact { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: transparent; font-family: system-ui, sans-serif; }
 .help-impact strong { margin-right: 4px; color: var(--cyan-bright); font-size: var(--font-xs); }
 .help-impact span { padding: 3px 7px; color: var(--muted); font-size: 10px; }

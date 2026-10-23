@@ -56,6 +56,22 @@ Release EXE 目前未使用 Authenticode 簽章，Windows 可能顯示 SmartScre
 - 匯出目前影格的 Remosaic Bayer 或 RGB48 Interleaved 資料。
 - 將畫布視窗或完整預覽圖儲存為 PNG，或複製到剪貼簿。
 
+## 命令列與 AI 呼叫
+
+可由終端、指令碼或 AI 指定 RAW 檔案、尺寸、存儲格式、位深、CFA 與初始檢視，每次呼叫開啟獨立視窗。請依實際分發檔案替換以下 EXE 名稱與輸入路徑。
+
+```powershell
+& '.\eRAW.exe' '.\result.raw' --width 1920 --height 1080 --packing unpacked16 --bit-depth 12 --cfa RGGB --mode demosaic
+& '.\eRAW.exe' --check '.\result.raw' --width 1920 --height 1080 --packing unpacked16 --bit-depth 12 --cfa RGGB
+& '.\eRAW.exe' --skill
+```
+
+加入 `--check` 僅預檢參數、檔案存取與配置，不開啟視窗。說明與回饋一律使用易讀英文，供人類與 AI 修正錯誤；預檢通過不代表畫面已繪製。
+
+`--skill` 列印編譯嵌入 EXE 的完整英文 SKILL.md 後退出，不安裝 skill、不修改 AI 設定。CLI 初始參數不自動儲存，之後使用者操作遵循一般 GUI 儲存規則。
+
+完整參數與退出碼見[CLI 說明](docs/CLI.md)，AI 呼叫流程見[skill 原始檔](skill/eraw-viewer/SKILL.md)。
+
 ## 平台與技術棧
 
 eRAW 目前以 Windows 為主要目標平台，並以 Tauri 2 建置：
@@ -66,7 +82,7 @@ eRAW 目前以 Windows 為主要目標平台，並以 Tauri 2 建置：
 
 ## 從原始碼執行
 
-需要 Node.js、Rust stable、Windows WebView2 和 Tauri 2 的系統建置相依項目。
+需要 Node.js、Rust stable（最低 1.90）、Windows WebView2 和 Tauri 2 的系統建置相依項目。
 
 ```powershell
 npm.cmd install
@@ -88,8 +104,6 @@ npm.cmd run release
 ## 工程文件
 
 產品決策、系統架構、RAW 語意、渲染、測試與迭代流程請參閱[工程文件索引](docs/README.md)。
-
-也可透過命令列指定影像與 RAW 參數，或使用 `--check` 預檢；請參閱[命令列說明](docs/CLI.md)。CLI 說明與回饋統一使用英文。
 
 ## 目前邊界
 

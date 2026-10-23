@@ -30,6 +30,8 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 
 ## 模块职责
 
+`skill/eraw-viewer/SKILL.md` 是 AI 调用说明的唯一源文件，`cli.rs` 使用 `include_str!` 编译嵌入；`--skill` 直接输出其 UTF-8 Markdown 后返回，不初始化窗口、不读取图像或安装 AI 配置。无外部资源路径、额外运行依赖或持久化状态。内置手册的 CLI 专页由 `help-cli.ts` 提供七语正文，通过 `getHelpCatalog` 插入“使用基础”组，原有章节与公式保持原位。
+
 桌面启动先由 `cli.rs` 解析参数并执行英文预检；`commands.rs` 的共用准备函数打开文件并建立映射。预检成功的映射直接安装进 `AppState`，主窗口通过一次性的 `take_startup_document` 拉取初始文档和视图，再复用 `applyOpenedDocument` 更新前端状态；不通过易丢失的启动事件或 URL 传文件参数。`console.rs` 仅在 CLI 调用时尝试连接父终端并保留重定向流。无参数启动继续使用普通文件对话框流程。详细契约见 [CLI.md](CLI.md)。
 
 | 模块 | 主要职责 |
@@ -45,6 +47,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | `src/statistics-view-state.ts` | 各图表曲线、横纵范围和分布局高度的持久状态、钳制与重置规则 |
 | `src/statistics-chart*.ts` / `src/statistics-report.ts` | 按需加载的主题自适应 ECharts 交互图表、独立的大数据图表变换，以及暂未接入入口的中性 PNG 报告绘制能力 |
 | `src/help-content.ts` / `src/help-content-localized.ts` / `src/help-math.ts` / `src/help-window.ts` | 按帮助路由惰性加载的分组、分篇七语技术参考内容，共享 LaTeX 公式源到原生 MathML 的渲染、单篇路由、前后篇导航，以及与主窗口语言、主题即时同步并原位重建内容的独立帮助窗口 |
+| `src/help-cli.ts` | CLI、预检、AI skill、异步调用与多实例保存规则的七语手册专页 |
 | `src/i18n.ts` | 语言偏好、系统语言解析、七语文案目录、日期时间格式化和静态 DOM 翻译 |
 | `src/backend-error.ts` | 解析后端结构化错误码，并在当前语言下生成用户消息 |
 | `src/channel-rendering.ts` | 将显示模式与通道渲染偏好映射为纯 GPU 着色参数 |
@@ -92,7 +95,7 @@ ROI 是主窗口级查看状态，不依赖统计视图是否打开。工具栏�
 
 ## 文档会话与一致性
 
-Rust 端只维护一个当前文档：
+每个进程的 Rust 端只维护一个当前文档：
 
 ```text
 RawDocument

@@ -6,6 +6,7 @@ use crate::raw::{
 use std::{collections::BTreeMap, ffi::OsString, path::PathBuf};
 
 pub const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+pub const SKILL: &str = include_str!("../../skill/eraw-viewer/SKILL.md");
 
 pub const HELP: &str = r#"eRAW - RAW sensor data viewer
 
@@ -13,6 +14,7 @@ Usage:
   eRAW [OPTIONS] <FILE> --width <N> --height <N> --packing <FORMAT> --cfa <PATTERN>
   eRAW --check [OPTIONS] <FILE> --width <N> --height <N> --packing <FORMAT> --cfa <PATTERN>
   eRAW --help
+  eRAW --skill
   eRAW --version
 
 Without arguments, open the normal graphical viewer.
@@ -49,6 +51,7 @@ Optional initial view:
 
 Control:
   --check                  Run preflight without creating a window or saving settings
+  --skill                  Print the bundled English SKILL.md and exit; use alone
   -h, --help               Print this help and exit
   -V, --version            Print the application version and exit
   --                       End options; use before a file name that starts with '-'
@@ -60,7 +63,7 @@ CLI values initialize this window only. Later user edits follow normal save sett
 Finish writing the source file before launch; keep it unchanged while viewing.
 
 Exit status:
-  0  Preflight passed (--check), help/version printed, or viewer closed normally
+  0  Preflight passed (--check), help/skill/version printed, or viewer closed normally
   1  Viewer startup failed
   2  Invalid command-line arguments
   3  File or layout preflight failed
@@ -119,6 +122,7 @@ pub struct LaunchOptions {
 pub enum Action {
     Gui,
     Help,
+    Skill,
     Version,
     Open(LaunchOptions),
 }
@@ -181,6 +185,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Action, CliErro
     if args.len() == 1 {
         match args[0].to_str() {
             Some("--help" | "-h") => return Ok(Action::Help),
+            Some("--skill") => return Ok(Action::Skill),
             Some("--version" | "-V") => return Ok(Action::Version),
             _ => {}
         }
@@ -201,6 +206,11 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Action, CliErro
             end_options = true;
             i += 1;
             continue;
+        }
+        if !end_options && matches!(text, "--skill" | "--help" | "-h" | "--version" | "-V") {
+            return Err(CliError::argument(format!(
+                "option '{text}' must be used alone.\n  Remove the input file and other options for this query."
+            )));
         }
         if !end_options && text == "--check" {
             if check {
@@ -613,6 +623,8 @@ mod tests {
     fn control_actions_do_not_require_image_parameters() {
         assert!(matches!(parse_text("").unwrap(), Action::Gui));
         assert!(matches!(parse_text("--help").unwrap(), Action::Help));
+        assert!(matches!(parse_text("--skill").unwrap(), Action::Skill));
+        assert!(parse_text("--skill --check").is_err());
         assert!(matches!(parse_text("-V").unwrap(), Action::Version));
     }
 

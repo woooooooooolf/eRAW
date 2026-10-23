@@ -56,6 +56,22 @@ L’affichage tolère autant que possible les données tronquées ou incomplète
 - Export de la trame courante en données Remosaic Bayer ou RGB48 Interleaved.
 - Enregistrement de la fenêtre du canevas ou de l’aperçu complet en PNG, ou copie dans le presse-papiers.
 
+## Ligne de commande et appels IA
+
+Un terminal, script ou outil IA peut fournir fichier RAW, dimensions, format, profondeur, CFA et vue initiale. Chaque appel ouvre une fenêtre indépendante. Remplacez le nom de l’EXE et le chemin d’entrée par les fichiers réellement distribués.
+
+```powershell
+& '.\eRAW.exe' '.\result.raw' --width 1920 --height 1080 --packing unpacked16 --bit-depth 12 --cfa RGGB --mode demosaic
+& '.\eRAW.exe' --check '.\result.raw' --width 1920 --height 1080 --packing unpacked16 --bit-depth 12 --cfa RGGB
+& '.\eRAW.exe' --skill
+```
+
+Ajoutez `--check` pour vérifier paramètres, accès au fichier et disposition sans fenêtre. L’aide et les retours sont toujours en anglais lisible pour les personnes et les IA ; une vérification réussie ne confirme pas un rendu terminé.
+
+`--skill` imprime le SKILL.md anglais complet intégré dans l’EXE puis quitte. Il n’installe aucun skill et ne modifie aucune configuration IA. Les valeurs CLI initiales ne sont pas enregistrées automatiquement ; les actions suivantes respectent les règles normales de la GUI.
+
+Consultez le [guide CLI](docs/CLI.md) pour les paramètres et codes de sortie, et le [skill source](skill/eraw-viewer/SKILL.md) pour les appels IA.
+
 ## Plateforme et technologies
 
 eRAW cible actuellement Windows en priorité et repose sur Tauri 2 :
@@ -66,7 +82,7 @@ eRAW cible actuellement Windows en priorité et repose sur Tauri 2 :
 
 ## Exécution depuis les sources
 
-Node.js, Rust stable, Windows WebView2 et les dépendances système requises par Tauri 2 sont nécessaires.
+Node.js, Rust stable (minimum 1.90), Windows WebView2 et les dépendances système requises par Tauri 2 sont nécessaires.
 
 ```powershell
 npm.cmd install
@@ -88,8 +104,6 @@ npm.cmd run release
 ## Documentation technique
 
 Consultez l’[index de la documentation technique](docs/README.md) pour les décisions produit, l’architecture, la sémantique RAW, le rendu, les tests et le processus de développement.
-
-Ouvrez une image avec des paramètres RAW explicites en ligne de commande ou lancez `--check` avant l’affichage. Consultez le [guide CLI](docs/CLI.md). L’aide et les résultats CLI sont en anglais.
 
 ## Périmètre actuel
 

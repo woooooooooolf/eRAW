@@ -56,6 +56,22 @@ Die Anzeige toleriert nach Möglichkeit abgeschnittene oder unvollständige Eing
 - Exportiert den aktuellen Frame als Remosaic-Bayer- oder RGB48-Interleaved-Daten.
 - Speichert das Canvas-Fenster oder die vollständige Vorschau als PNG oder kopiert sie in die Zwischenablage.
 
+## Befehlszeile und KI-Aufrufe
+
+Terminal, Skript oder KI-Werkzeug können RAW-Datei, Maße, Format, Bittiefe, CFA und erste Ansicht vorgeben. Jeder Aufruf öffnet ein unabhängiges Fenster. Ersetzen Sie EXE-Namen und Eingabepfad durch die tatsächlich verteilten Dateien.
+
+```powershell
+& '.\eRAW.exe' '.\result.raw' --width 1920 --height 1080 --packing unpacked16 --bit-depth 12 --cfa RGGB --mode demosaic
+& '.\eRAW.exe' --check '.\result.raw' --width 1920 --height 1080 --packing unpacked16 --bit-depth 12 --cfa RGGB
+& '.\eRAW.exe' --skill
+```
+
+Mit `--check` werden Parameter, Dateizugriff und Layout ohne Fenster geprüft. Hilfe und Rückmeldungen sind stets auf verständlichem Englisch für Menschen und KI; eine erfolgreiche Prüfung bestätigt kein abgeschlossenes Rendering.
+
+`--skill` gibt die vollständige englische SKILL.md aus der EXE aus und endet. Es installiert keinen Skill und ändert keine KI-Konfiguration. CLI-Startwerte werden nicht automatisch gespeichert; spätere Benutzeraktionen folgen den normalen GUI-Speicherregeln.
+
+Parameter und Rückgabecodes stehen in der [CLI-Anleitung](docs/CLI.md), Hinweise für KI-Aufrufe im [Skill-Quelltext](skill/eraw-viewer/SKILL.md).
+
 ## Plattform und Technik
 
 eRAW zielt derzeit vorrangig auf Windows und wird mit Tauri 2 erstellt:
@@ -66,7 +82,7 @@ eRAW zielt derzeit vorrangig auf Windows und wird mit Tauri 2 erstellt:
 
 ## Aus dem Quellcode starten
 
-Erforderlich sind Node.js, stabiles Rust, Windows WebView2 und die von Tauri 2 benötigten Systemabhängigkeiten.
+Erforderlich sind Node.js, stabiles Rust (mindestens 1.90), Windows WebView2 und die von Tauri 2 benötigten Systemabhängigkeiten.
 
 ```powershell
 npm.cmd install
@@ -88,8 +104,6 @@ npm.cmd run release
 ## Technische Dokumentation
 
 Im [Index der technischen Dokumentation](docs/README.md) finden Sie Produktentscheidungen, Architektur, RAW-Semantik, Rendering, Tests und den Entwicklungsablauf.
-
-Öffnen Sie Bilder mit expliziten RAW-Parametern über die Befehlszeile oder prüfen Sie sie vorab mit `--check`. Siehe [CLI-Anleitung](docs/CLI.md). CLI-Hilfe und Rückmeldungen erscheinen auf Englisch.
 
 ## Aktueller Umfang
 

@@ -2,6 +2,8 @@
 
 ## 自动化检查
 
+`--skill` 的 Release 检查在仓库之外的工作目录执行，验证完整输出与 `skill/eraw-viewer/SKILL.md` 一致且不依赖旁置文件，并实际预检 skill 中的调用示例。前端运行时目录测试确认七种语言均恰好插入一篇 CLI 专页、位于工作流之后、章节 ID 唯一，并保留全部原章节；CLI 页面示例共用同一份命令文本。
+
 新增 CLI 验证使用 `npm.cmd run test:cli`，须先执行 `npm.cmd run release`。该检查以 10 秒子进程超时运行已构建 EXE 的帮助、版本和 `--check`，验证英文输出、stdout/stderr、退出码、中文/空格路径和调用方相对路径；不会打开 GUI 或启动开发服务器。Rust 测试另覆盖 CLI 参数、packing/位深冲突、CFA 模式限制、预检边界和部分帧。多实例偏好测试模拟持有旧快照的窗口，验证按字段保存不覆盖无关修改。
 
 当前自动化由 TypeScript 静态检查、前端生产构建和 Rust 单元测试组成：

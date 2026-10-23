@@ -86,7 +86,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
     readingTime: "约 6 分钟",
     body: `
       <div class="help-card-grid">
-        <article><h3>文档会话</h3><p>应用同一时间只维护一个当前 RAW 文件。重新打开文件或成功提交新描述符后，旧瓦片和旧统计会失效；<kbd>Ctrl</kbd><kbd>W</kbd> 关闭文件并释放只读映射。</p></article>
+        <article><h3>文档会话</h3><p>每个应用实例同一时间只维护一个当前 RAW 文件。重新打开文件或成功提交新描述符后，旧瓦片和旧统计会失效；<kbd>Ctrl</kbd><kbd>W</kbd> 关闭文件并释放只读映射。</p></article>
         <article><h3>帧与观察状态</h3><p>多帧文件使用 <kbd>[</kbd> / <kbd>]</kbd> 切换相邻帧；同尺寸帧保留缩放和平移，尺寸变化会清除依赖旧坐标的 ROI。关闭文件不会清除已保存的描述符、处理选项和应用设置。</p></article>
         <article><h3>画布导航</h3><p>滚轮以指针下的图像点为锚连续缩放，左键拖动平移。<kbd>Ctrl</kbd><kbd>0</kbd> 适应窗口，<kbd>Ctrl</kbd><kbd>1</kbd> 回到 100% 实际像素。</p></article>
         <article><h3>诊断的含义</h3><p>诊断面板只描述当前状态，不是历史日志。修正参数、重新渲染或打开新文件后，不再成立的运行时错误会自动消失。</p></article>
