@@ -26,14 +26,14 @@ use tauri::{
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandError {
-    code: &'static str,
-    arguments: BTreeMap<String, serde_json::Value>,
+    pub(crate) code: &'static str,
+    pub(crate) arguments: BTreeMap<String, serde_json::Value>,
     cause: Option<String>,
     field: Option<&'static str>,
 }
 
 impl CommandError {
-    fn new(code: &'static str) -> Self {
+    pub(crate) fn new(code: &'static str) -> Self {
         Self {
             code,
             arguments: BTreeMap::new(),
@@ -45,6 +45,15 @@ impl CommandError {
     fn with_cause(mut self, cause: impl ToString) -> Self {
         self.cause = Some(cause.to_string());
         self
+    }
+
+    fn with_io_cause(mut self, error: std::io::Error) -> Self {
+        self.arguments
+            .insert("ioKind".into(), format!("{:?}", error.kind()).into());
+        if let Some(code) = error.raw_os_error() {
+            self.arguments.insert("osCode".into(), code.into());
+        }
+        self.with_cause(error)
     }
 }
 
@@ -94,6 +103,15 @@ struct RawDocument {
     layout: RawLayout,
     warnings: Vec<RawWarning>,
     generation: u64,
+}
+
+/// A file mapped once, before committing it to a GUI session.
+pub(crate) struct PreparedDocument(RawDocument);
+
+impl PreparedDocument {
+    pub(crate) fn info(&self) -> DocumentInfo {
+        DocumentInfo::from(&self.0)
+    }
 }
 
 const PREVIEW_CACHE_TILES: usize = 128;
@@ -154,6 +172,21 @@ impl Default for AppState {
 }
 
 impl AppState {
+    pub(crate) fn install_prepared(
+        &self,
+        prepared: PreparedDocument,
+    ) -> Result<DocumentInfo, CommandError> {
+        let mut document = prepared.0;
+        document.generation = self.next_generation();
+        let info = DocumentInfo::from(&document);
+        *self
+            .document
+            .lock()
+            .map_err(|_| CommandError::new("document_session_poisoned"))? = Some(document);
+        self.clear_preview_cache()?;
+        Ok(info)
+    }
+
     fn next_generation(&self) -> u64 {
         self.generation_clock.fetch_add(1, Ordering::AcqRel) + 1
     }
@@ -170,12 +203,12 @@ impl AppState {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DocumentInfo {
-    path: String,
+    pub(crate) path: String,
     name: String,
-    file_size: u64,
-    descriptor: RawDescriptor,
-    layout: RawLayout,
-    warnings: Vec<RawWarning>,
+    pub(crate) file_size: u64,
+    pub(crate) descriptor: RawDescriptor,
+    pub(crate) layout: RawLayout,
+    pub(crate) warnings: Vec<RawWarning>,
     generation: u64,
 }
 
@@ -208,18 +241,30 @@ pub fn open_document(
     descriptor: RawDescriptor,
     state: State<'_, AppState>,
 ) -> Result<DocumentInfo, CommandError> {
+    state.install_prepared(prepare_document(path, descriptor)?)
+}
+
+pub(crate) fn prepare_document(
+    path: String,
+    descriptor: RawDescriptor,
+) -> Result<PreparedDocument, CommandError> {
     let file = File::open(&path)
-        .map_err(|error| CommandError::new("file_open_failed").with_cause(error))?;
-    let file_size = file
+        .map_err(|error| CommandError::new("file_open_failed").with_io_cause(error))?;
+    let metadata = file
         .metadata()
-        .map_err(|error| CommandError::new("file_metadata_failed").with_cause(error))?
-        .len();
+        .map_err(|error| CommandError::new("file_metadata_failed").with_io_cause(error))?;
+    if !metadata.is_file() {
+        return Err(
+            CommandError::new("file_open_failed").with_cause("The input must be a regular file.")
+        );
+    }
+    let file_size = metadata.len();
     let map = if file_size == 0 {
         None
     } else {
         // SAFETY: 映射保持只读；Mmap 持有独立映射句柄，源文件不会通过 eRAW 修改。
         Some(Arc::new(unsafe { MmapOptions::new().map(&file) }.map_err(
-            |error| CommandError::new("file_map_failed").with_cause(error),
+            |error| CommandError::new("file_map_failed").with_io_cause(error),
         )?))
     };
     let (layout, warnings) = calculate_layout(&descriptor, file_size);
@@ -228,7 +273,6 @@ pub fn open_document(
         .and_then(|v| v.to_str())
         .unwrap_or("未命名.raw")
         .to_owned();
-    let generation = state.next_generation();
     let document = RawDocument {
         path,
         name,
@@ -237,12 +281,9 @@ pub fn open_document(
         descriptor,
         layout,
         warnings,
-        generation,
+        generation: 0,
     };
-    let info = DocumentInfo::from(&document);
-    *lock_document(&state)? = Some(document);
-    state.clear_preview_cache()?;
-    Ok(info)
+    Ok(PreparedDocument(document))
 }
 
 #[tauri::command]
@@ -664,26 +705,15 @@ mod tests {
         let renamed = path.with_extension("closed");
         write(&path, vec![0u8; 4096]).expect("temporary RAW should be created");
 
-        let file = File::open(&path).expect("temporary RAW should open");
-        let map = unsafe { MmapOptions::new().map(&file) }.expect("temporary RAW should map");
-        drop(file);
-        let descriptor = RawDescriptor::default();
-        let (layout, warnings) = calculate_layout(&descriptor, 4096);
         let state = AppState::default();
-        *state.document.lock().expect("document session should lock") = Some(RawDocument {
-            path: path.to_string_lossy().into_owned(),
-            name: path
-                .file_name()
-                .expect("temporary RAW should have a name")
-                .to_string_lossy()
-                .into_owned(),
-            file_size: 4096,
-            map: Some(Arc::new(map)),
-            descriptor,
-            layout,
-            warnings,
-            generation: state.next_generation(),
-        });
+        let prepared = prepare_document(
+            path.to_string_lossy().into_owned(),
+            RawDescriptor::default(),
+        )
+        .expect("temporary RAW should prepare through the shared open path");
+        state
+            .install_prepared(prepared)
+            .expect("prepared document should install");
 
         let exclusive_while_open = OpenOptions::new()
             .read(true)

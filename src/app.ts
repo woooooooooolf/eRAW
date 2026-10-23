@@ -112,6 +112,7 @@ import type {
   Packing,
   ProcessingSettings,
   RawDescriptor,
+  StartupDocument,
 } from "./types";
 import type { ImageRect } from "./viewport-transform";
 import {
@@ -313,8 +314,13 @@ export class ErawApp {
   private statisticsResizeStartY = 0;
   private statisticsResizeStartSize = 0;
 
-  constructor(root: HTMLElement) {
+  constructor(root: HTMLElement, startup: StartupDocument | null = null) {
     this.root = root;
+    if (startup) {
+      this.descriptor = startup.document.descriptor;
+      this.processing = startup.processing;
+      this.displayMode = startup.mode;
+    }
     setLanguagePreference(this.settings.language);
     root.innerHTML = this.template();
     this.bindStaticLocalizationKeys();
@@ -371,6 +377,7 @@ export class ErawApp {
     this.updateCfaDependentUi(false);
     this.updateDisplay();
     this.updateDocumentUi();
+    if (startup) this.applyOpenedDocument(startup.document, startup.frame, startup.view);
   }
 
   private get<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -1463,27 +1470,35 @@ export class ErawApp {
       this.clearRuntimeDiagnostics(["webgl"]);
       this.showToast(t("runtime.opening"), "busy");
       const info = await openDocument(path, this.readDescriptor());
-      this.document = info;
-      this.descriptor = info.descriptor;
-      this.frame = 0;
-      this.resetCoordinateLinkState();
-      this.cancelDisplayRangeCalculation();
-      this.resetDisplayAdjustment(info.descriptor.bitDepth);
-      this.viewport.setDocument(info);
-      this.updateDisplay();
-      this.statisticsResult = null;
-      this.statisticsError = null;
-      if (this.settings.openView === "actual") this.viewport.actualSize();
-      this.updateDocumentUi();
-      this.syncStatisticsState();
-      if (this.statisticsOpen) void this.requestStatistics();
-      this.showToast(t("runtime.opened", { name: info.name }), "success");
+      this.applyOpenedDocument(info);
     } catch (error) {
       this.reportRuntimeError(error, undefined, 5000, "open");
     } finally {
       this.fileOperationInProgress = false;
       this.updateDocumentUi();
     }
+  }
+
+  private applyOpenedDocument(info: DocumentInfo, frame = 0, view = this.settings.openView): void {
+    this.document = info;
+    this.descriptor = info.descriptor;
+    this.writeDescriptor(info.descriptor);
+    this.updatePackingDependentUi();
+    this.updateCfaDependentUi();
+    this.frame = frame;
+    this.resetCoordinateLinkState();
+    this.cancelDisplayRangeCalculation();
+    this.resetDisplayAdjustment(info.descriptor.bitDepth);
+    this.viewport.setDocument(info);
+    this.viewport.setFrame(frame);
+    this.setDisplayMode(this.displayMode);
+    this.statisticsResult = null;
+    this.statisticsError = null;
+    if (view === "actual") this.viewport.actualSize();
+    this.updateDocumentUi();
+    this.syncStatisticsState();
+    if (this.statisticsOpen) void this.requestStatistics();
+    this.showToast(t("runtime.opened", { name: info.name }), "success");
   }
 
   private async closeFile(): Promise<void> {

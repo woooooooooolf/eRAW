@@ -30,6 +30,8 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 
 ## 模块职责
 
+桌面启动先由 `cli.rs` 解析参数并执行英文预检；`commands.rs` 的共用准备函数打开文件并建立映射。预检成功的映射直接安装进 `AppState`，主窗口通过一次性的 `take_startup_document` 拉取初始文档和视图，再复用 `applyOpenedDocument` 更新前端状态；不通过易丢失的启动事件或 URL 传文件参数。`console.rs` 仅在 CLI 调用时尝试连接父终端并保留重定向流。无参数启动继续使用普通文件对话框流程。详细契约见 [CLI.md](CLI.md)。
+
 | 模块 | 主要职责 |
 | --- | --- |
 | `src/app.ts` | 应用状态、参数提交、菜单、状态栏、诊断、设置与对话框编排 |

@@ -74,6 +74,14 @@ export interface DocumentInfo {
   generation: number;
 }
 
+export interface StartupDocument {
+  document: DocumentInfo;
+  frame: number;
+  mode: DisplayMode;
+  view: "fit" | "actual";
+  processing: ProcessingSettings;
+}
+
 export interface TileRequest {
   generation: number;
   renderRevision: number;

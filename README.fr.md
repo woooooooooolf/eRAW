@@ -89,6 +89,8 @@ npm.cmd run release
 
 Consultez l’[index de la documentation technique](docs/README.md) pour les décisions produit, l’architecture, la sémantique RAW, le rendu, les tests et le processus de développement.
 
+Ouvrez une image avec des paramètres RAW explicites en ligne de commande ou lancez `--check` avant l’affichage. Consultez le [guide CLI](docs/CLI.md). L’aide et les résultats CLI sont en anglais.
+
 ## Périmètre actuel
 
 - eRAW sert au diagnostic des données brutes du capteur ; il n’effectue pas d’amélioration photographique telle que la réduction du bruit, l’accentuation, la correction des couleurs ou la réparation des pixels défectueux.

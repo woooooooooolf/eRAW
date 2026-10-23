@@ -105,6 +105,11 @@ test("workflows pin actions and protect build and release integrity", () => {
   assert.match(ciSource, /Verify third-party dependency notices/);
   assert.match(ciSource, /npm\.cmd run check:site/);
   assert.match(ciSource, /npm\.cmd run build:site/);
+  for (const workflow of [ciSource, releaseSource]) {
+    assert.ok(workflow.indexOf("run: npm.cmd run release") < workflow.indexOf("run: npm.cmd run test:cli"));
+    assert.match(workflow, /run: npm\.cmd run test:cli/);
+    assert.equal([...workflow.matchAll(/run: npm\.cmd run test:cli/g)].length, 1);
+  }
   assert.match(releaseSource, /SHA256SUMS/);
   assert.match(releaseSource, /dependency-graph\/sbom/);
   assert.match(releaseSource, /THIRD_PARTY_LICENSES\.txt/);

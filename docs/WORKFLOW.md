@@ -71,9 +71,11 @@ npm.cmd run release
 
 不要用裸 `cargo build --release` 代替发布命令；它不会保证执行 Tauri 的前端构建和资源嵌入流程。
 
+涉及 CLI 或启动流程的迭代，在 Release 构建后运行 `npm.cmd run test:cli`；采用重定向 stdout/stderr 的有限子进程验证 GUI 子系统 EXE 的英文反馈和退出码。CLI 文字统一使用英文，不随 GUI 七语目录切换；文件路径保持原文。多实例人工检查使用隔离的 WebView 测试目录，避免改写真实用户偏好。
+
 ## GitHub 自动化
 
-- `.github/workflows/ci.yml` 在 `master` 推送、面向 `master` 的 Pull Request 和手动触发时运行前后端检查、测试与生产构建。
+- `.github/workflows/ci.yml` 在 `master` 推送、面向 `master` 的 Pull Request 和手动触发时运行前后端检查、测试、生产构建、独立 Release EXE 构建与 CLI 进程测试；发布工作流在打包前同样验证 CLI。
 - 发布标签使用 `Vx.y.z` 格式，并且必须与仓库中的软件版本严格一致。
 - 推送发布标签后，`.github/workflows/release.yml` 自动运行完整检查和 Tauri Release 构建，创建对应的 GitHub Release。
 - 后续 Windows x64 Release 只上传 `eRAW-Vx.y.z-windows-x64.zip`；包内根目录包含同名 EXE、SHA-256 清单、SPDX SBOM 与第三方许可证文本。V0.6.0 及更早版本的现有资产保持不变。

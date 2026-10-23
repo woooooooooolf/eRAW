@@ -89,6 +89,8 @@ npm.cmd run release
 
 See the [engineering documentation index](docs/README.md) for product decisions, architecture, RAW semantics, rendering, testing, and the development workflow.
 
+Open an image with explicit RAW parameters from the command line, or run `--check` before viewing. See the [CLI guide](docs/CLI.md). All CLI help and feedback are English.
+
 ## Current scope
 
 - eRAW diagnoses raw sensor data; it does not perform photo enhancement such as denoising, sharpening, color correction, or bad-pixel repair.

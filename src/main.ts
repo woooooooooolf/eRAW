@@ -2,6 +2,8 @@ import "./styles.css";
 import { ErawApp } from "./app";
 import { t } from "./i18n";
 import { StatisticsWindowApp } from "./statistics-window";
+import { isTauri } from "@tauri-apps/api/core";
+import { takeStartupDocument } from "./api";
 
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error(t("error.rootMissing"));
@@ -29,7 +31,10 @@ try {
   } else if (page.get("statistics") === "1") {
     new StatisticsWindowApp(appRoot);
   } else {
-    new ErawApp(appRoot);
+    void (async () => {
+      const startup = isTauri() ? await takeStartupDocument() : null;
+      new ErawApp(appRoot, startup);
+    })().catch(showFatalError);
   }
 } catch (error) {
   showFatalError(error);

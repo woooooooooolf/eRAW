@@ -89,6 +89,8 @@ npm.cmd run release
 
 Consulta el [índice de documentación técnica](docs/README.md) para conocer las decisiones de producto, la arquitectura, la semántica RAW, el renderizado, las pruebas y el flujo de desarrollo.
 
+Abra una imagen con parámetros RAW explícitos desde la línea de comandos o ejecute `--check` antes de visualizarla. Consulte la [guía de CLI](docs/CLI.md). La ayuda y los resultados de CLI se muestran en inglés.
+
 ## Alcance actual
 
 - eRAW diagnostica datos sin procesar del sensor; no realiza mejoras fotográficas como reducción de ruido, enfoque, corrección de color o reparación de píxeles defectuosos.
