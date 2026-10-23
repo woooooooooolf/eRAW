@@ -72,14 +72,14 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | vite | 8.3.4 | development | MIT |
 | zrender | 6.1.0 | runtime | BSD-3-Clause |
 
-## Cargo dependencies (469)
+## Cargo dependencies (464)
 
 | Crate | Version | Declared license |
 | --- | --- | --- |
 | adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 |
 | aho-corasick | 1.1.4 | Unlicense OR MIT |
-| alloc-no-stdlib | 2.0.4 | BSD-3-Clause |
-| alloc-stdlib | 0.2.4 | BSD-3-Clause |
+| alloc-no-stdlib | 3.0.0 | BSD-3-Clause |
+| alloc-stdlib | 0.3.0 | BSD-3-Clause |
 | android_system_properties | 0.1.5 | MIT/Apache-2.0 |
 | anyhow | 1.0.104 | MIT OR Apache-2.0 |
 | arboard | 3.6.1 | MIT OR Apache-2.0 |
@@ -89,14 +89,15 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | autocfg | 1.5.1 | Apache-2.0 OR MIT |
 | base64 | 0.21.7 | MIT OR Apache-2.0 |
 | base64 | 0.22.1 | MIT OR Apache-2.0 |
+| base64 | 0.23.1 | MIT OR Apache-2.0 |
 | bit-set | 0.8.0 | Apache-2.0 OR MIT |
 | bit-vec | 0.8.0 | Apache-2.0 OR MIT |
 | bitflags | 1.3.2 | MIT/Apache-2.0 |
 | bitflags | 2.13.1 | MIT OR Apache-2.0 |
 | block-buffer | 0.10.4 | MIT OR Apache-2.0 |
 | block2 | 0.6.2 | MIT |
-| brotli | 8.0.4 | BSD-3-Clause AND MIT |
-| brotli-decompressor | 5.0.3 | BSD-3-Clause/MIT |
+| brotli | 9.0.0 | BSD-3-Clause AND MIT |
+| brotli-decompressor | 6.0.1 | BSD-3-Clause/MIT |
 | bs58 | 0.5.1 | MIT/Apache-2.0 |
 | bumpalo | 3.20.3 | MIT OR Apache-2.0 |
 | bytemuck | 1.25.2 | Zlib OR Apache-2.0 OR MIT |
@@ -107,11 +108,11 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | cairo-sys-rs | 0.18.2 | MIT |
 | camino | 1.2.4 | MIT OR Apache-2.0 |
 | cargo_metadata | 0.19.2 | MIT |
-| cargo_toml | 0.22.3 | Apache-2.0 OR MIT |
+| cargo_toml | 1.0.1 | Apache-2.0 OR MIT |
 | cargo-platform | 0.1.9 | MIT OR Apache-2.0 |
 | cc | 1.3.0 | MIT OR Apache-2.0 |
 | cesu8 | 1.1.0 | Apache-2.0/MIT |
-| cfb | 0.7.3 | MIT |
+| cfb | 0.14.0 | MIT |
 | cfg-expr | 0.15.8 | MIT OR Apache-2.0 |
 | cfg-if | 1.0.4 | MIT OR Apache-2.0 |
 | chrono | 0.4.45 | MIT OR Apache-2.0 |
@@ -128,10 +129,9 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | crossbeam-utils | 0.8.22 | MIT OR Apache-2.0 |
 | crunchy | 0.2.4 | MIT |
 | crypto-common | 0.1.7 | MIT OR Apache-2.0 |
-| cssparser | 0.36.0 | MPL-2.0 |
-| cssparser-macros | 0.6.1 | MPL-2.0 |
-| ctor | 0.8.0 | Apache-2.0 OR MIT |
-| ctor-proc-macro | 0.0.7 | Apache-2.0 OR MIT |
+| cssparser | 0.37.0 | MPL-2.0 |
+| cssparser-macros | 0.7.1 | MPL-2.0 |
+| ctor | 1.0.13 | Apache-2.0 OR MIT |
 | darling | 0.23.0 | MIT |
 | darling_core | 0.23.0 | MIT |
 | darling_macro | 0.23.0 | MIT |
@@ -140,19 +140,17 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | derive_more | 2.1.1 | MIT |
 | derive_more-impl | 2.1.1 | MIT |
 | digest | 0.10.7 | MIT OR Apache-2.0 |
-| dirs | 6.0.0 | MIT OR Apache-2.0 |
+| dirs | 7.0.0 | MIT OR Apache-2.0 |
 | dirs-sys | 0.5.0 | MIT OR Apache-2.0 |
 | dispatch2 | 0.3.1 | Zlib OR Apache-2.0 OR MIT |
 | displaydoc | 0.2.6 | MIT OR Apache-2.0 |
 | dlopen2 | 0.8.2 | MIT |
 | dlopen2_derive | 0.4.3 | MIT |
-| dom_query | 0.27.0 | MIT |
+| dom_query | 0.28.0 | MIT |
 | downcast-rs | 1.2.1 | MIT/Apache-2.0 |
 | dpi | 0.1.2 | Apache-2.0 AND MIT |
 | dtoa | 1.0.11 | MIT OR Apache-2.0 |
 | dtoa-short | 0.3.5 | MPL-2.0 |
-| dtor | 0.3.0 | Apache-2.0 OR MIT |
-| dtor-proc-macro | 0.0.6 | Apache-2.0 OR MIT |
 | dunce | 1.0.5 | CC0-1.0 OR MIT-0 OR Apache-2.0 |
 | dyn-clone | 1.0.20 | MIT OR Apache-2.0 |
 | embed_plist | 1.2.2 | MIT OR Apache-2.0 |
@@ -212,7 +210,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | heck | 0.4.1 | MIT OR Apache-2.0 |
 | heck | 0.5.0 | MIT OR Apache-2.0 |
 | hex | 0.4.3 | MIT OR Apache-2.0 |
-| html5ever | 0.38.0 | MIT OR Apache-2.0 |
+| html5ever | 0.39.0 | MIT OR Apache-2.0 |
 | http | 1.4.2 | MIT OR Apache-2.0 |
 | http-body | 1.1.0 | MIT |
 | http-body-util | 0.1.4 | MIT |
@@ -221,7 +219,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | hyper-util | 0.1.20 | MIT |
 | iana-time-zone | 0.1.65 | MIT OR Apache-2.0 |
 | iana-time-zone-haiku | 0.1.2 | MIT OR Apache-2.0 |
-| ico | 0.5.0 | MIT |
+| ico | 0.6.0 | MIT |
 | icu_collections | 2.1.1 | Unicode-3.0 |
 | icu_locale_core | 2.1.1 | Unicode-3.0 |
 | icu_normalizer | 2.1.1 | Unicode-3.0 |
@@ -235,7 +233,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | image | 0.25.9 | MIT OR Apache-2.0 |
 | indexmap | 1.9.3 | Apache-2.0 OR MIT |
 | indexmap | 2.14.0 | Apache-2.0 OR MIT |
-| infer | 0.19.0 | MIT |
+| infer | 0.22.0 | MIT |
 | ipnet | 2.12.0 | MIT OR Apache-2.0 |
 | itoa | 1.0.18 | MIT OR Apache-2.0 |
 | javascriptcore-rs | 1.1.2 | MIT |
@@ -245,9 +243,9 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | jni-sys | 0.4.1 | MIT OR Apache-2.0 |
 | jni-sys-macros | 0.4.1 | MIT OR Apache-2.0 |
 | js-sys | 0.3.103 | MIT OR Apache-2.0 |
-| json-patch | 3.0.1 | MIT/Apache-2.0 |
-| jsonptr | 0.6.3 | MIT OR Apache-2.0 |
-| keyboard-types | 0.7.0 | MIT OR Apache-2.0 |
+| json-patch | 4.2.0 | MIT/Apache-2.0 |
+| jsonptr | 0.7.1 | MIT OR Apache-2.0 |
+| keyboard-types | 0.8.3 | MIT OR Apache-2.0 |
 | libappindicator | 0.9.0 | Apache-2.0 OR MIT |
 | libappindicator-sys | 0.9.0 | Apache-2.0 OR MIT |
 | libc | 0.2.189 | MIT OR Apache-2.0 |
@@ -258,7 +256,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | litemap | 0.8.2 | Unicode-3.0 |
 | lock_api | 0.4.14 | MIT OR Apache-2.0 |
 | log | 0.4.33 | MIT OR Apache-2.0 |
-| markup5ever | 0.38.0 | MIT OR Apache-2.0 |
+| markup5ever | 0.39.0 | MIT OR Apache-2.0 |
 | memchr | 2.8.3 | Unlicense OR MIT |
 | memmap2 | 0.9.11 | MIT OR Apache-2.0 |
 | memoffset | 0.9.1 | MIT |
@@ -266,8 +264,9 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | miniz_oxide | 0.8.9 | MIT OR Zlib OR Apache-2.0 |
 | mio | 1.2.2 | MIT |
 | moxcms | 0.7.11 | BSD-3-Clause OR Apache-2.0 |
-| muda | 0.19.3 | Apache-2.0 OR MIT |
+| muda | 0.20.0 | Apache-2.0 OR MIT |
 | ndk | 0.9.0 | MIT OR Apache-2.0 |
+| ndk-context | 0.1.1 | MIT OR Apache-2.0 |
 | ndk-sys | 0.6.0+11769913 | MIT OR Apache-2.0 |
 | new_debug_unreachable | 1.0.6 | MIT |
 | nom | 8.0.0 | MIT |
@@ -309,7 +308,6 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
 | pkg-config | 0.3.33 | MIT OR Apache-2.0 |
 | plist | 1.10.0 | MIT |
-| png | 0.17.16 | MIT OR Apache-2.0 |
 | png | 0.18.1 | MIT OR Apache-2.0 |
 | potential_utf | 0.1.5 | Unicode-3.0 |
 | powerfmt | 0.2.0 | MIT OR Apache-2.0 |
@@ -346,7 +344,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | schemars | 1.2.1 | MIT |
 | schemars_derive | 0.8.22 | MIT |
 | scopeguard | 1.2.0 | MIT OR Apache-2.0 |
-| selectors | 0.36.1 | MPL-2.0 |
+| selectors | 0.38.0 | MPL-2.0 |
 | semver | 1.0.28 | MIT OR Apache-2.0 |
 | serde | 1.0.229 | MIT OR Apache-2.0 |
 | serde_core | 1.0.229 | MIT OR Apache-2.0 |
@@ -373,30 +371,31 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | soup3 | 0.5.0 | MIT |
 | soup3-sys | 0.5.0 | MIT |
 | stable_deref_trait | 1.2.1 | MIT OR Apache-2.0 |
+| static_vcruntime | 3.0.0 | MIT OR Apache-2.0 OR Zlib |
 | string_cache | 0.9.0 | MIT OR Apache-2.0 |
 | string_cache_codegen | 0.6.1 | MIT OR Apache-2.0 |
 | strsim | 0.11.1 | MIT |
-| swift-rs | 1.0.7 | MIT OR Apache-2.0 |
+| swift-rs | 1.0.9 | MIT OR Apache-2.0 |
 | syn | 1.0.109 | MIT OR Apache-2.0 |
 | syn | 2.0.119 | MIT OR Apache-2.0 |
 | syn | 3.0.3 | MIT OR Apache-2.0 |
 | sync_wrapper | 1.0.2 | Apache-2.0 |
 | synstructure | 0.13.2 | MIT |
 | system-deps | 6.2.2 | MIT OR Apache-2.0 |
-| tao | 0.35.3 | Apache-2.0 |
-| tao-macros | 0.1.3 | MIT OR Apache-2.0 |
+| tao | 0.37.2 | Apache-2.0 |
+| tao-macros | 0.1.4 | MIT OR Apache-2.0 |
 | target-lexicon | 0.12.16 | Apache-2.0 WITH LLVM-exception |
-| tauri | 2.11.6 | Apache-2.0 OR MIT |
-| tauri-build | 2.6.3 | Apache-2.0 OR MIT |
-| tauri-codegen | 2.6.3 | Apache-2.0 OR MIT |
-| tauri-macros | 2.6.3 | Apache-2.0 OR MIT |
-| tauri-plugin | 2.6.3 | Apache-2.0 OR MIT |
-| tauri-plugin-clipboard-manager | 2.3.3 | Apache-2.0 OR MIT |
-| tauri-plugin-dialog | 2.7.3 | Apache-2.0 OR MIT |
-| tauri-plugin-fs | 2.5.2 | Apache-2.0 OR MIT |
-| tauri-runtime | 2.11.3 | Apache-2.0 OR MIT |
-| tauri-runtime-wry | 2.11.4 | Apache-2.0 OR MIT |
-| tauri-utils | 2.9.3 | Apache-2.0 OR MIT |
+| tauri | 2.12.5 | Apache-2.0 OR MIT |
+| tauri-build | 2.7.4 | Apache-2.0 OR MIT |
+| tauri-codegen | 2.7.4 | Apache-2.0 OR MIT |
+| tauri-macros | 2.7.4 | Apache-2.0 OR MIT |
+| tauri-plugin | 2.7.2 | Apache-2.0 OR MIT |
+| tauri-plugin-clipboard-manager | 2.5.0 | Apache-2.0 OR MIT |
+| tauri-plugin-dialog | 2.8.3 | Apache-2.0 OR MIT |
+| tauri-plugin-fs | 2.7.1 | Apache-2.0 OR MIT |
+| tauri-runtime | 2.12.2 | Apache-2.0 OR MIT |
+| tauri-runtime-wry | 2.12.3 | Apache-2.0 OR MIT |
+| tauri-utils | 2.10.2 | Apache-2.0 OR MIT |
 | tauri-winres | 0.3.6 | MIT |
 | tendril | 0.5.1 | MIT OR Apache-2.0 |
 | thiserror | 1.0.69 | MIT OR Apache-2.0 |
@@ -413,10 +412,8 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | tokio | 1.53.1 | MIT |
 | tokio-util | 0.7.19 | MIT |
 | toml | 0.8.2 | MIT OR Apache-2.0 |
-| toml | 0.9.12+spec-1.1.0 | MIT OR Apache-2.0 |
 | toml | 1.1.3+spec-1.1.0 | MIT OR Apache-2.0 |
 | toml_datetime | 0.6.3 | MIT OR Apache-2.0 |
-| toml_datetime | 0.7.5+spec-1.1.0 | MIT OR Apache-2.0 |
 | toml_datetime | 1.1.1+spec-1.1.0 | MIT OR Apache-2.0 |
 | toml_edit | 0.19.15 | MIT OR Apache-2.0 |
 | toml_edit | 0.20.2 | MIT OR Apache-2.0 |
@@ -429,20 +426,15 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | tower-service | 0.3.3 | MIT |
 | tracing | 0.1.44 | MIT |
 | tracing-core | 0.1.36 | MIT |
-| tray-icon | 0.24.1 | MIT OR Apache-2.0 |
+| tray-icon | 0.25.1 | MIT OR Apache-2.0 |
 | tree_magic_mini | 3.2.2 | MIT |
 | try-lock | 0.2.5 | MIT |
 | typeid | 1.0.3 | MIT OR Apache-2.0 |
 | typenum | 1.20.1 | MIT OR Apache-2.0 |
-| unic-char-property | 0.9.0 | MIT/Apache-2.0 |
-| unic-char-range | 0.9.0 | MIT/Apache-2.0 |
-| unic-common | 0.9.0 | MIT/Apache-2.0 |
-| unic-ucd-ident | 0.9.0 | MIT/Apache-2.0 |
-| unic-ucd-version | 0.9.0 | MIT/Apache-2.0 |
 | unicode-ident | 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 |
 | unicode-segmentation | 1.13.3 | MIT OR Apache-2.0 |
 | url | 2.5.8 | MIT OR Apache-2.0 |
-| urlpattern | 0.3.0 | MIT |
+| urlpattern | 0.6.0 | MIT |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT |
 | uuid | 1.24.0 | Apache-2.0 OR MIT |
 | version_check | 0.9.5 | MIT/Apache-2.0 |
@@ -467,18 +459,19 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | wayland-sys | 0.31.11 | MIT |
 | web_atoms | 0.2.5 | MIT OR Apache-2.0 |
 | web-sys | 0.3.103 | MIT OR Apache-2.0 |
+| web-time | 1.1.0 | MIT OR Apache-2.0 |
 | webkit2gtk | 2.0.2 | MIT |
 | webkit2gtk-sys | 2.0.2 | MIT |
-| webview2-com | 0.38.2 | MIT |
+| webview2-com | 0.39.1 | MIT |
 | webview2-com-macros | 0.8.1 | MIT |
-| webview2-com-sys | 0.38.2 | MIT |
+| webview2-com-sys | 0.39.1 | MIT |
 | weezl | 0.1.12 | MIT OR Apache-2.0 |
 | winapi | 0.3.9 | MIT/Apache-2.0 |
 | winapi-i686-pc-windows-gnu | 0.4.0 | MIT/Apache-2.0 |
 | winapi-util | 0.1.11 | Unlicense OR MIT |
 | winapi-x86_64-pc-windows-gnu | 0.4.0 | MIT/Apache-2.0 |
-| window-vibrancy | 0.6.0 | Apache-2.0 OR MIT |
-| windows | 0.61.3 | MIT OR Apache-2.0 |
+| window-vibrancy | 0.8.1 | Apache-2.0 OR MIT |
+| windows | 0.62.2 | MIT OR Apache-2.0 |
 | windows_aarch64_gnullvm | 0.42.2 | MIT OR Apache-2.0 |
 | windows_aarch64_gnullvm | 0.52.6 | MIT OR Apache-2.0 |
 | windows_aarch64_gnullvm | 0.53.1 | MIT OR Apache-2.0 |
@@ -502,16 +495,19 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | windows_x86_64_msvc | 0.42.2 | MIT OR Apache-2.0 |
 | windows_x86_64_msvc | 0.52.6 | MIT OR Apache-2.0 |
 | windows_x86_64_msvc | 0.53.1 | MIT OR Apache-2.0 |
-| windows-collections | 0.2.0 | MIT OR Apache-2.0 |
+| windows-collections | 0.3.2 | MIT OR Apache-2.0 |
 | windows-core | 0.61.2 | MIT OR Apache-2.0 |
-| windows-future | 0.2.1 | MIT OR Apache-2.0 |
+| windows-core | 0.62.2 | MIT OR Apache-2.0 |
+| windows-future | 0.3.2 | MIT OR Apache-2.0 |
 | windows-implement | 0.60.2 | MIT OR Apache-2.0 |
 | windows-interface | 0.59.3 | MIT OR Apache-2.0 |
 | windows-link | 0.1.3 | MIT OR Apache-2.0 |
 | windows-link | 0.2.1 | MIT OR Apache-2.0 |
-| windows-numerics | 0.2.0 | MIT OR Apache-2.0 |
+| windows-numerics | 0.3.1 | MIT OR Apache-2.0 |
 | windows-result | 0.3.4 | MIT OR Apache-2.0 |
+| windows-result | 0.4.1 | MIT OR Apache-2.0 |
 | windows-strings | 0.4.2 | MIT OR Apache-2.0 |
+| windows-strings | 0.5.1 | MIT OR Apache-2.0 |
 | windows-sys | 0.45.0 | MIT OR Apache-2.0 |
 | windows-sys | 0.59.0 | MIT OR Apache-2.0 |
 | windows-sys | 0.60.2 | MIT OR Apache-2.0 |
@@ -519,16 +515,15 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | windows-targets | 0.42.2 | MIT OR Apache-2.0 |
 | windows-targets | 0.52.6 | MIT OR Apache-2.0 |
 | windows-targets | 0.53.5 | MIT OR Apache-2.0 |
-| windows-threading | 0.1.0 | MIT OR Apache-2.0 |
+| windows-threading | 0.2.1 | MIT OR Apache-2.0 |
 | windows-version | 0.1.7 | MIT OR Apache-2.0 |
 | winnow | 0.5.40 | MIT |
-| winnow | 0.7.15 | MIT |
 | winnow | 1.0.4 | MIT |
 | winreg | 0.55.0 | MIT |
 | wit-bindgen | 0.46.0 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | wl-clipboard-rs | 0.9.3 | MIT/Apache-2.0 |
 | writeable | 0.6.3 | Unicode-3.0 |
-| wry | 0.55.1 | Apache-2.0 OR MIT |
+| wry | 0.57.1 | Apache-2.0 OR MIT |
 | x11 | 2.21.0 | MIT |
 | x11-dl | 2.21.0 | MIT |
 | x11rb | 0.13.2 | MIT OR Apache-2.0 |

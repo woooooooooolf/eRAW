@@ -58,7 +58,7 @@ test("public package metadata and application versions stay synchronized", () =>
   assert.equal(packageJson.repository.url, "git+https://github.com/woooooooooolf/eRAW.git");
   assert.equal(tauriConfig.version, packageJson.version);
   assert.match(cargoSource, new RegExp(`version = "${packageJson.version.replaceAll(".", "\\.")}"`));
-  assert.match(cargoSource, /rust-version = "1\.88"/);
+  assert.match(cargoSource, /rust-version = "1\.90"/);
   assert.match(cargoSource, /repository = "https:\/\/github\.com\/woooooooooolf\/eRAW"/);
   assert.match(appSource, new RegExp(`const VERSION = "${packageJson.version.replaceAll(".", "\\.")}"`));
   assert.match(helpWindowSource, new RegExp(`eRAW V${packageJson.version.replaceAll(".", "\\.")}`));

@@ -66,7 +66,7 @@ eRAW 当前以 Windows 为主要目标平台，基于 Tauri 2 构建：
 
 ## 从源码运行
 
-需要 Node.js、Rust stable、Windows WebView2 和 Tauri 2 的系统构建依赖。
+需要 Node.js、Rust stable（最低 1.90）、Windows WebView2 和 Tauri 2 的系统构建依赖。
 
 ```powershell
 npm.cmd install
