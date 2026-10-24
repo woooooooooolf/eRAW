@@ -23,7 +23,7 @@ eRAW 的现有功能已经形成相对完整的 RAW 查看、诊断、统计与�
 1. 保持变更小而聚焦；较大变更先关联 Issue。
 2. 不提交 `dist/`、`target/`、RAW 样本、密钥或用户临时文件。
 3. 同步更新直接相关的测试和文档。
-4. 至少运行：
+4. 程序、依赖或构建流程变更至少运行以下检查；仅工程文档变更按 [工程流程](docs/WORKFLOW.md#一次完整迭代) 检查内容、链接和格式，无须完整程序构建：
 
    ```powershell
    npm.cmd run check
@@ -33,6 +33,8 @@ eRAW 的现有功能已经形成相对完整的 RAW 查看、诊断、统计与�
    ```
 
 5. 提交贡献即表示你有权提供相关代码和资源，并同意其按项目的 GPL-3.0-or-later 许可证发布。
+
+普通迭代或 Pull Request 不要求提升软件版本号。维护者在准备发布时，按相对上一次正式发布的累计变更统一决定版本号；升版不自动触发推送、标签或 Release。版本规则以 [工程版本策略](docs/WORKFLOW.md#版本策略) 为准。
 
 维护者会尽力处理清晰、可复现且符合范围的贡献，但不承诺响应、评审、修复或合并时限。
 
@@ -46,6 +48,8 @@ Contributions are welcome when they address reproducible defects, compatibility,
 
 Features that materially change the architecture, processing workflow, data semantics, or user behavior are generally not prioritized. If such a change appears necessary, open a Maintenance proposal first and explain the concrete problem, boundaries, long-term maintenance cost, and verification plan. A proposal may be declined when it does not fit the project scope or maintenance budget.
 
-Use the Bug report form for defects. Never upload sensor data, customer data, proprietary samples, or formats that you are not authorized to disclose. Keep pull requests small, link larger work to an Issue, update relevant tests and documentation, and run the commands listed above.
+Use the Bug report form for defects. Never upload sensor data, customer data, proprietary samples, or formats that you are not authorized to disclose. Keep pull requests small, link larger work to an Issue, update relevant tests and documentation, and run the commands listed above for application, dependency, or build changes. For engineering documentation changes only, check content, links, and formatting as described in the [development workflow](docs/WORKFLOW.md#一次完整迭代); a full application build is not required.
+
+Routine iterations and pull requests do not require a version bump. Maintainers choose the release version from all changes since the previous formal release when preparing the next release. A version bump does not automatically authorize a push, tag, or GitHub Release. See the [version policy](docs/WORKFLOW.md#版本策略).
 
 By contributing, you confirm that you may provide the contribution and agree that it is distributed under GPL-3.0-or-later. Clear and in-scope contributions are appreciated, but response, review, fix, and merge timelines are not guaranteed.
