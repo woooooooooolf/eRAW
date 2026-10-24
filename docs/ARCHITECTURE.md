@@ -26,6 +26,8 @@ flowchart LR
 
 Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予原生全屏、统计 WebviewWindow、文件对话框和写入图像剪贴板所需权限；F11 直接调用窗口 API，不通过 CSS 模拟或新增 Rust 命令。
 
+关于页的仓库链接通过无参数命令 `open_project_repository` 交给 Tauri Opener 的 Rust API，地址固定取自 `CARGO_PKG_REPOSITORY`。关闭 Opener 的自动 JS 链接拦截，也不授予前端通用 URL/文件打开权限。许可证卡片展示 `GPL-3.0-or-later` 与七语概览；全文按需从仓库 `LICENSE?raw` 构建为内嵌资源，使用 `textContent` 放入可选择、可滚动的原文阅读器，不依赖网络或外置文件。
+
 界面样式不打包或下载字体文件；常规正文、手册正文和等宽内容分别使用 `system-ui`、`ui-serif` 与 `ui-monospace` 通用系统字体族，具体字形由用户系统与 WebView2 回退机制提供。技术手册通过 MIT 许可的 KaTeX 将 LaTeX 源直接转换为原生 MathML，不加载 KaTeX CSS 或字体资源。
 
 ## 模块职责

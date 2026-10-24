@@ -72,7 +72,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | vite | 8.3.4 | development | MIT |
 | zrender | 6.1.0 | runtime | BSD-3-Clause |
 
-## Cargo dependencies (464)
+## Cargo dependencies (498)
 
 | Crate | Version | Declared license |
 | --- | --- | --- |
@@ -83,6 +83,16 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | android_system_properties | 0.1.5 | MIT/Apache-2.0 |
 | anyhow | 1.0.104 | MIT OR Apache-2.0 |
 | arboard | 3.6.1 | MIT OR Apache-2.0 |
+| async-broadcast | 0.7.2 | MIT OR Apache-2.0 |
+| async-channel | 2.5.0 | Apache-2.0 OR MIT |
+| async-executor | 1.14.0 | Apache-2.0 OR MIT |
+| async-io | 2.6.0 | Apache-2.0 OR MIT |
+| async-lock | 3.4.2 | Apache-2.0 OR MIT |
+| async-process | 2.5.0 | Apache-2.0 OR MIT |
+| async-recursion | 1.2.0 | MIT OR Apache-2.0 |
+| async-signal | 0.2.14 | Apache-2.0 OR MIT |
+| async-task | 4.7.1 | Apache-2.0 OR MIT |
+| async-trait | 0.1.92 | MIT OR Apache-2.0 |
 | atk | 0.18.2 | MIT |
 | atk-sys | 0.18.2 | MIT |
 | atomic-waker | 1.1.2 | Apache-2.0 OR MIT |
@@ -96,6 +106,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | bitflags | 2.13.1 | MIT OR Apache-2.0 |
 | block-buffer | 0.10.4 | MIT OR Apache-2.0 |
 | block2 | 0.6.2 | MIT |
+| blocking | 1.7.0 | Apache-2.0 OR MIT |
 | brotli | 9.0.0 | BSD-3-Clause AND MIT |
 | brotli-decompressor | 6.0.1 | BSD-3-Clause/MIT |
 | bs58 | 0.5.1 | MIT/Apache-2.0 |
@@ -118,6 +129,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | chrono | 0.4.45 | MIT OR Apache-2.0 |
 | clipboard-win | 5.4.1 | BSL-1.0 |
 | combine | 4.6.7 | MIT |
+| concurrent-queue | 2.5.0 | Apache-2.0 OR MIT |
 | cookie | 0.18.1 | MIT OR Apache-2.0 |
 | core-foundation | 0.10.1 | MIT OR Apache-2.0 |
 | core-foundation-sys | 0.8.7 | MIT OR Apache-2.0 |
@@ -155,10 +167,15 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | dyn-clone | 1.0.20 | MIT OR Apache-2.0 |
 | embed_plist | 1.2.2 | MIT OR Apache-2.0 |
 | embed-resource | 3.0.11 | MIT |
+| endi | 1.1.1 | MIT |
+| enumflags2 | 0.7.12 | MIT OR Apache-2.0 |
+| enumflags2_derive | 0.7.12 | MIT OR Apache-2.0 |
 | equivalent | 1.0.2 | Apache-2.0 OR MIT |
 | erased-serde | 0.4.10 | MIT OR Apache-2.0 |
 | errno | 0.3.14 | MIT OR Apache-2.0 |
 | error-code | 3.3.2 | BSL-1.0 |
+| event-listener | 5.4.2 | Apache-2.0 OR MIT |
+| event-listener-strategy | 0.5.4 | Apache-2.0 OR MIT |
 | fastrand | 2.5.0 | Apache-2.0 OR MIT |
 | fax | 0.2.7 | MIT |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 |
@@ -177,6 +194,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | futures-core | 0.3.33 | MIT OR Apache-2.0 |
 | futures-executor | 0.3.33 | MIT OR Apache-2.0 |
 | futures-io | 0.3.33 | MIT OR Apache-2.0 |
+| futures-lite | 2.6.1 | Apache-2.0 OR MIT |
 | futures-macro | 0.3.33 | MIT OR Apache-2.0 |
 | futures-sink | 0.3.33 | MIT OR Apache-2.0 |
 | futures-task | 0.3.33 | MIT OR Apache-2.0 |
@@ -209,6 +227,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | hashbrown | 0.17.1 | MIT OR Apache-2.0 |
 | heck | 0.4.1 | MIT OR Apache-2.0 |
 | heck | 0.5.0 | MIT OR Apache-2.0 |
+| hermit-abi | 0.5.3 | MIT OR Apache-2.0 |
 | hex | 0.4.3 | MIT OR Apache-2.0 |
 | html5ever | 0.39.0 | MIT OR Apache-2.0 |
 | http | 1.4.2 | MIT OR Apache-2.0 |
@@ -235,6 +254,8 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | indexmap | 2.14.0 | Apache-2.0 OR MIT |
 | infer | 0.22.0 | MIT |
 | ipnet | 2.12.0 | MIT OR Apache-2.0 |
+| is-docker | 0.2.0 | MIT |
+| is-wsl | 0.4.0 | MIT |
 | itoa | 1.0.18 | MIT OR Apache-2.0 |
 | javascriptcore-rs | 1.1.2 | MIT |
 | javascriptcore-rs-sys | 1.1.1 | MIT |
@@ -292,10 +313,13 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | objc2-user-notifications | 0.3.2 | Zlib OR Apache-2.0 OR MIT |
 | objc2-web-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT |
 | once_cell | 1.21.4 | MIT OR Apache-2.0 |
+| open | 5.4.5 | MIT |
 | option-ext | 0.2.0 | MPL-2.0 |
+| ordered-stream | 0.2.0 | MIT OR Apache-2.0 |
 | os_pipe | 1.2.3 | MIT |
 | pango | 0.18.3 | MIT |
 | pango-sys | 0.18.0 | MIT |
+| parking | 2.2.1 | Apache-2.0 OR MIT |
 | parking_lot | 0.12.5 | MIT OR Apache-2.0 |
 | parking_lot_core | 0.9.12 | MIT OR Apache-2.0 |
 | percent-encoding | 2.3.2 | MIT OR Apache-2.0 |
@@ -306,9 +330,11 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | phf_macros | 0.13.1 | MIT |
 | phf_shared | 0.13.1 | MIT |
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
+| piper | 0.2.5 | MIT OR Apache-2.0 |
 | pkg-config | 0.3.33 | MIT OR Apache-2.0 |
 | plist | 1.10.0 | MIT |
 | png | 0.18.1 | MIT OR Apache-2.0 |
+| polling | 3.11.0 | Apache-2.0 OR MIT |
 | potential_utf | 0.1.5 | Unicode-3.0 |
 | powerfmt | 0.2.0 | MIT OR Apache-2.0 |
 | precomputed-hash | 0.1.1 | MIT |
@@ -362,6 +388,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | servo_arc | 0.4.3 | MIT OR Apache-2.0 |
 | sha2 | 0.10.9 | MIT OR Apache-2.0 |
 | shlex | 2.0.1 | MIT OR Apache-2.0 |
+| signal-hook-registry | 1.4.8 | MIT OR Apache-2.0 |
 | simd-adler32 | 0.3.10 | MIT |
 | siphasher | 1.0.3 | MIT/Apache-2.0 |
 | slab | 0.4.12 | MIT |
@@ -393,10 +420,12 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | tauri-plugin-clipboard-manager | 2.5.0 | Apache-2.0 OR MIT |
 | tauri-plugin-dialog | 2.8.3 | Apache-2.0 OR MIT |
 | tauri-plugin-fs | 2.7.1 | Apache-2.0 OR MIT |
+| tauri-plugin-opener | 2.7.2 | Apache-2.0 OR MIT |
 | tauri-runtime | 2.12.2 | Apache-2.0 OR MIT |
 | tauri-runtime-wry | 2.12.3 | Apache-2.0 OR MIT |
 | tauri-utils | 2.10.2 | Apache-2.0 OR MIT |
 | tauri-winres | 0.3.6 | MIT |
+| tempfile | 3.27.0 | MIT OR Apache-2.0 |
 | tendril | 0.5.1 | MIT OR Apache-2.0 |
 | thiserror | 1.0.69 | MIT OR Apache-2.0 |
 | thiserror | 2.0.19 | MIT OR Apache-2.0 |
@@ -425,12 +454,14 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | tower-layer | 0.3.3 | MIT |
 | tower-service | 0.3.3 | MIT |
 | tracing | 0.1.44 | MIT |
+| tracing-attributes | 0.1.31 | MIT |
 | tracing-core | 0.1.36 | MIT |
 | tray-icon | 0.25.1 | MIT OR Apache-2.0 |
 | tree_magic_mini | 3.2.2 | MIT |
 | try-lock | 0.2.5 | MIT |
 | typeid | 1.0.3 | MIT OR Apache-2.0 |
 | typenum | 1.20.1 | MIT OR Apache-2.0 |
+| uds_windows | 1.2.1 | MIT |
 | unicode-ident | 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 |
 | unicode-segmentation | 1.13.3 | MIT OR Apache-2.0 |
 | url | 2.5.8 | MIT OR Apache-2.0 |
@@ -496,17 +527,13 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | windows_x86_64_msvc | 0.52.6 | MIT OR Apache-2.0 |
 | windows_x86_64_msvc | 0.53.1 | MIT OR Apache-2.0 |
 | windows-collections | 0.3.2 | MIT OR Apache-2.0 |
-| windows-core | 0.61.2 | MIT OR Apache-2.0 |
 | windows-core | 0.62.2 | MIT OR Apache-2.0 |
 | windows-future | 0.3.2 | MIT OR Apache-2.0 |
 | windows-implement | 0.60.2 | MIT OR Apache-2.0 |
 | windows-interface | 0.59.3 | MIT OR Apache-2.0 |
-| windows-link | 0.1.3 | MIT OR Apache-2.0 |
 | windows-link | 0.2.1 | MIT OR Apache-2.0 |
 | windows-numerics | 0.3.1 | MIT OR Apache-2.0 |
-| windows-result | 0.3.4 | MIT OR Apache-2.0 |
 | windows-result | 0.4.1 | MIT OR Apache-2.0 |
-| windows-strings | 0.4.2 | MIT OR Apache-2.0 |
 | windows-strings | 0.5.1 | MIT OR Apache-2.0 |
 | windows-sys | 0.45.0 | MIT OR Apache-2.0 |
 | windows-sys | 0.59.0 | MIT OR Apache-2.0 |
@@ -530,6 +557,10 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | x11rb-protocol | 0.13.2 | MIT OR Apache-2.0 |
 | yoke | 0.8.3 | Unicode-3.0 |
 | yoke-derive | 0.8.2 | Unicode-3.0 |
+| zbus | 5.19.0 | MIT |
+| zbus_macros | 5.19.0 | MIT |
+| zbus_names | 4.3.5 | MIT |
+| zcheapstr | 1.1.0 | MIT |
 | zerocopy | 0.8.55 | BSD-2-Clause OR Apache-2.0 OR MIT |
 | zerocopy-derive | 0.8.55 | BSD-2-Clause OR Apache-2.0 OR MIT |
 | zerofrom | 0.1.8 | Unicode-3.0 |
@@ -540,3 +571,6 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | zmij | 1.0.23 | MIT |
 | zune-core | 0.4.12 | MIT OR Apache-2.0 OR Zlib |
 | zune-jpeg | 0.4.21 | MIT OR Apache-2.0 OR Zlib |
+| zvariant | 5.15.1 | MIT |
+| zvariant_derive | 5.15.1 | MIT |
+| zvariant_utils | 4.2.0 | MIT |

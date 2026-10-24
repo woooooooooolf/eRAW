@@ -21,6 +21,10 @@ export function takeStartupDocument(): Promise<StartupDocument | null> {
   return invoke("take_startup_document");
 }
 
+export function openProjectRepository(): Promise<void> {
+  return invoke("open_project_repository");
+}
+
 export async function chooseRawFile(): Promise<string | null> {
   const result = await open({
     title: t("empty.open"),

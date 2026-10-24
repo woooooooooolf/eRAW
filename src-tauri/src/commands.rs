@@ -22,6 +22,7 @@ use tauri::{
     State,
     ipc::{Channel, Response},
 };
+use tauri_plugin_opener::OpenerExt;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -233,6 +234,14 @@ fn lock_document<'a>(
         .document
         .lock()
         .map_err(|_| CommandError::new("document_session_poisoned"))
+}
+
+/// The frontend cannot supply arbitrary URLs or executable paths.
+#[tauri::command]
+pub fn open_project_repository(app: tauri::AppHandle) -> Result<(), CommandError> {
+    app.opener()
+        .open_url(env!("CARGO_PKG_REPOSITORY"), None::<&str>)
+        .map_err(|error| CommandError::new("repository_open_failed").with_cause(error))
 }
 
 #[tauri::command]

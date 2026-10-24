@@ -7,8 +7,8 @@ mod raw;
 use commands::{
     AppState, analyze_raw_image, calculate_raw_display_range, cancel_raw_analysis,
     cancel_raw_display_range, cancel_raw_export, close_document, export_document,
-    inspect_raw_pixels, open_document, render_raw_tile, sample_raw_pixel, save_png,
-    update_descriptor,
+    inspect_raw_pixels, open_document, open_project_repository, render_raw_tile, sample_raw_pixel,
+    save_png, update_descriptor,
 };
 use serde::Serialize;
 use std::{
@@ -115,8 +115,10 @@ pub fn run() {
         .manage(StartupState(Mutex::new(startup)))
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
         .invoke_handler(tauri::generate_handler![
             take_startup_document,
+            open_project_repository,
             open_document,
             update_descriptor,
             close_document,

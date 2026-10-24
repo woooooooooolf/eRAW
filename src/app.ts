@@ -12,6 +12,7 @@ import {
   chooseRawFile,
   closeDocument,
   openDocument,
+  openProjectRepository,
   updateDescriptor,
 } from "./api";
 import {
@@ -912,13 +913,24 @@ export class ErawApp {
 
     texts("#about-dialog .about-credits span", ["about.productDesign", "about.engineering"]);
     text("#about-repository strong", "about.repository");
-    text("#about-repository small", "about.repositoryAvailability");
+    attribute("#about-repository", "title", "about.repositoryOpenHint");
+    text("#about-license .license-label", "about.applicationLicense");
+    text("#about-license .license-name", "about.licenseName");
+    text("#about-license .license-summary", "about.licenseSummary");
+    text("#about-license .license-read-label", "about.readLicense");
+    attribute("#about-license", "aria-label", "about.readLicense");
+    texts("#license-dialog header small, #license-dialog header h2", ["about.applicationLicense", "about.licenseName"]);
+    text("#license-dialog .license-scope", "about.licenseScope");
+    text("#license-dialog .license-original", "about.licenseOriginal");
+    text("#back-from-license", "about.back");
+    text('#license-dialog footer button[value="cancel"]', "common.done");
+    attribute("#license-text", "aria-label", "about.licenseOriginal");
     text("#open-source-components strong", "about.components");
     text("#open-source-components small", "about.componentsHint");
     text("#about-dialog footer button", "common.done");
     texts("#open-source-dialog header small, #open-source-dialog header h2", ["about.componentsEyebrow", "about.componentsTitle"]);
     text("#open-source-dialog .open-source-body > p:first-child", "about.componentsIntro");
-    texts("#open-source-dialog .component-list > div > span", ["about.desktopFramework", "about.fileDialog", "about.serialization", "about.memoryMap", "about.buildTool", "about.typeSystem", "about.charting", "about.mathTypesetting"]);
+    texts("#open-source-dialog .component-list > div > span", ["about.desktopFramework", "about.fileDialog", "about.serialization", "about.memoryMap", "about.buildTool", "about.typeSystem", "about.charting", "about.mathTypesetting", "about.browserOpener"]);
     text("#open-source-dialog .component-list > div:nth-child(1) > strong", "about.tauriApi");
     text("#open-source-dialog .component-list > div:nth-child(3) > strong", "about.serde");
     text("#open-source-dialog .open-source-note", "about.licenseNote");
@@ -1034,12 +1046,23 @@ export class ErawApp {
       <div class="about-copy">
         <div class="about-credits">
           <div><span>产品设计</span><strong>凌净清河</strong></div>
-          <div><span>工程实现</span><strong>Codex (GPT-5.6 Sol)</strong></div>
+          <div><span>工程实现</span><strong>Codex (GPT-5.6 Sol/GPT-6.1 Sol)</strong></div>
         </div>
-        <a id="about-repository" class="about-repository" href="https://github.com/woooooooooolf/eRAW" target="_blank" rel="noopener noreferrer"><strong>GitHub</strong><span>github.com/woooooooooolf/eRAW</span><small>（以仓库实际公开情况为准）</small></a>
+        <a id="about-repository" class="about-repository" href="https://github.com/woooooooooolf/eRAW" target="_blank" rel="noopener noreferrer"><strong>GitHub</strong><span>github.com/woooooooooolf/eRAW</span><b aria-hidden="true">↗</b></a>
+        <button id="about-license" type="button" class="about-license" aria-haspopup="dialog">
+          <span class="license-card-heading"><span class="license-label">软件许可证</span><code>GPL-3.0-or-later</code></span>
+          <strong class="license-name">GNU GPL 第 3 版或后续版本</strong>
+          <span class="license-summary">使用、研究、修改与再分发，遵循 GPL 条款；本软件不提供担保。</span>
+          <span class="license-read"><span class="license-read-label">离线阅读完整许可证</span><b aria-hidden="true">›</b></span>
+        </button>
         <button id="open-source-components" type="button" class="about-link"><span><strong>开源组件</strong><small>查看主要第三方组件与许可证信息</small></span><b>›</b></button>
       </div>
       <footer><button value="cancel" class="primary-button">完成</button></footer>
+    </form></dialog>
+    <dialog id="license-dialog" class="modal license-modal"><form method="dialog">
+      <header><div><small>软件许可证</small><h2>GNU GPL 第 3 版或后续版本</h2></div><button value="cancel" class="dialog-close">×</button></header>
+      <div class="license-body"><div class="license-context"><code>GPL-3.0-or-later</code><p class="license-scope">此许可证适用于 eRAW 软件。第三方组件保留各自的许可证。</p><p class="license-original">以下为随程序提供的英文许可证原文。</p></div><pre id="license-text" tabindex="0"></pre></div>
+      <footer><button id="back-from-license" type="button" class="secondary-button">返回关于</button><button value="cancel" class="primary-button">完成</button></footer>
     </form></dialog>
     <dialog id="open-source-dialog" class="modal open-source-modal"><form method="dialog">
       <header><div><small>OPEN SOURCE ACKNOWLEDGEMENTS</small><h2>主要开源组件</h2></div><button value="cancel" class="dialog-close">×</button></header>
@@ -1054,11 +1077,26 @@ export class ErawApp {
           <div><strong>TypeScript</strong><span>前端类型系统与编译工具</span><code>Apache-2.0</code></div>
           <div><strong>Apache ECharts</strong><span>交互式统计图表</span><code>Apache-2.0</code></div>
           <div><strong>KaTeX</strong><span>LaTeX 解析与 MathML 公式排版</span><code>MIT</code></div>
+          <div><strong>Tauri Opener Plugin</strong><span>在系统浏览器打开仓库</span><code>MIT OR Apache-2.0</code></div>
         </div>
-        <p class="open-source-note">完整传递依赖许可证清单将在正式公开发布前随源代码与发布产物提供。</p>
+        <p class="open-source-note">完整依赖清单见源代码中的 THIRD_PARTY_NOTICES.md；完整许可文本随发布包中的 THIRD_PARTY_LICENSES.txt 提供。</p>
       </div>
       <footer><button id="back-to-about" type="button" class="secondary-button">返回关于</button><button value="cancel" class="primary-button">完成</button></footer>
     </form></dialog>`;
+  }
+
+  private async openLicenseDialog(): Promise<void> {
+    try {
+      const { default: license } = await import("../LICENSE?raw");
+      if (!this.get<HTMLDialogElement>("about-dialog").open) return;
+      this.get("license-text").textContent = license;
+      this.get<HTMLDialogElement>("about-dialog").close();
+      this.get<HTMLDialogElement>("license-dialog").showModal();
+      this.get("license-text").scrollTop = 0;
+      this.get("license-text").focus();
+    } catch (error) {
+      this.reportRuntimeError(error, "about.licenseLoadFailed", 5000, "license");
+    }
   }
 
   private settingsDialogTemplate(): string {
@@ -1210,6 +1248,16 @@ export class ErawApp {
     this.get("open-source-components").addEventListener("click", () => {
       this.get<HTMLDialogElement>("about-dialog").close();
       this.get<HTMLDialogElement>("open-source-dialog").showModal();
+    });
+    this.get("about-repository").addEventListener("click", (event) => {
+      if (!isTauri()) return;
+      event.preventDefault();
+      void openProjectRepository().catch((error) => this.reportRuntimeError(error, undefined, 5000, "repository"));
+    });
+    this.get("about-license").addEventListener("click", () => { void this.openLicenseDialog(); });
+    this.get("back-from-license").addEventListener("click", () => {
+      this.get<HTMLDialogElement>("license-dialog").close();
+      this.get<HTMLDialogElement>("about-dialog").showModal();
     });
     this.get("back-to-about").addEventListener("click", () => {
       this.get<HTMLDialogElement>("open-source-dialog").close();
