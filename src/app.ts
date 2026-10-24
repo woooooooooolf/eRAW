@@ -914,19 +914,19 @@ export class ErawApp {
     texts("#about-dialog .about-credits span", ["about.productDesign", "about.engineering"]);
     text("#about-repository strong", "about.repository");
     attribute("#about-repository", "title", "about.repositoryOpenHint");
-    text("#about-license .license-label", "about.applicationLicense");
-    text("#about-license .license-name", "about.licenseName");
-    text("#about-license .license-summary", "about.licenseSummary");
-    text("#about-license .license-read-label", "about.readLicense");
+    text("#about-license strong", "about.applicationLicense");
+    attribute("#about-license", "title", "about.readLicense");
     attribute("#about-license", "aria-label", "about.readLicense");
     texts("#license-dialog header small, #license-dialog header h2", ["about.applicationLicense", "about.licenseName"]);
     text("#license-dialog .license-scope", "about.licenseScope");
+    text("#license-dialog .license-summary", "about.licenseSummary");
     text("#license-dialog .license-original", "about.licenseOriginal");
     text("#back-from-license", "about.back");
     text('#license-dialog footer button[value="cancel"]', "common.done");
     attribute("#license-text", "aria-label", "about.licenseOriginal");
     text("#open-source-components strong", "about.components");
-    text("#open-source-components small", "about.componentsHint");
+    text("#open-source-components .about-entry-detail", "about.thirdPartyLicenses");
+    attribute("#open-source-components", "title", "about.componentsHint");
     text("#about-dialog footer button", "common.done");
     texts("#open-source-dialog header small, #open-source-dialog header h2", ["about.componentsEyebrow", "about.componentsTitle"]);
     text("#open-source-dialog .open-source-body > p:first-child", "about.componentsIntro");
@@ -1048,20 +1048,15 @@ export class ErawApp {
           <div><span>产品设计</span><strong>凌净清河</strong></div>
           <div><span>工程实现</span><strong>Codex (GPT-5.6 Sol/GPT-6.1 Sol)</strong></div>
         </div>
-        <a id="about-repository" class="about-repository" href="https://github.com/woooooooooolf/eRAW" target="_blank" rel="noopener noreferrer"><strong>GitHub</strong><span>github.com/woooooooooolf/eRAW</span><b aria-hidden="true">↗</b></a>
-        <button id="about-license" type="button" class="about-license" aria-haspopup="dialog">
-          <span class="license-card-heading"><span class="license-label">软件许可证</span><code>GPL-3.0-or-later</code></span>
-          <strong class="license-name">GNU GPL 第 3 版或后续版本</strong>
-          <span class="license-summary">使用、研究、修改与再分发，遵循 GPL 条款；本软件不提供担保。</span>
-          <span class="license-read"><span class="license-read-label">离线阅读完整许可证</span><b aria-hidden="true">›</b></span>
-        </button>
-        <button id="open-source-components" type="button" class="about-link"><span><strong>开源组件</strong><small>查看主要第三方组件与许可证信息</small></span><b>›</b></button>
+        <a id="about-repository" class="about-entry" href="https://github.com/woooooooooolf/eRAW" target="_blank" rel="noopener noreferrer"><strong>GitHub</strong><span class="about-entry-detail">github.com/woooooooooolf/eRAW</span><b aria-hidden="true">↗</b></a>
+        <button id="about-license" type="button" class="about-entry" aria-haspopup="dialog"><strong>软件许可证</strong><span class="about-entry-detail">GPL-3.0-or-later</span><b aria-hidden="true">›</b></button>
+        <button id="open-source-components" type="button" class="about-entry" aria-haspopup="dialog"><strong>开源组件</strong><span class="about-entry-detail">第三方许可证</span><b aria-hidden="true">›</b></button>
       </div>
       <footer><button value="cancel" class="primary-button">完成</button></footer>
     </form></dialog>
     <dialog id="license-dialog" class="modal license-modal"><form method="dialog">
       <header><div><small>软件许可证</small><h2>GNU GPL 第 3 版或后续版本</h2></div><button value="cancel" class="dialog-close">×</button></header>
-      <div class="license-body"><div class="license-context"><code>GPL-3.0-or-later</code><p class="license-scope">此许可证适用于 eRAW 软件。第三方组件保留各自的许可证。</p><p class="license-original">以下为随程序提供的英文许可证原文。</p></div><pre id="license-text" tabindex="0"></pre></div>
+      <div class="license-body"><div class="license-context"><code>GPL-3.0-or-later</code><p class="license-summary">使用、研究、修改与再分发，遵循 GPL 条款；本软件不提供担保。</p><p class="license-scope">此许可证适用于 eRAW 软件。第三方组件保留各自的许可证。</p><p class="license-original">以下为随程序提供的英文许可证原文。</p></div><pre id="license-text" tabindex="0"></pre></div>
       <footer><button id="back-from-license" type="button" class="secondary-button">返回关于</button><button value="cancel" class="primary-button">完成</button></footer>
     </form></dialog>
     <dialog id="open-source-dialog" class="modal open-source-modal"><form method="dialog">
