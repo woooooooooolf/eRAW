@@ -126,7 +126,7 @@ import {
   isQuadCfa,
 } from "./types";
 
-const VERSION = "0.7.3";
+const VERSION = "0.8.0";
 const BUILD_TIME_SOURCE = __ERAW_BUILD_TIME__;
 const STORAGE_KEY = "eraw.rawDescriptor.v1";
 const SETTINGS_KEY = "eraw.appSettings.v1";
