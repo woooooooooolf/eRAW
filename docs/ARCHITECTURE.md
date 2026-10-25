@@ -32,6 +32,8 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 
 前端 `ManualUpdateChecker` 由 `ErawApp` 持有，不由对话框创建/销毁；构造和渲染不发起请求，进行中点击复用同一 Promise，关闭对话框不取消定时器或 RPC。IPC 另有 10 秒兜底截止，避免异常通信令按钮永久停在检查中，兜底后到达的旧结果不能覆盖已完成的失败状态。语言变化只重新呈现当前状态，不重新检查；该状态不进入应用设置或 WebView 存储。
 
+HTTP 客户端使用系统原生 TLS 校验证书，并启用系统手动代理、代理环境变量与 SOCKS 支持；浏览器插件、PAC 和企业认证代理不保证兼容，失败后给出关于页内反馈及官方发布页入口，不自动切换镜像或降低证书验证。Windows 使用 Schannel，无需额外 OpenSSL DLL；Linux 源码构建需安装 OpenSSL 开发依赖。更新检查只确认 GitHub 侧版本与 ZIP 入口，浏览器后续的 CDN 访问及文件保存由浏览器负责，不将入口确认报告为下载完成。
+
 界面样式不打包或下载字体文件；常规正文、手册正文和等宽内容分别使用 `system-ui`、`ui-serif` 与 `ui-monospace` 通用系统字体族，具体字形由用户系统与 WebView2 回退机制提供。技术手册通过 MIT 许可的 KaTeX 将 LaTeX 源直接转换为原生 MathML，不加载 KaTeX CSS 或字体资源。
 
 ## 模块职责
@@ -43,6 +45,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | 模块 | 主要职责 |
 | --- | --- |
 | `src/app.ts` | 应用状态、参数提交、菜单、状态栏、诊断、设置与对话框编排 |
+| `src/update-check.ts` | 进程内手动检查状态、进行中去重、IPC 截止与七语状态映射，不以关于页可见性控制请求 |
 | `src/app-settings.ts` | 应用设置类型、默认值、旧设置迁移、非法持久值回退和侧栏宽度约束 |
 | `src/theme-catalog.ts` | 九套主题的稳定标识、菜单预览元数据、合法性判断和本地化键映射 |
 | `src/descriptor-input.ts` | 数值参数的整数化、边界限制和空值默认规则 |
@@ -66,6 +69,7 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 | `src/pixel-overlay.ts` / `src/pixel-value-display.ts` / `src/pixel-grid-rendering.ts` | 高倍率像素网格、颜色校验，以及与当前显示模式一致的原始、单通道或 RGB 数值叠加 |
 | `src/api.ts` / `src/types.ts` | Tauri 调用封装及前后端共享数据契约 |
 | `src-tauri/src/commands.rs` | 当前文档会话、内存映射、缓存、任务快照和命令边界 |
+| `src-tauri/src/update_check.rs` | 固定仓库的 Latest 重定向与稳定版本校验、有界异步请求、ZIP 确认、进程内限流冷却和受控链接目标 |
 | `src-tauri/src/raw/mod.rs` | 布局、packing、CFA、预览、Remosaic、Demosaic、检查、RAW 导出与原子输出写入 |
 | `src-tauri/src/analysis/mod.rs` | L0 CFA DN 摘要、精确 Histogram、Row/Column Profile 和 QCFA 原子平面 |
 

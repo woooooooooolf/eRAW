@@ -66,6 +66,8 @@ Terminal, Skript oder KI-Werkzeug können RAW-Datei, Maße, Format, Bittiefe, CF
 & '.\eRAW.exe' --skill
 ```
 
+Die Entwicklungsversion bietet unten links im Infofenster eine Updateprüfung. Nur ein Klick prüft im Hintergrund die Weiterleitungsheader von GitHub Latest, ohne GitHub-API oder HTML-Auswertung. Start, RAW-Öffnen und Öffnen des Infofensters prüfen nicht automatisch. Das Schließen unterbricht die Anfrage nicht; beim erneuten Öffnen bleibt ihr laufender oder abgeschlossener Zustand nur für diesen Prozess erhalten. Netzwerkzeitlimits verhindern eine Blockierung der Bildarbeit. Eine bestätigte passende ZIP-Datei öffnet sich erst nach einem Klick im Standardbrowser.
+
 Reines Umordnen ist nur auf einem vollständigen, unter der Permutation abgeschlossenen Koordinatenbereich mit lesbaren Samples ohne Zuschnitt oder verlustbehaftete Bittiefenabbildung umkehrbar; es stellt nicht alle ursprünglichen Dateibytes wieder her. Manche Größen und Phasen benötigen Pixel außerhalb des Bildes. Vorschau und CLI-Vorprüfung bleiben mit einer Verarbeitungswarnung und Rückgabecode 0 nutzbar; Remosaic/RGB48-Exporte lehnen nicht unterstützte Bereiche ab. Wählen Sie ausdrücklich einen inneren Zuschnitt oder die Rekonstruktion gleicher Farbe. Parameter werden nicht automatisch geändert. Die Rekonstruktion interpoliert und benötigt die erforderlichen Farbsamples.
 
 Mit `--check` werden Parameter, Dateizugriff und Layout ohne Fenster geprüft. Hilfe und Rückmeldungen sind stets auf verständlichem Englisch für Menschen und KI; eine erfolgreiche Prüfung bestätigt kein abgeschlossenes Rendering.

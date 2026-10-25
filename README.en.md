@@ -66,6 +66,8 @@ A terminal, script, or AI tool can supply the RAW file, dimensions, storage form
 & '.\eRAW.exe' --skill
 ```
 
+The current development build provides Check for updates at the bottom left of About. Only a click starts a background check of GitHub Latest redirect headers; it uses neither the GitHub API nor release HTML parsing. Startup, RAW opening and About opening do not check automatically. Closing About leaves the request running, and reopening retains its pending or completed state for this process only. Network deadlines end stalled checks without blocking image work. A confirmed compatible ZIP opens in the default browser only when clicked.
+
 Only-reorder is reversible only on a closed full-image coordinate domain with readable samples and no crop or lossy depth mapping; it does not restore the original file bytes. Some dimensions and phases require pixels outside the image. Preview and CLI preflight remain available with a processing-boundary warning and preflight status 0; related Remosaic/RGB48 exports reject unsupported ranges. Explicitly choose an interior crop or same-color reconstruction; parameters are never changed automatically. Reconstruction is interpolation and still requires the necessary color sites.
 
 Add `--check` to validate parameters, file access, and layout without a window. Help and feedback are always readable English for people and AI correction; preflight success does not confirm completed rendering.

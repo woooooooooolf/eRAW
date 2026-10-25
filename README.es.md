@@ -66,6 +66,8 @@ Un terminal, script o herramienta de IA puede indicar archivo RAW, dimensiones, 
 & '.\eRAW.exe' --skill
 ```
 
+La compilación de desarrollo ofrece Buscar actualizaciones en la esquina inferior izquierda de Acerca de. Solo al pulsar consulta en segundo plano las cabeceras de redirección de GitHub Latest, sin API de GitHub ni análisis de HTML. No consulta al iniciar, abrir RAW o abrir Acerca de. Cerrar el cuadro no detiene la consulta; al reabrir conserva el estado pendiente o final solo durante este proceso. Los tiempos límite evitan bloquear el trabajo con imágenes. El ZIP compatible confirmado se abre en el navegador predeterminado cuando el usuario pulsa su enlace.
+
 La reordenación solo es reversible en un dominio completo cerrado bajo la permutación, con muestras legibles, sin recorte ni conversión con pérdida de profundidad; no restaura todos los bytes originales. Algunas dimensiones y fases requieren píxeles externos. La vista y la comprobación CLI siguen disponibles con un aviso del límite de procesamiento y código 0; las exportaciones Remosaic/RGB48 rechazan rangos no admitidos. Elija expresamente un recorte interior o reconstrucción del mismo color; los parámetros no cambian automáticamente. La reconstrucción interpola y requiere muestras de los colores necesarios.
 
 Añada `--check` para comprobar parámetros, acceso al archivo y disposición sin ventana. La ayuda y los resultados siempre están en inglés legible para personas e IA; superar la comprobación no confirma que el dibujo haya terminado.

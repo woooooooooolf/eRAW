@@ -307,9 +307,11 @@ async fn discover(
         return Ok((UpdateResult::Current, None, None));
     }
     let candidate = platform.map(|platform| {
-        Url::parse(&format!(
-        "https://github.com/woooooooooolf/eRAW/releases/download/{tag}/eRAW-{tag}-{platform}.zip"
-    )).expect("validated stable tag")
+        let mut url = release.clone();
+        url.set_path(&format!(
+            "{REPOSITORY_PATH}releases/download/{tag}/eRAW-{tag}-{platform}.zip"
+        ));
+        url
     });
     let (download, retry_after) = if let Some(ref url) = candidate {
         match tokio::time::timeout_at(deadline, zip_available(transport, url)).await {

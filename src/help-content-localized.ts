@@ -688,6 +688,16 @@ const IMPLEMENTATION_DETAILS: Readonly<Record<ResolvedLocale, Readonly<Record<st
   }
 };
 
+const MANUAL_UPDATE_NOTES: Readonly<Record<ResolvedLocale, string>> = {
+  "zh-CN": "当前开发版在关于页左下提供“检查更新”。只有点击才后台读取 GitHub Latest 的重定向响应头，不使用 GitHub API 或解析发布 HTML；启动、打开 RAW 和打开关于都不自动检查。关闭关于后检查继续，重新打开保留检查中或最终结果，仅在当前进程有效。网络超时会结束检查，不阻塞图像操作；发现适配 ZIP 后由用户点击、交给默认浏览器下载。",
+  "en": "The current development build provides Check for updates at the bottom left of About. Only a click starts a background check of GitHub Latest redirect headers; it uses neither the GitHub API nor release HTML parsing. Startup, RAW opening and About opening do not check automatically. Closing About leaves the request running, and reopening retains its pending or completed state for this process only. Network deadlines end stalled checks without blocking image work. A confirmed compatible ZIP opens in the default browser only when clicked.",
+  "zh-TW": "目前開發版在關於頁左下提供「檢查更新」。只有點擊才於背景讀取 GitHub Latest 的重新導向標頭，不使用 GitHub API 或解析發佈 HTML；啟動、開啟 RAW 及關於頁均不自動檢查。關閉關於後檢查繼續，重新開啟保留進行中或最終結果，僅在目前行程有效。網路逾時會結束檢查，不阻塞影像操作；確認相容 ZIP 後由使用者點擊，交給預設瀏覽器下載。",
+  "ja": "現在の開発版は「バージョン情報」の左下に更新確認ボタンを備えます。クリック時だけ GitHub Latest のリダイレクトヘッダーをバックグラウンドで確認し、GitHub API やリリース HTML 解析は使いません。起動、RAW や画面を開く操作では自動確認しません。画面を閉じても確認は続き、開き直すと実行中または完了した状態を保持します。状態は現在のプロセスだけに保存します。ネットワークのタイムアウトでも画像操作を妨げません。対応 ZIP はユーザーがクリックしたときに既定ブラウザーでダウンロードします。",
+  "es": "La compilación de desarrollo ofrece Buscar actualizaciones en la esquina inferior izquierda de Acerca de. Solo al pulsar consulta en segundo plano las cabeceras de redirección de GitHub Latest, sin API de GitHub ni análisis de HTML. No consulta al iniciar, abrir RAW o abrir Acerca de. Cerrar el cuadro no detiene la consulta; al reabrir conserva el estado pendiente o final solo durante este proceso. Los tiempos límite evitan bloquear el trabajo con imágenes. El ZIP compatible confirmado se abre en el navegador predeterminado cuando el usuario pulsa su enlace.",
+  "fr": "La version de développement propose la recherche de mise à jour en bas à gauche de la fenêtre À propos. Seul un clic interroge en arrière-plan les en-têtes de redirection GitHub Latest, sans API GitHub ni analyse HTML. Aucun contrôle automatique au démarrage, à l’ouverture d’un RAW ou d’À propos. Fermer la fenêtre laisse la requête continuer ; sa réouverture conserve l’état en cours ou terminé uniquement pour ce processus. Les délais réseau évitent de bloquer le travail sur les images. Le ZIP compatible confirmé est ouvert dans le navigateur par défaut après un clic de l’utilisateur.",
+  "de": "Die Entwicklungsversion bietet unten links im Infofenster eine Updateprüfung. Nur ein Klick prüft im Hintergrund die Weiterleitungsheader von GitHub Latest, ohne GitHub-API oder HTML-Auswertung. Start, RAW-Öffnen und Öffnen des Infofensters prüfen nicht automatisch. Das Schließen unterbricht die Anfrage nicht; beim erneuten Öffnen bleibt ihr laufender oder abgeschlossener Zustand nur für diesen Prozess erhalten. Netzwerkzeitlimits verhindern eine Blockierung der Bildarbeit. Eine bestätigte passende ZIP-Datei öffnet sich erst nach einem Klick im Standardbrowser."
+};
+
 const ZH_CN_UI: HelpUiText = {
   manualTitle: "使用手册",
   subtitle: "技术参考 · 简体中文",
@@ -710,7 +720,8 @@ export function getHelpCatalog(locale: ResolvedLocale): HelpCatalog {
         : section.id === "inspection" ? ORIGINAL_DN_NOTES[locale]
         : section.id === "charts" ? CHART_SAMPLING_NOTES[locale]
         : section.id === "rendering" ? CAPTURE_LIFECYCLE_NOTES[locale] : "";
-      const paragraphs = [note, IMPLEMENTATION_DETAILS[locale][section.id]].filter(Boolean);
+      const paragraphs = [note, IMPLEMENTATION_DETAILS[locale][section.id],
+        section.id === "workflow" ? MANUAL_UPDATE_NOTES[locale] : ""].filter(Boolean);
       return paragraphs.length ? { ...section, body: `<div class="help-prose">${paragraphs.map((text) => `<p>${text}</p>`).join("")}</div>${section.body}` } : section;
     }) };
   };
