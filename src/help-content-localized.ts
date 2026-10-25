@@ -595,6 +595,16 @@ const LOCALIZED_COPY: Readonly<Record<NonChineseLocale, LocaleCopy>> = {
   de: DE_COPY,
 };
 
+const REORDER_BOUNDARY_NOTES: Readonly<Record<ResolvedLocale, string>> = {
+  "zh-CN": "仅重排的可逆性要求完整坐标域对置换闭合、样本全部可读且没有裁剪或有损位深映射；它不保证恢复原文件字节。部分尺寸和 Phase 会在边缘请求图像外像素。预览和 CLI 预检保留查看并给出处理边界警告，预检退出码仍为 0；相关 Remosaic/RGB48 导出会拒绝不支持的范围。请显式选择内部裁剪或同色重建，程序不会自动改参数。同色重建是插值，也需要所需颜色站点存在。",
+  "en": "Only-reorder is reversible only on a closed full-image coordinate domain with readable samples and no crop or lossy depth mapping; it does not restore the original file bytes. Some dimensions and phases require pixels outside the image. Preview and CLI preflight remain available with a processing-boundary warning and preflight status 0; related Remosaic/RGB48 exports reject unsupported ranges. Explicitly choose an interior crop or same-color reconstruction; parameters are never changed automatically. Reconstruction is interpolation and still requires the necessary color sites.",
+  "zh-TW": "僅重排的可逆性要求完整座標域對置換封閉、樣本全部可讀且沒有裁剪或有損位深映射；不保證還原原始檔案位元組。部分尺寸和 Phase 會在邊緣請求影像外像素。預覽及 CLI 預檢仍可使用並顯示處理邊界警告，預檢退出碼仍為 0；相關 Remosaic/RGB48 匯出拒絕不支援的範圍。請明確選擇內部裁剪或同色重建，程式不會自動改參數。同色重建屬於插值，仍需要所需顏色站點存在。",
+  "ja": "並べ替えの可逆性には、置換で閉じた画像全体の座標領域、読み取り可能な全サンプル、切り抜きや非可逆なビット深度変換がないことが必要です。元のファイルの全バイトは復元しません。サイズと Phase により画像外の画素が必要になります。プレビューと CLI 事前確認は処理境界の警告付きで利用でき、事前確認の終了コードは 0 のままです。該当する Remosaic/RGB48 出力は非対応範囲を拒否します。内側の切り抜きか同色再構成を明示的に選んでください。自動変更はしません。再構成は補間であり、必要な色のサンプルを要します。",
+  "es": "La reordenación solo es reversible en un dominio completo cerrado bajo la permutación, con muestras legibles, sin recorte ni conversión con pérdida de profundidad; no restaura todos los bytes originales. Algunas dimensiones y fases requieren píxeles externos. La vista y la comprobación CLI siguen disponibles con un aviso del límite de procesamiento y código 0; las exportaciones Remosaic/RGB48 rechazan rangos no admitidos. Elija expresamente un recorte interior o reconstrucción del mismo color; los parámetros no cambian automáticamente. La reconstrucción interpola y requiere muestras de los colores necesarios.",
+  "fr": "La permutation est réversible uniquement sur un domaine complet fermé par cette permutation, avec des échantillons lisibles, sans recadrage ni conversion de profondeur avec perte ; elle ne restaure pas tous les octets initiaux. Certaines dimensions et phases exigent des pixels hors image. La prévisualisation et la vérification CLI restent disponibles avec un avertissement de limite du traitement et le code 0 ; les exports Remosaic/RGB48 refusent les plages non prises en charge. Choisissez explicitement un recadrage intérieur ou la reconstruction de même couleur, sans changement automatique. Cette reconstruction interpole et exige les échantillons de couleur nécessaires.",
+  "de": "Reines Umordnen ist nur auf einem vollständigen, unter der Permutation abgeschlossenen Koordinatenbereich mit lesbaren Samples ohne Zuschnitt oder verlustbehaftete Bittiefenabbildung umkehrbar; es stellt nicht alle ursprünglichen Dateibytes wieder her. Manche Größen und Phasen benötigen Pixel außerhalb des Bildes. Vorschau und CLI-Vorprüfung bleiben mit einer Verarbeitungswarnung und Rückgabecode 0 nutzbar; Remosaic/RGB48-Exporte lehnen nicht unterstützte Bereiche ab. Wählen Sie ausdrücklich einen inneren Zuschnitt oder die Rekonstruktion gleicher Farbe. Parameter werden nicht automatisch geändert. Die Rekonstruktion interpoliert und benötigt die erforderlichen Farbsamples."
+};
+
 const ZH_CN_UI: HelpUiText = {
   manualTitle: "使用手册",
   subtitle: "技术参考 · 简体中文",
@@ -612,7 +622,8 @@ export function getHelpCatalog(locale: ResolvedLocale): HelpCatalog {
     const sections = [...catalog.sections];
     const index = sections.findIndex((section) => section.id === "workflow") + 1;
     sections.splice(index, 0, createCliHelpSection(locale));
-    return { ...catalog, sections };
+    return { ...catalog, sections: sections.map((section) => ["remosaic", "export", "cli"].includes(section.id)
+      ? { ...section, body: `<div class="help-prose"><p>${REORDER_BOUNDARY_NOTES[locale]}</p></div>${section.body}` } : section) };
   };
   if (locale === "zh-CN") return withCli({ groups: HELP_GROUPS, sections: HELP_SECTIONS, ui: ZH_CN_UI });
   return withCli(buildCatalog(locale, LOCALIZED_COPY[locale]));

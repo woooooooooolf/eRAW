@@ -46,6 +46,13 @@ MONO supports `raw` only. Use `cfa` for either Bayer or Quad CFA mosaics. Color
 sources support `demosaic` and the reconstructed `red`, `green`, `blue` channels.
 `remosaic` requires Quad CFA. For Quad CFA, optionally set
 `--same-color-reconstruction true` (default false); it also affects Demosaic.
+Only-reorder processing can require pixels outside the image for some dimensions
+and phases. A processing-boundary warning is distinct from missing source bytes;
+preflight can still exit 0. Related processed exports reject unsupported ranges.
+Choose an interior export crop or explicitly enable same-color reconstruction
+when appropriate; do not change parameters without a metadata-supported reason.
+Reconstruction interpolates and is not a lossless permutation.
+
 RGB-interleaved files and camera containers such as DNG/CR2 are not supported inputs.
 
 ## Check, correct, then open

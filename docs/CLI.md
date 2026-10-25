@@ -212,3 +212,12 @@ npm.cmd run test:cli
 
 Windows is the validated target. Portable parsing and non-Windows console handling
 remain platform-neutral; this iteration does not establish Linux desktop support.
+
+## Processing-boundary warnings
+
+Only-reorder Quad processing may request samples beyond the finite image edges.
+`[remosaic_boundary]` reports this geometric limit without scanning pixels.
+Preflight still exits 0 for an otherwise valid file/layout, and viewing remains
+available. Remosaic and RGB48 export reject unsupported crops (including the RGB
+interpolation halo); choose an interior crop or explicitly select reconstruction.
+This warning does not mean source bytes are missing.

@@ -1,4 +1,10 @@
 import { t, type MessageKey } from "./i18n";
+import type { ReorderEdge } from "./remosaic-boundary";
+
+export function localizeReorderBoundary(edges: readonly ReorderEdge[]): string {
+  const keys: Record<ReorderEdge, MessageKey> = { left: "common.left", right: "common.right", top: "common.top", bottom: "common.bottom" };
+  return t("processing.reorderBoundary", { edges: edges.map((edge) => t(keys[edge])).join(", ") });
+}
 
 export interface BackendError {
   code: string;
@@ -66,6 +72,10 @@ export function localizeBackendError(error: unknown): { code?: string; field?: s
   if (!backend) {
     const raw = String(error).replace(/^Error:\s*/, "").trim();
     return { message: raw || t("backend.operationFailed") };
+  }
+  if (backend.code === "export_reorder_boundary") {
+    const edges = (["left", "right", "top", "bottom"] as const).filter((edge) => backend.arguments?.[edge] === true);
+    return { code: backend.code, message: localizeReorderBoundary(edges) };
   }
   const key = ERROR_MESSAGES[backend.code] ?? "backend.operationFailed";
   const message = t(key, backend.arguments ?? {});

@@ -66,6 +66,8 @@ Un terminal, script o herramienta de IA puede indicar archivo RAW, dimensiones, 
 & '.\eRAW.exe' --skill
 ```
 
+La reordenación solo es reversible en un dominio completo cerrado bajo la permutación, con muestras legibles, sin recorte ni conversión con pérdida de profundidad; no restaura todos los bytes originales. Algunas dimensiones y fases requieren píxeles externos. La vista y la comprobación CLI siguen disponibles con un aviso del límite de procesamiento y código 0; las exportaciones Remosaic/RGB48 rechazan rangos no admitidos. Elija expresamente un recorte interior o reconstrucción del mismo color; los parámetros no cambian automáticamente. La reconstrucción interpola y requiere muestras de los colores necesarios.
+
 Añada `--check` para comprobar parámetros, acceso al archivo y disposición sin ventana. La ayuda y los resultados siempre están en inglés legible para personas e IA; superar la comprobación no confirma que el dibujo haya terminado.
 
 `--skill` imprime el SKILL.md completo en inglés integrado en el EXE y termina. No instala skills ni cambia ajustes de IA. Los valores CLI iniciales no se guardan automáticamente; las acciones posteriores siguen los ajustes normales de la GUI.

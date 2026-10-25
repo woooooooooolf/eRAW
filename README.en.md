@@ -66,6 +66,8 @@ A terminal, script, or AI tool can supply the RAW file, dimensions, storage form
 & '.\eRAW.exe' --skill
 ```
 
+Only-reorder is reversible only on a closed full-image coordinate domain with readable samples and no crop or lossy depth mapping; it does not restore the original file bytes. Some dimensions and phases require pixels outside the image. Preview and CLI preflight remain available with a processing-boundary warning and preflight status 0; related Remosaic/RGB48 exports reject unsupported ranges. Explicitly choose an interior crop or same-color reconstruction; parameters are never changed automatically. Reconstruction is interpolation and still requires the necessary color sites.
+
 Add `--check` to validate parameters, file access, and layout without a window. Help and feedback are always readable English for people and AI correction; preflight success does not confirm completed rendering.
 
 `--skill` prints the complete English SKILL.md embedded in the EXE and exits. It installs no skill and changes no AI configuration. Initial CLI values are not saved automatically; later user actions follow the normal GUI save settings.

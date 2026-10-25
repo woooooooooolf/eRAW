@@ -66,6 +66,8 @@ Un terminal, script ou outil IA peut fournir fichier RAW, dimensions, format, pr
 & '.\eRAW.exe' --skill
 ```
 
+La permutation est réversible uniquement sur un domaine complet fermé par cette permutation, avec des échantillons lisibles, sans recadrage ni conversion de profondeur avec perte ; elle ne restaure pas tous les octets initiaux. Certaines dimensions et phases exigent des pixels hors image. La prévisualisation et la vérification CLI restent disponibles avec un avertissement de limite du traitement et le code 0 ; les exports Remosaic/RGB48 refusent les plages non prises en charge. Choisissez explicitement un recadrage intérieur ou la reconstruction de même couleur, sans changement automatique. Cette reconstruction interpole et exige les échantillons de couleur nécessaires.
+
 Ajoutez `--check` pour vérifier paramètres, accès au fichier et disposition sans fenêtre. L’aide et les retours sont toujours en anglais lisible pour les personnes et les IA ; une vérification réussie ne confirme pas un rendu terminé.
 
 `--skill` imprime le SKILL.md anglais complet intégré dans l’EXE puis quitte. Il n’installe aucun skill et ne modifie aucune configuration IA. Les valeurs CLI initiales ne sont pas enregistrées automatiquement ; les actions suivantes respectent les règles normales de la GUI.

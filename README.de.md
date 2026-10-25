@@ -66,6 +66,8 @@ Terminal, Skript oder KI-Werkzeug können RAW-Datei, Maße, Format, Bittiefe, CF
 & '.\eRAW.exe' --skill
 ```
 
+Reines Umordnen ist nur auf einem vollständigen, unter der Permutation abgeschlossenen Koordinatenbereich mit lesbaren Samples ohne Zuschnitt oder verlustbehaftete Bittiefenabbildung umkehrbar; es stellt nicht alle ursprünglichen Dateibytes wieder her. Manche Größen und Phasen benötigen Pixel außerhalb des Bildes. Vorschau und CLI-Vorprüfung bleiben mit einer Verarbeitungswarnung und Rückgabecode 0 nutzbar; Remosaic/RGB48-Exporte lehnen nicht unterstützte Bereiche ab. Wählen Sie ausdrücklich einen inneren Zuschnitt oder die Rekonstruktion gleicher Farbe. Parameter werden nicht automatisch geändert. Die Rekonstruktion interpoliert und benötigt die erforderlichen Farbsamples.
+
 Mit `--check` werden Parameter, Dateizugriff und Layout ohne Fenster geprüft. Hilfe und Rückmeldungen sind stets auf verständlichem Englisch für Menschen und KI; eine erfolgreiche Prüfung bestätigt kein abgeschlossenes Rendering.
 
 `--skill` gibt die vollständige englische SKILL.md aus der EXE aus und endet. Es installiert keinen Skill und ändert keine KI-Konfiguration. CLI-Startwerte werden nicht automatisch gespeichert; spätere Benutzeraktionen folgen den normalen GUI-Speicherregeln.

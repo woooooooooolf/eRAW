@@ -29,6 +29,17 @@ const CATALOG = {
   "common.extraLarge": message("Extra large", "特大", "特大", "特大", "Muy grande", "Très grand", "Sehr groß"),
   "common.left": message("Left", "左侧", "左側", "左", "Izquierda", "Gauche", "Links"),
   "common.right": message("Right", "右侧", "右側", "右", "Derecha", "Droite", "Rechts"),
+  "common.top": message("Top", "顶部", "頂部", "上端", "Superior", "Haut", "Oben"),
+  "common.bottom": message("Bottom", "底部", "底部", "下端", "Inferior", "Bas", "Unten"),
+  "processing.reorderBoundary": message(
+    "Only-reorder needs pixels outside the source at these edges: {edges}. Select an interior output crop or explicitly enable same-color reconstruction. This is a processing boundary, not missing source bytes.",
+    "仅重排会在这些边缘读取图像外像素：{edges}。请选择内部导出范围，或显式启用同色重建。这是处理边界限制，不代表源字节缺失。",
+    "僅重排會在這些邊緣讀取影像外像素：{edges}。請選擇內部匯出範圍，或明確啟用同色重建。這是處理邊界限制，不代表來源位元組缺失。",
+    "並べ替えのみでは次の端で画像外の画素が必要です：{edges}。内側の出力範囲を選ぶか、同色再構成を明示的に有効にしてください。元データの欠損ではなく処理境界の制限です。",
+    "La reordenación necesita píxeles fuera del origen en estos bordes: {edges}. Elija un recorte interior o active expresamente la reconstrucción del mismo color. Es un límite del procesamiento, no bytes ausentes.",
+    "La permutation seule exige des pixels hors source sur ces bords : {edges}. Choisissez un recadrage intérieur ou activez explicitement la reconstruction de même couleur. Cette limite du traitement ne signifie pas des octets source manquants.",
+    "Reines Umordnen benötigt außerhalb der Quelle liegende Pixel an diesen Rändern: {edges}. Wählen Sie einen inneren Ausgabebereich oder aktivieren Sie ausdrücklich die Rekonstruktion gleicher Farbe. Dies ist eine Verarbeitungsgrenze, kein fehlendes Quellbyte.",
+  ),
   "common.auto": message("0 = Auto", "0 = 自动", "0 = 自動", "0 = 自動", "0 = Automático", "0 = Automatique", "0 = Automatisch"),
   "common.bilinear": message("Bilinear", "双线性", "雙線性", "バイリニア", "Bilineal", "Bilinéaire", "Bilinear"),
 

@@ -60,6 +60,16 @@ impl CommandError {
 
 impl From<String> for CommandError {
     fn from(cause: String) -> Self {
+        if let Some(edges) = cause.strip_prefix("export_reorder_boundary:") {
+            let mut error = Self::new("export_reorder_boundary");
+            for edge in edges
+                .split(',')
+                .filter(|edge| matches!(*edge, "left" | "right" | "top" | "bottom"))
+            {
+                error.arguments.insert(edge.into(), true.into());
+            }
+            return error;
+        }
         let code = match cause.as_str() {
             "stale_generation" => "stale_generation",
             "stale_render" => "stale_render",

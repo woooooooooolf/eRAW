@@ -89,3 +89,13 @@ test("Release resolves relative paths from the caller directory", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.ok(result.stdout.includes(file));
 });
+
+test("Release preflight warns about processing edges without rejecting a valid source", () => {
+  const args=["--check",file,"--width","4","--height","4","--packing","unpacked8","--cfa","QRGGB","--cfa-phase-x","2","--mode","demosaic"];
+  const result=run(args);
+  assert.equal(result.status,0,result.stderr);
+  assert.match(result.stdout,/Warning \[remosaic_boundary\].*left, right/);
+  const warning=result.stdout.split("\n").find(line=>line.includes("[remosaic_boundary]"));
+  assert.doesNotMatch(warning,/[\u4e00-\u9fff]/);
+  assert.doesNotMatch(run([...args,"--same-color-reconstruction","true"]).stdout,/\[remosaic_boundary\]/);
+});

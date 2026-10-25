@@ -719,6 +719,50 @@ fn reordered_source_coordinate(value: u32, phase: u8) -> Option<u32> {
     u32::try_from(block + i64::from(reordered) - phase).ok()
 }
 
+/// Geometric processing support, independent of file truncation or byte layout.
+/// A crop is checked against the whole source, including the RGB kernel halo.
+pub fn unsupported_reorder_edges(
+    d: &RawDescriptor,
+    processing: ProcessingSettings,
+    mode: DisplayMode,
+    rect: (u32, u32, u32, u32),
+) -> Vec<&'static str> {
+    if !is_quad_cfa(d.cfa)
+        || processing.remosaic.same_color_reconstruction
+        || matches!(mode, DisplayMode::Raw | DisplayMode::Bayer)
+        || rect.2 == 0
+        || rect.3 == 0
+        || d.width == 0
+        || d.height == 0
+    {
+        return Vec::new();
+    }
+    let halo = u32::from(!matches!(mode, DisplayMode::Remosaic));
+    let x0 = rect.0.saturating_sub(halo);
+    let y0 = rect.1.saturating_sub(halo);
+    let x1 = rect
+        .0
+        .saturating_add(rect.2)
+        .saturating_add(halo)
+        .min(d.width);
+    let y1 = rect
+        .1
+        .saturating_add(rect.3)
+        .saturating_add(halo)
+        .min(d.height);
+    let px = u32::from(d.cfa_phase_x % 4);
+    let py = u32::from(d.cfa_phase_y % 4);
+    [
+        ("left", x0 == 0 && px == 2),
+        ("right", x1 == d.width && (d.width % 4 + px) % 4 == 2),
+        ("top", y0 == 0 && py == 2),
+        ("bottom", y1 == d.height && (d.height % 4 + py) % 4 == 2),
+    ]
+    .into_iter()
+    .filter_map(|(edge, unsupported)| unsupported.then_some(edge))
+    .collect()
+}
+
 fn reordered_pixel(
     data: &[u8],
     d: &RawDescriptor,
@@ -1700,6 +1744,25 @@ pub fn export_raw_cancellable(
     }
     if request.current_frame >= layout.frame_count {
         return Err(format!("当前帧索引 {} 超出范围", request.current_frame));
+    }
+    let mode = match request.target {
+        ExportTarget::OriginalCfa => DisplayMode::Raw,
+        ExportTarget::Remosaic => DisplayMode::Remosaic,
+        ExportTarget::Demosaic => DisplayMode::Demosaic,
+    };
+    let unsupported = unsupported_reorder_edges(
+        source,
+        request.processing,
+        mode,
+        (
+            request.crop_x,
+            request.crop_y,
+            request.crop_width,
+            request.crop_height,
+        ),
+    );
+    if !unsupported.is_empty() {
+        return Err(format!("export_reorder_boundary:{}", unsupported.join(",")));
     }
     let output_bit_depth = if request.target == ExportTarget::Demosaic {
         source.bit_depth
@@ -2947,6 +3010,131 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn reorder_support_matches_actual_source_coordinates_for_phases_and_crops() {
+        for cfa in [
+            CfaPattern::Qrggb,
+            CfaPattern::Qbggr,
+            CfaPattern::Qgbrg,
+            CfaPattern::Qgrbg,
+        ] {
+            for size in 1..=17 {
+                for phase in 0..4 {
+                    let d = RawDescriptor {
+                        width: size,
+                        height: size,
+                        cfa,
+                        cfa_phase_x: phase,
+                        cfa_phase_y: phase,
+                        ..RawDescriptor::default()
+                    };
+                    for start in 0..size {
+                        for length in 1..=size - start {
+                            for mode in [DisplayMode::Remosaic, DisplayMode::Demosaic] {
+                                let halo = u32::from(matches!(mode, DisplayMode::Demosaic));
+                                let range =
+                                    start.saturating_sub(halo)..(start + length + halo).min(size);
+                                let readable = range.clone().all(|v| {
+                                    reordered_source_coordinate(v, phase).is_some_and(|s| s < size)
+                                });
+                                let support = unsupported_reorder_edges(
+                                    &d,
+                                    ProcessingSettings::default(),
+                                    mode,
+                                    (start, start, length, length),
+                                );
+                                assert_eq!(
+                                    support.is_empty(),
+                                    readable,
+                                    "{size} {phase} {start} {length}"
+                                );
+                            }
+                        }
+                    }
+                    if unsupported_reorder_edges(
+                        &d,
+                        ProcessingSettings::default(),
+                        DisplayMode::Remosaic,
+                        (0, 0, size, size),
+                    )
+                    .is_empty()
+                    {
+                        let mut values: Vec<_> = (0..size)
+                            .map(|v| reordered_source_coordinate(v, phase).unwrap())
+                            .collect();
+                        values.sort();
+                        assert_eq!(values, (0..size).collect::<Vec<_>>());
+                        for v in 0..size {
+                            assert_eq!(
+                                reordered_source_coordinate(
+                                    reordered_source_coordinate(v, phase).unwrap(),
+                                    phase
+                                ),
+                                Some(v)
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn export_rejects_reorder_geometry_before_replacing_output_and_checks_rgb_halo() {
+        let d = RawDescriptor {
+            width: 8,
+            height: 8,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Qrggb,
+            cfa_phase_x: 2,
+            ..RawDescriptor::default()
+        };
+        let source: Vec<u8> = (0..64).collect();
+        let layout = calculate_layout(&d, 64).0;
+        let output = test_output_path("reorder-boundary");
+        fs::write(&output, b"existing").unwrap();
+        let mut request = test_export_request(&d, &output, ExportTarget::Remosaic);
+        assert_eq!(
+            export_raw(&source, &d, &layout, &request).unwrap_err(),
+            "export_reorder_boundary:left,right"
+        );
+        assert_eq!(fs::read(&output).unwrap(), b"existing");
+        request.crop_x = 1;
+        request.crop_width = 6;
+        let result = export_raw(&source, &d, &layout, &request).unwrap();
+        assert_eq!(
+            result.filled_pixels.red
+                + result.filled_pixels.green_red
+                + result.filled_pixels.green_blue
+                + result.filled_pixels.blue,
+            0
+        );
+        request.target = ExportTarget::Demosaic;
+        assert!(
+            export_raw(&source, &d, &layout, &request)
+                .unwrap_err()
+                .starts_with("export_reorder_boundary:")
+        );
+        request.crop_x = 2;
+        request.crop_width = 4;
+        assert_eq!(
+            export_raw(&source, &d, &layout, &request)
+                .unwrap()
+                .filled_pixels
+                .rgb,
+            0
+        );
+        request.crop_x = 0;
+        request.crop_width = 8;
+        request.processing.remosaic.same_color_reconstruction = true;
+        assert!(export_raw(&source, &d, &layout, &request).is_ok());
+        request.target = ExportTarget::OriginalCfa;
+        request.processing.remosaic.same_color_reconstruction = false;
+        assert!(export_raw(&source, &d, &layout, &request).is_ok());
+        fs::remove_file(output).unwrap();
     }
 
     #[test]

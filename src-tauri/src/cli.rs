@@ -2,6 +2,7 @@
 use crate::commands::{DocumentInfo, PreparedDocument, prepare_document};
 use crate::raw::{
     BitAlignment, CfaPattern, DisplayMode, Endianness, Packing, ProcessingSettings, RawDescriptor,
+    unsupported_reorder_edges,
 };
 use std::{collections::BTreeMap, ffi::OsString, path::PathBuf};
 
@@ -59,6 +60,8 @@ Control:
 Use --name VALUE or --name=VALUE. Options must not be repeated.
 Numbers are unsigned decimal integers, at most 9007199254740991.
 Partial frames and overlapping strides remain viewable and produce warnings.
+Only-reorder processing can require pixels beyond the image edges; warnings do
+not fail preflight. Processed export requires a supported crop or explicit reconstruction.
 CLI values initialize this window only. Later user edits follow normal save settings.
 Finish writing the source file before launch; keep it unchanged while viewing.
 
@@ -514,6 +517,15 @@ pub(crate) fn preflight_report(info: &DocumentInfo, options: &LaunchOptions) -> 
         "  Initial mode:     {mode}\n  Initial view:     {}\n",
         options.view
     ));
+    let edges = unsupported_reorder_edges(
+        d,
+        options.processing,
+        options.mode,
+        (0, 0, d.width, d.height),
+    );
+    if !edges.is_empty() {
+        report.push_str(&format!("\n  Warning [remosaic_boundary]: Only-reorder processing needs pixels beyond the {} edge(s).\n    Viewing remains available. Processed export requires an interior crop or explicit same-color reconstruction.\n", edges.join(", ")));
+    }
     for warning in &info.warnings {
         let explanation = match warning.code {
             "short_row_stride" => "Row stride is smaller than the active row size; rows overlap.",

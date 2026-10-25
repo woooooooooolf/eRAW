@@ -3,6 +3,8 @@ import { emitTo, listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import erawIconUrl from "./assets/eraw-icon.svg";
+import { unsupportedReorderEdges } from "./remosaic-boundary";
+import { localizeReorderBoundary } from "./backend-error";
 import {
   analyzeRawImage,
   calculateRawDisplayRange,
@@ -1739,7 +1741,10 @@ export class ErawApp {
   }
 
   private renderDiagnostics(): void {
-    const warnings = this.document?.warnings ?? [];
+    const edges = this.document ? unsupportedReorderEdges(this.document.descriptor, this.processing, this.displayMode) : [];
+    const warnings = [...(this.document?.warnings ?? []), ...(edges.length ? [{
+      severity: "warning", code: "remosaic_boundary", arguments: {}, message: localizeReorderBoundary(edges),
+    }] : [])];
     const warningMarkup = warnings.map((warning) => {
       const key = WARNING_MESSAGES[warning.code];
       const message = key ? t(key, warning.arguments ?? {}) : warning.message;
@@ -2555,6 +2560,7 @@ export class ErawApp {
     });
     this.updatePresentationAvailability();
     this.updateRoiPresentation();
+    this.renderDiagnostics();
   }
 
   private setFrame(frame: number): void {

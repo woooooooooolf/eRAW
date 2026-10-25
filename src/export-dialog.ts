@@ -1,5 +1,6 @@
 import { cancelRawExport, chooseExportFile, exportDocument } from "./api";
-import { backendErrorCode, localizeBackendError } from "./backend-error";
+import { backendErrorCode, localizeBackendError, localizeReorderBoundary } from "./backend-error";
+import { unsupportedReorderEdges } from "./remosaic-boundary";
 import { t } from "./i18n";
 import type {
   BitAlignment,
@@ -434,6 +435,7 @@ export class ExportDialog {
     this.get("export-cfa").textContent = this.outputFormatLabel(x!, y!);
     this.get("export-range-summary").textContent =
       `(${x}, ${y}) → (${x! + width! - 1}, ${y! + height! - 1}) · ${width} × ${height}`;
+    this.restoreSnapshotMessage();
   }
 
   private applyPackingRules(): void {
@@ -551,6 +553,10 @@ export class ExportDialog {
     if (!valid) {
       this.showMessage(t("export.fixFields"), "error");
       this.root.querySelector<HTMLInputElement | HTMLSelectElement>(".export-field.invalid input, .export-field.invalid select")?.focus();
+    }
+    if (valid && this.reorderEdges().length) {
+      this.showMessage(localizeReorderBoundary(this.reorderEdges()), "error");
+      return false;
     }
     return valid;
   }
@@ -683,8 +689,20 @@ export class ExportDialog {
     element.toggleAttribute("hidden", !message);
   }
 
+  private reorderEdges() {
+    if (!this.snapshot) return [];
+    const [x, y, width, height] = ["crop-x", "crop-y", "crop-width", "crop-height"].map((id) => this.integerValue(id));
+    if (x === null || y === null || width === null || height === null) return [];
+    const mode = this.snapshot.target === "originalCfa" ? "raw" : this.snapshot.target;
+    return unsupportedReorderEdges(this.snapshot.descriptor, this.snapshot.processing, mode, { x, y, width, height });
+  }
+
   private restoreSnapshotMessage(): void {
-    if (this.snapshot?.partial) {
+    if (this.busy) return;
+    const edges = this.reorderEdges();
+    if (edges.length) {
+      this.showMessage(localizeReorderBoundary(edges), "warning");
+    } else if (this.snapshot?.partial) {
       this.showMessage(t("export.partialFrame"), "warning");
     } else {
       this.showMessage("", "info");

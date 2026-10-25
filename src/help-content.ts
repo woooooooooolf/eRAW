@@ -176,14 +176,14 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
     group: "processing",
     kicker: "Quad CFA 处理",
     title: "Remosaic：重排与同色重建",
-    summary: "将 Quad CFA 转为标准 Bayer 语义时，可以选择可逆重排或同色双线性重建。",
+    summary: "将 Quad CFA 转为标准 Bayer 语义时，可以选择满足边界条件的重排或同色双线性重建。",
     level: "参考",
     readingTime: "约 11 分钟",
     body: `
       <div class="help-flow" aria-label="Remosaic processing flow"><span>Quad CFA DN</span><i>→</i><span>目标 Bayer 站点</span><i>→</i><span>坐标重排或同色重建</span><i>→</i><span>Bayer DN</span></div>
       <div class="help-prose"><h3>仅重排：4 点局部置换</h3><p>每个坐标轴独立执行相同置换。把局部坐标序列 <code>[0,1,2,3]</code> 变为 <code>[0,2,1,3]</code>，即交换中间两项；X/Y 组合后把 4×4 同色块重新排列为标准 Bayer 周期。该模式不插值 DN。</p></div>
       ${equation("单轴源坐标", String.raw`\begin{aligned}s&=v+p\\b&=4\left\lfloor\frac{s}{4}\right\rfloor\\\ell&=s\bmod4\\\pi(\ell)&=2(\ell\bmod2)+\left\lfloor\frac{\ell}{2}\right\rfloor\\v_{\mathrm{src}}&=b+\pi(\ell)-p\end{aligned}`)}
-      <div class="help-example"><small>局部映射</small><p>Phase 为 0 时，输出位置 0、1、2、3 分别读取源位置 0、2、1、3。二维映射对 X 和 Y 各执行一次，因此它是确定性的坐标置换，可以通过逆置换恢复站点顺序。</p></div>
+      <div class="help-example"><small>局部映射</small><p>Phase 为 0 时，输出位置 0、1、2、3 分别读取源位置 0、2、1、3。二维映射对 X 和 Y 各执行一次，因此它是确定性的坐标置换；只有完整坐标域闭合且样本全部可读时，才可通过逆置换恢复站点顺序。</p></div>
       <div class="help-prose"><h3>同色双线性重建</h3><p>先确定输出坐标需要的 Bayer 站点，再在 Quad CFA 中寻找该站点在 X/Y 方向包围目标的合法坐标。四个组合角点按距离乘积加权；缺失角点不进入分子和分母。</p></div>
       ${equation("二维权重", String.raw`\begin{aligned}w_{ij}&=w_x(x_i)w_y(y_j)\\w_x(x_0)&=x_1-x,&w_x(x_1)&=x-x_0\\w_y(y_0)&=y_1-y,&w_y(y_1)&=y-y_0\\\mathrm{DN}'&=\operatorname{round}\!\left(\frac{\sum_{(i,j)\in V}\mathrm{DN}_{ij}w_{ij}}{\sum_{(i,j)\in V}w_{ij}}\right)\end{aligned}`)}
       <div class="help-prose"><h3>边缘与原位样本</h3><p>目标坐标本身已经是所需站点且可读时，直接保留原 DN。图像边缘只有单侧合法坐标时，该轴退化为单点权重 1；若最终没有任何有效权重，输出像素保持缺失。</p></div>
