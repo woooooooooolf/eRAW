@@ -1319,9 +1319,7 @@ pub fn inspect_pixels(
                 .ok()
                 .and_then(|value| value.checked_mul(BYTES_PER_PIXEL))
                 .ok_or("像素检查数据索引溢出")?;
-            let raw = if is_quad_cfa(d.cfa)
-                && matches!(request.mode, DisplayMode::Remosaic | DisplayMode::Demosaic)
-            {
+            let raw = if is_quad_cfa(d.cfa) && matches!(request.mode, DisplayMode::Remosaic) {
                 remosaic_pixel(data, d, l, request.frame, x, y, request.processing.remosaic)
             } else {
                 read_pixel(data, d, l, request.frame, x, y)
@@ -3515,6 +3513,81 @@ mod tests {
 
         assert_eq!(exported.len(), 24);
         assert!(result.filled_pixels.rgb > 0);
+    }
+
+    #[test]
+    fn quad_demosaic_original_inspection_reads_source_dn_without_changing_rgb() {
+        for cfa in [
+            CfaPattern::Qrggb,
+            CfaPattern::Qbggr,
+            CfaPattern::Qgbrg,
+            CfaPattern::Qgrbg,
+        ] {
+            for px in 0..4 {
+                for py in 0..4 {
+                    for reconstruct in [false, true] {
+                        for length in [7, 16] {
+                            let d = RawDescriptor {
+                                width: 4,
+                                height: 4,
+                                bit_depth: 8,
+                                packing: Packing::Unpacked8,
+                                cfa,
+                                cfa_phase_x: px,
+                                cfa_phase_y: py,
+                                ..RawDescriptor::default()
+                            };
+                            let data: Vec<u8> = (0..length).collect();
+                            let layout = calculate_layout(&d, data.len() as u64).0;
+                            let request = PixelInspectionRequest {
+                                generation: 1,
+                                frame: 0,
+                                x: 0,
+                                y: 0,
+                                width: 4,
+                                height: 4,
+                                mode: DisplayMode::Demosaic,
+                                processing: ProcessingSettings {
+                                    remosaic: RemosaicOptions {
+                                        same_color_reconstruction: reconstruct,
+                                    },
+                                    ..ProcessingSettings::default()
+                                },
+                            };
+                            let inspected = inspect_pixels(&data, &d, &layout, &request).unwrap();
+                            for (index, pixel) in inspected.chunks_exact(10).enumerate() {
+                                let expected = (index < length as usize).then_some(index as u16);
+                                assert_eq!(pixel[0] & 1 != 0, expected.is_some());
+                                if let Some(value) = expected {
+                                    assert_eq!(u16::from_le_bytes([pixel[2], pixel[3]]), value);
+                                }
+                            }
+                            if px == 0
+                                && py == 0
+                                && cfa == CfaPattern::Qrggb
+                                && !reconstruct
+                                && length == 16
+                            {
+                                let pixel = &inspected[10..20];
+                                assert_eq!(pixel[0] & 3, 3);
+                                assert_eq!([pixel[4], pixel[6], pixel[8]], [0, 2, 10]);
+                                let reordered = inspect_pixels(
+                                    &data,
+                                    &d,
+                                    &layout,
+                                    &PixelInspectionRequest {
+                                        mode: DisplayMode::Remosaic,
+                                        ..request
+                                    },
+                                )
+                                .unwrap();
+                                assert_eq!(u16::from_le_bytes([reordered[12], reordered[13]]), 2);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[test]

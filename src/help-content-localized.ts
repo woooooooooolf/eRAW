@@ -605,6 +605,16 @@ const REORDER_BOUNDARY_NOTES: Readonly<Record<ResolvedLocale, string>> = {
   "de": "Reines Umordnen ist nur auf einem vollständigen, unter der Permutation abgeschlossenen Koordinatenbereich mit lesbaren Samples ohne Zuschnitt oder verlustbehaftete Bittiefenabbildung umkehrbar; es stellt nicht alle ursprünglichen Dateibytes wieder her. Manche Größen und Phasen benötigen Pixel außerhalb des Bildes. Vorschau und CLI-Vorprüfung bleiben mit einer Verarbeitungswarnung und Rückgabecode 0 nutzbar; Remosaic/RGB48-Exporte lehnen nicht unterstützte Bereiche ab. Wählen Sie ausdrücklich einen inneren Zuschnitt oder die Rekonstruktion gleicher Farbe. Parameter werden nicht automatisch geändert. Die Rekonstruktion interpoliert und benötigt die erforderlichen Farbsamples."
 };
 
+const ORIGINAL_DN_NOTES: Readonly<Record<ResolvedLocale, string>> = {
+  "zh-CN": "Demosaic 选择原始 DN 时，始终读取同一源坐标的测量值，包括 Quad CFA；它不显示重排或重建后的 Bayer DN。Remosaic 模式仍显示处理后的 Bayer DN，RGB 选项仍显示重建分量。",
+  en: "Original DN in Demosaic always reads the measured value at the same source coordinate, including Quad CFA. It is not the reordered or reconstructed Bayer DN. Remosaic still shows processed Bayer DN, and the RGB option still shows reconstructed components.",
+  "zh-TW": "Demosaic 的原始 DN 始終讀取同一來源座標的測量值，包含 Quad CFA，不是重排或重建後的 Bayer DN。Remosaic 仍顯示處理後的 Bayer DN，RGB 選項仍顯示重建分量。",
+  ja: "Demosaic の元 DN は Quad CFA でも同じ元座標の測定値を読みます。並べ替え・再構成後の Bayer DN ではありません。Remosaic は処理後の Bayer DN、RGB オプションは再構成した成分を表示します。",
+  es: "DN original en Demosaic lee el valor medido en la misma coordenada de origen, también con Quad CFA, no el Bayer reordenado o reconstruido. Remosaic conserva el DN Bayer procesado; RGB muestra los componentes reconstruidos.",
+  fr: "Le DN original en Demosaic lit la mesure à la même coordonnée source, y compris en Quad CFA, sans utiliser le Bayer permuté ou reconstruit. Remosaic affiche le DN Bayer traité ; RGB affiche les composantes reconstruites.",
+  de: "Original DN in Demosaic liest auch bei Quad CFA den Messwert derselben Quellkoordinate statt des umgeordneten oder rekonstruierten Bayer-DN. Remosaic zeigt weiterhin verarbeitete Bayer-DN; RGB zeigt rekonstruierte Komponenten.",
+};
+
 const ZH_CN_UI: HelpUiText = {
   manualTitle: "使用手册",
   subtitle: "技术参考 · 简体中文",
@@ -622,8 +632,11 @@ export function getHelpCatalog(locale: ResolvedLocale): HelpCatalog {
     const sections = [...catalog.sections];
     const index = sections.findIndex((section) => section.id === "workflow") + 1;
     sections.splice(index, 0, createCliHelpSection(locale));
-    return { ...catalog, sections: sections.map((section) => ["remosaic", "export", "cli"].includes(section.id)
-      ? { ...section, body: `<div class="help-prose"><p>${REORDER_BOUNDARY_NOTES[locale]}</p></div>${section.body}` } : section) };
+    return { ...catalog, sections: sections.map((section) => {
+      const note = ["remosaic", "export", "cli"].includes(section.id) ? REORDER_BOUNDARY_NOTES[locale]
+        : section.id === "inspection" ? ORIGINAL_DN_NOTES[locale] : "";
+      return note ? { ...section, body: `<div class="help-prose"><p>${note}</p></div>${section.body}` } : section;
+    }) };
   };
   if (locale === "zh-CN") return withCli({ groups: HELP_GROUPS, sections: HELP_SECTIONS, ui: ZH_CN_UI });
   return withCli(buildCatalog(locale, LOCALIZED_COPY[locale]));
