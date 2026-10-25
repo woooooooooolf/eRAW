@@ -153,6 +153,7 @@ export interface StatisticalSummary {
   minimum: number | null;
   maximum: number | null;
   mean: number | null;
+  /** Legacy field name for the discrete lower P50 defined in the manual. */
   median: number | null;
   mode: number | null;
   variance: number | null;

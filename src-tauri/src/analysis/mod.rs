@@ -70,6 +70,7 @@ pub struct StatisticalSummary {
     pub minimum: Option<u16>,
     pub maximum: Option<u16>,
     pub mean: Option<f64>,
+    /// Legacy field name: discrete lower P50, not the average of two central DN.
     pub median: Option<u16>,
     pub mode: Option<u16>,
     pub variance: Option<f64>,
@@ -529,6 +530,16 @@ mod tests {
             || true,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn discrete_p50_and_tied_mode_keep_the_documented_integer_contract() {
+        let result = analyze(&[0, 100], &descriptor(2, 1, CfaPattern::Mono), None);
+        let summary = &result.groups[0].summary;
+        assert_eq!(summary.mean, Some(50.0));
+        assert_eq!(summary.median, Some(0));
+        assert_eq!(summary.mode, Some(0));
+        assert_eq!(summary.p99, Some(0));
     }
 
     #[test]

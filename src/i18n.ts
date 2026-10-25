@@ -118,7 +118,7 @@ const CATALOG = {
   "statistics.rowProfile": message("Row Profile", "行剖面", "列剖面", "行プロファイル", "Perfil de filas", "Profil des lignes", "Zeilenprofil"),
   "statistics.columnProfile": message("Column Profile", "列剖面", "行剖面", "列プロファイル", "Perfil de columnas", "Profil des colonnes", "Spaltenprofil"),
   "statistics.minimumMaximumDn": message("Minimum / Maximum DN", "最小值 / 最大值 DN", "最小值 / 最大值 DN", "最小 / 最大 DN", "DN mínimo / máximo", "DN minimum / maximum", "DN-Minimum / -Maximum"),
-  "statistics.meanMedianDn": message("Mean / Median DN", "均值 / 中位数 DN", "平均值 / 中位數 DN", "平均 / 中央値 DN", "Media / mediana de DN", "Moyenne / médiane DN", "DN-Mittelwert / -Median"),
+  "statistics.meanMedianDn": message("Mean / P50 DN", "均值 / P50 DN", "平均值 / P50 DN", "平均 / P50 DN", "Media / P50 de DN", "Moyenne / P50 DN", "DN-Mittelwert / P50"),
   "statistics.modeDn": message("Mode DN", "众数 DN", "眾數 DN", "最頻 DN", "Moda de DN", "Mode DN", "Modalwert DN"),
   "statistics.varianceStdDev": message("Variance / Std. deviation", "方差 / 标准差", "變異數 / 標準差", "分散 / 標準偏差", "Varianza / desv. estándar", "Variance / écart-type", "Varianz / Standardabw."),
   "statistics.percentiles": message("P1 / P5 / P95 / P99", "P1 / P5 / P95 / P99 分位数", "P1 / P5 / P95 / P99 百分位數", "P1 / P5 / P95 / P99 パーセンタイル", "Percentiles P1 / P5 / P95 / P99", "Percentiles P1 / P5 / P95 / P99", "Perzentile P1 / P5 / P95 / P99"),

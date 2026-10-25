@@ -122,7 +122,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
       ${equation("MIPI RAW12", String.raw`\mathrm{rowBytes}=3\left\lceil\frac{W}{2}\right\rceil`)}
       ${equation("MIPI RAW14", String.raw`\mathrm{rowBytes}=7\left\lceil\frac{W}{4}\right\rceil`)}
       <div class="help-prose"><h3>2. 对齐、行步长与帧步长</h3><p>对齐值小于 1 时按 1 处理。显式步长为 0 才使用自动计算；非零步长按用户给定值解释，即使它短于有效数据并造成行或帧重叠，也会提示后继续尝试预览。</p></div>
-      ${equation("向上对齐", String.raw`\operatorname{alignUp}(v,a)=v+\left((a-(v\bmod a))\bmod a\right)`)}
+      ${equation("向上对齐", String.raw`\operatorname{alignUp}(v,a)=v+\left((a'-(v\bmod a'))\bmod a'\right),\qquad a'=\max(a,1)`)}
       ${equation("自动布局", String.raw`\begin{aligned}\mathrm{rowStride}&=\operatorname{alignUp}(\mathrm{rowBytes},\mathrm{rowAlignment})\\\mathrm{frameBytes}&=\mathrm{rowStride}\cdot H\\\mathrm{frameStride}&=\operatorname{alignUp}(\mathrm{frameBytes},\mathrm{frameAlignment})\end{aligned}`)}
       <div class="help-prose"><h3>3. 可用字节与部分帧</h3><p>文件头偏移先从文件大小中扣除。只要完整帧之后还有剩余字节，就把它作为一个可尝试的部分尾帧；读取不到的像素成为缺失样本，而不是凭空补齐。</p></div>
       ${equation("帧计数", String.raw`\begin{aligned}\mathrm{available}&=\max(\mathrm{fileSize}-\mathrm{headerOffset},0)\\\mathrm{complete}&=\left\lfloor\frac{\mathrm{available}}{\mathrm{frameStride}}\right\rfloor\\\mathrm{trailing}&=\mathrm{available}\bmod\mathrm{frameStride}\\\mathrm{frameCount}&=\mathrm{complete}+\mathbf{1}_{\mathrm{trailing}>0}\end{aligned}`)}
@@ -185,7 +185,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
       ${equation("单轴源坐标", String.raw`\begin{aligned}s&=v+p\\b&=4\left\lfloor\frac{s}{4}\right\rfloor\\\ell&=s\bmod4\\\pi(\ell)&=2(\ell\bmod2)+\left\lfloor\frac{\ell}{2}\right\rfloor\\v_{\mathrm{src}}&=b+\pi(\ell)-p\end{aligned}`)}
       <div class="help-example"><small>局部映射</small><p>Phase 为 0 时，输出位置 0、1、2、3 分别读取源位置 0、2、1、3。二维映射对 X 和 Y 各执行一次，因此它是确定性的坐标置换；只有完整坐标域闭合且样本全部可读时，才可通过逆置换恢复站点顺序。</p></div>
       <div class="help-prose"><h3>同色双线性重建</h3><p>先确定输出坐标需要的 Bayer 站点，再在 Quad CFA 中寻找该站点在 X/Y 方向包围目标的合法坐标。四个组合角点按距离乘积加权；缺失角点不进入分子和分母。</p></div>
-      ${equation("二维权重", String.raw`\begin{aligned}w_{ij}&=w_x(x_i)w_y(y_j)\\w_x(x_0)&=x_1-x,&w_x(x_1)&=x-x_0\\w_y(y_0)&=y_1-y,&w_y(y_1)&=y-y_0\\\mathrm{DN}'&=\operatorname{round}\!\left(\frac{\sum_{(i,j)\in V}\mathrm{DN}_{ij}w_{ij}}{\sum_{(i,j)\in V}w_{ij}}\right)\end{aligned}`)}
+      ${equation("二维权重", String.raw`\begin{aligned}w_{ij}&=w_x(x_i)w_y(y_j)\\w_x(x_i)&=\begin{cases}1,&x_0=x_1,\ i=0\\x_1-x,&x_0<x_1,\ i=0\\x-x_0,&x_0<x_1,\ i=1\end{cases}\\w_y(y_j)&=\begin{cases}1,&y_0=y_1,\ j=0\\y_1-y,&y_0<y_1,\ j=0\\y-y_0,&y_0<y_1,\ j=1\end{cases}\\S&=\sum_{(i,j)\in V}w_{ij}\\\mathrm{DN}'&=\begin{cases}\operatorname{round}\!\left(\dfrac{\sum_{(i,j)\in V}\mathrm{DN}_{ij}w_{ij}}{S}\right),&S>0\\\varnothing,&S=0\end{cases}\end{aligned}`)}
       <div class="help-prose"><h3>边缘与原位样本</h3><p>目标坐标本身已经是所需站点且可读时，直接保留原 DN。图像边缘只有单侧合法坐标时，该轴退化为单点权重 1；若最终没有任何有效权重，输出像素保持缺失。</p></div>
       <div class="help-impact"><strong>选择建议</strong><span>仅重排：验证站点与可逆格式转换</span><span>同色重建：观察空间连续性</span><span>二者都不做白平衡或颜色校正</span></div>
       ${admonition("warning", "计算成本", "仅重排每个输出像素只定位并读取一个源 DN；同色重建需要搜索合法同色坐标并读取最多四个组合角点，因此在大图和频繁缩放时更慢。")}`,
@@ -200,8 +200,8 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
     readingTime: "约 10 分钟",
     body: `
       <div class="help-prose"><h3>处理顺序</h3><p>标准 Bayer 直接进入 Demosaic；Quad CFA 先按当前 Remosaic 选项生成“处理后的 Bayer”，再执行相同插值。因此改变 Remosaic 会同时影响 Quad CFA 的 Demosaic 和 RGB 单通道结果。</p></div>
-      ${equation("目标通道集合", String.raw`N_c(x,y)=\left\{(u,v)\in\mathcal{N}_{3\times3}(x,y)\;\middle|\;(u,v)\ne(x,y),\ \operatorname{channel}(u,v)=c,\ \mathrm{DN}(u,v)\ \mathrm{valid}\right\}`)}
-      ${equation("通道重建", String.raw`C_c(x,y)=\begin{cases}\mathrm{DN}(x,y),&\operatorname{channel}(x,y)=c\\\left\lfloor\dfrac{\sum_{(u,v)\in N_c(x,y)}\mathrm{DN}(u,v)}{|N_c(x,y)|}\right\rfloor,&|N_c(x,y)|>0\end{cases}`)}
+      ${equation("目标通道集合", String.raw`N_c(x,y)=\left\{(u,v)\in\mathcal{N}_{3\times3}(x,y)\;\middle|\;(u,v)\ne(x,y),\ \operatorname{channel}(u,v)=c,\ \mathrm{DN}_p(u,v)\ \mathrm{valid}\right\}`)}
+      ${equation("通道重建", String.raw`C_c(x,y)=\begin{cases}\mathrm{DN}_p(x,y),&\operatorname{channel}(x,y)=c,\ \mathrm{DN}_p(x,y)\ \mathrm{valid}\\\left\lfloor\dfrac{\sum_{(u,v)\in N_c(x,y)}\mathrm{DN}_p(u,v)}{|N_c(x,y)|}\right\rfloor,&\operatorname{channel}(x,y)\ne c,\ |N_c(x,y)|>0\\\varnothing,&\text{otherwise}\end{cases}`)}
       <div class="help-card-grid">
         <article><h3>红/蓝站点上的绿色</h3><p>3×3 邻域筛选会得到上、下、左、右最多四个绿色样本，取可读样本算术平均。</p></article>
         <article><h3>红站点上的蓝色</h3><p>筛选得到最多四个对角蓝色样本；蓝站点上的红色同理。</p></article>
@@ -227,6 +227,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
       <div class="help-prose"><h3>统一显示调整</h3><p>同一 EV 在 RAW/CFA/Remosaic/Demosaic/R/G/B 的最终呈现阶段应用。P1–P99 会精确扫描当前整帧 L0 原始 All DN、忽略缺失像素，并一次性设置所有模式共用的黑白点；若 P1 与 P99 相同则回退 Min/Max，平坦或全缺失帧保持当前范围。它不读取 ROI，也不修改源/处理 DN、统计、算法或导出。</p></div>
       <div class="help-prose"><h3>LOD 层级选择</h3><p>层级 <var>l</var> 的一个输出 texel 覆盖最多 <code>2^l × 2^l</code> 个源像素。100% 及以上始终使用 L0；缩小时由缩放率计算理想层级。</p></div>
       ${equation("理想层级", String.raw`\begin{aligned}\ell_{\max}&=\min\!\left(30,\left\lceil\log_2(\max(W,H))\right\rceil\right)\\\ell_{\mathrm{ideal}}&=\operatorname{clamp}\!\left(\log_2\frac{1}{z},0,\ell_{\max}\right)\end{aligned}`)}
+       ${equation("L1+ 通道聚合：n_c 为有效同色站点数，n 为有效总数", String.raw`\widehat C_c(B)=\begin{cases}\operatorname{round}\!\left(\dfrac{\sum_{i\in V_c(B)}v_i}{n_c}\right),&n_c>0\\\operatorname{round}\!\left(\dfrac{\sum_{i\in V(B)}v_i}{n}\right),&n_c=0,\ n>0,\ \text{Demosaic}\\\varnothing,&\text{otherwise}\end{cases}`)}
       <div class="help-card-grid">
         <article><h3>平滑型视图</h3><p>MONO、Demosaic 与 RGB 通道使用 <code>floor(ideal)</code> 和下一层，并按小数部分交叉淡化；淡化量小于 0.015 时只画精细层。</p></article>
         <article><h3>结构型视图</h3><p>彩色 RAW、CFA、Remosaic 不跨层淡化，避免把不同尺寸的 CFA 网格混色。层级在半级阈值外加 0.08 滞回后整体切换。</p></article>
@@ -269,7 +270,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
       <div class="help-prose"><h3>在线均值与总体方差</h3><p>为避免先求和再平方带来的精度损失，扫描使用 Welford 在线更新。这里计算的是当前 ROI 有效样本总体的描述性方差，分母是 <var>n</var>，不是无偏样本方差的 <var>n−1</var>。</p></div>
       ${equation("第 n 个有效 DN：xₙ", String.raw`\begin{aligned}\delta_n&=x_n-\mu_{n-1}\\\mu_n&=\mu_{n-1}+\frac{\delta_n}{n}\\M_{2,n}&=M_{2,n-1}+\delta_n(x_n-\mu_n)\\\sigma^2&=\frac{M_{2,n}}{n},&\sigma&=\sqrt{\sigma^2}\end{aligned}`)}
       <div class="help-prose"><h3>精确 Histogram 与离散百分位</h3><p>位深为 <var>b</var> 时建立 <code>2^b</code> 个精确 DN 桶，DN 直接作为索引。最小值和最大值是首个/最后一个非零桶；众数出现并列时取较小 DN。</p></div>
-      ${equation("p 百分位，p∈[0,100]", String.raw`r_p=\left\lfloor\frac{(n-1)p}{100}\right\rfloor`, String.raw`Q_p=\min\left\{d\;\middle|\;\sum_{k=0}^{d}h_k>r_p\right\}`)}
+      ${equation("p 百分位，p∈[0,100]", String.raw`r_p=\left\lfloor\frac{(n-1)p}{100}\right\rfloor,\qquad n>0`, String.raw`Q_p=\min\left\{d\;\middle|\;\sum_{k=0}^{d}h_k>r_p\right\}`)}
       <div class="help-example"><small>示例 · 总体方差</small><p>有效 DN 为 2、4、6 时，均值为 4；总体方差为 <code>((2−4)²+(4−4)²+(6−4)²)/3 = 8/3</code>，标准差约 1.633。若另有一个缺失坐标，则 expected=4、valid=3、missing=1，但上述数值不把缺失当 0。</p></div>
       <div class="help-prose"><h3>Row / Column Profile</h3><p>每一行、每一列和每个语义组都维护同样的 expected、valid、mean 和总体标准差。坐标保留整幅图绝对坐标，因此 ROI 从 (100,200) 开始时，Profile 也从列 100、行 200 开始。</p></div>
       ${admonition("warning", "测量边界", "这些结果是单帧、单 ROI 的描述性统计，不包含多帧 temporal noise、曝光线性序列、暗场/平场条件或 EMVA 1288 的完整测量流程。")}`,

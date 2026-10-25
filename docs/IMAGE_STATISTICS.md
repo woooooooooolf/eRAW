@@ -39,7 +39,7 @@ eRAW 仍然是面向 SoC Bring-up 和图像传感器适配的单文件 RAW 查�
 - 不读取 LOD、RGBA 预览瓦片或 WebGL 结果。
 - 不受 RAW/CFA/Remosaic/Demosaic/R/G/B 显示模式影响。
 - 不受显示 Min/Max、通道着色、缩放、主题和缺失数据外观影响。
-- Remosaic/Demosaic 当前只服务预览；其算法输出不进入统计。
+- Remosaic/Demosaic 可用于预览和处理结果导出；其算法输出不进入原始 DN 统计。
 - 对 QCFA，CFA Phase X/Y 必须参与样本分类。
 - ROI 使用原图绝对坐标；不得把 ROI 左上角重新当成 CFA 周期原点。
 - 文件中无法读取的预期像素计为 missing，不得按 DN 0 参与统计。
@@ -181,7 +181,7 @@ All CFA 不只是一条合并曲线，而是总体统计与子通道比较的入
 - Histogram 以 All CFA 为主，同时默认叠加较细的 R/Gr/Gb/B 子通道曲线。
 - Profile 默认只绘制 All CFA，避免稀疏子通道曲线同时叠加；用户可主动添加子通道。
 - 进入 G 时可以同时比较 G、Gr、Gb；进入其他语义通道时聚焦该通道。
-- All CFA 的 Mean、Median 和 Histogram 混合了不同颜色响应，界面应明确标注为“All CFA 站点”，不能解释成单一光谱通道。
+- All CFA 的 Mean、P50 和 Histogram 混合了不同颜色响应，界面应明确标注为“All CFA 站点”，不能解释成单一光谱通道。
 
 **已确认的架构预留**：
 
@@ -190,7 +190,7 @@ All CFA 不只是一条合并曲线，而是总体统计与子通道比较的入
 - 未来的“按子相位查看”只增加分组和界面入口，不修改统计核心、IPC 语义或缓存键。
 - 测试使用 4×4 人工 QCFA，每个原子位置写入不同 DN，同时验证 16 平面分类和四颜色合并。
 
-Mean/Variance 使用可合并累加器；Histogram 按 bin 相加。Median、Mode 和 Percentile 必须从合并后的精确 Histogram 计算，不能对各子相位的统计结果做算术平均。
+Mean/Variance 使用可合并累加器；Histogram 按 bin 相加。P50、Mode 和 Percentile 必须从合并后的精确 Histogram 计算，不能对各子相位的统计结果做算术平均。
 
 ## 统计摘要
 
@@ -202,8 +202,8 @@ Mean/Variance 使用可合并累加器；Histogram 按 bin 相加。Median、Mod
 | Expected / Valid / Missing | 当前分组的预期、有效和缺失样本数 |
 | Min / Max DN | 有效样本的最小、最大原始 DN |
 | Mean DN | 有效样本算术平均 |
-| Median DN | 精确 Histogram 的 50% 分位位置 |
-| Mode DN | 最高 bin；并列时结果标记为多峰，不静默选择一个 DN |
+| P50 DN | 精确 Histogram 的离散 50% 分位位置；偶数样本取较低中央值，内部旧 median 字段保留此含义 |
+| Mode DN | 最高 bin；并列时取较小 DN；不把并列最高桶等同于多峰检测 |
 | Variance | 当前有限像素集合的总体方差，分母为 `N` |
 | Standard Deviation | 总体方差平方根 |
 | P1 / P5 / P95 / P99 | 从精确 Histogram 得到的离散 DN 分位数 |
@@ -240,7 +240,7 @@ variance = Σ(x - mean)² / N
 - 普通 Histogram / 累计 Histogram。
 - 线性 / 对数纵轴。
 - tooltip 显示 DN、count 和占有效样本比例。
-- 图中标记 Min、Mean、Median、P1、P99 和 Full-scale DN。
+- 图中标记 Min、Mean、P50、P1、P99 和 Full-scale DN。
 - 支持复制当前图表和保存 PNG。
 
 ## Row / Column Profile
@@ -469,7 +469,7 @@ flowchart LR
 flowchart TB
     META["文件与 RAW 描述符<br/>文件名 / frame / 分辨率 / 位深 / Packing / CFA"]
     ROI["范围<br/>整帧或 ROI 坐标与尺寸"]
-    SUMMARY["统计摘要<br/>Count / Min / Max / Mean / Median / StdDev / Percentile"]
+    SUMMARY["统计摘要<br/>Count / Min / Max / Mean / P50 / StdDev / Percentile"]
     HIST["DN Histogram"]
     ROW["Row Profile"]
     COL["Column Profile"]

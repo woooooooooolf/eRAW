@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
+import { renderToString } from "katex";
 
 const url = (source) => `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
 const compile = async (file) => ts.transpileModule(await readFile(new URL(file, import.meta.url), "utf8"), {
@@ -38,4 +39,21 @@ test("all seven runtime manuals insert exactly one localized CLI article without
     examples = commands;
   }
   assert.equal(titles.size, 7);
+});
+
+test("all seven manuals share identical formulas that render strictly to MathML", () => {
+  let reference;
+  for(const locale of ["zh-CN","en","zh-TW","ja","es","fr","de"]){
+    const formulas=[];
+    for(const section of getHelpCatalog(locale).sections){
+      for(const match of section.body.matchAll(/<div class="help-latex" data-latex>([\s\S]*?)<\/div>/g)){
+        const formula=match[1].replaceAll("&lt;","<").replaceAll("&gt;",">").replaceAll("&amp;","&");
+        formulas.push(formula);
+        const math=renderToString(formula,{displayMode:true,output:"mathml",strict:"error",throwOnError:true});
+        assert.ok(math.includes("<math"));
+      }
+    }
+    assert.equal(formulas.length,36);
+    if(reference)assert.deepEqual(formulas,reference);else reference=formulas;
+  }
 });

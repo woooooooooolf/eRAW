@@ -2751,6 +2751,83 @@ mod tests {
     }
 
     #[test]
+    fn coarse_demosaic_uses_cfa_channel_means_and_explicit_missing_channel_fallbacks() {
+        let d = RawDescriptor {
+            width: 4,
+            height: 4,
+            bit_depth: 8,
+            packing: Packing::Unpacked8,
+            cfa: CfaPattern::Rggb,
+            ..RawDescriptor::default()
+        };
+        let data = [
+            0, 40, 200, 40, 40, 80, 40, 80, 100, 40, 240, 40, 40, 80, 40, 80,
+        ];
+        let l = calculate_layout(&d, data.len() as u64).0;
+        let request = TileRequest {
+            generation: 1,
+            render_revision: 1,
+            frame: 0,
+            level: 0,
+            tile_x: 0,
+            tile_y: 0,
+            tile_size: 64,
+            mode: DisplayMode::Demosaic,
+            processing: ProcessingSettings::default(),
+            display_window: DisplayWindow {
+                black_point: 0,
+                white_point: 255,
+            },
+        };
+        let fine = render_tile(&data, &d, &l, &request).unwrap();
+        assert_eq!(
+            [fine[0], fine[4], fine[64 * 4], fine[65 * 4]],
+            [0, 100, 50, 135]
+        );
+        let coarse = render_tile(
+            &data,
+            &d,
+            &l,
+            &TileRequest {
+                level: 1,
+                ..request.clone()
+            },
+        )
+        .unwrap();
+        assert_eq!(&coarse[..4], &[0, 40, 80, 255]);
+        let edge = RawDescriptor {
+            width: 3,
+            height: 3,
+            ..d
+        };
+        let data = [10, 20, 30, 40, 50, 60, 70, 80, 90];
+        let l = calculate_layout(&edge, 9).0;
+        let coarse = render_tile(
+            &data,
+            &edge,
+            &l,
+            &TileRequest {
+                level: 1,
+                ..request.clone()
+            },
+        )
+        .unwrap();
+        assert_eq!(&coarse[65 * 4..66 * 4], &[90, 90, 90, 255]);
+        let green = render_tile(
+            &data,
+            &edge,
+            &l,
+            &TileRequest {
+                level: 1,
+                mode: DisplayMode::Green,
+                ..request
+            },
+        )
+        .unwrap();
+        assert_eq!(green[65 * 4 + 3], 254);
+    }
+
+    #[test]
     fn demosaic_preview_keeps_flat_color_stable_between_levels() {
         let d = RawDescriptor {
             width: 64,
