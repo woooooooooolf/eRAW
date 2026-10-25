@@ -615,6 +615,16 @@ const ORIGINAL_DN_NOTES: Readonly<Record<ResolvedLocale, string>> = {
   de: "Original DN in Demosaic liest auch bei Quad CFA den Messwert derselben Quellkoordinate statt des umgeordneten oder rekonstruierten Bayer-DN. Remosaic zeigt weiterhin verarbeitete Bayer-DN; RGB zeigt rekonstruierte Komponenten.",
 };
 
+const CHART_SAMPLING_NOTES: Readonly<Record<ResolvedLocale, string>> = {
+  "zh-CN": "Histogram 和 Profile 的有界数据不再由 ECharts 二次抽样。包络保留每桶的局部极值，但有限屏幕分辨率不保证区分全部原始局部峰；精确摘要保持不变。",
+  en: "ECharts does not resample the bounded Histogram or Profile data. The envelope retains each bucket's extrema, but finite screen resolution cannot distinguish every original local peak. Exact summaries remain unchanged.",
+  "zh-TW": "Histogram 和 Profile 的有界資料不再由 ECharts 二次抽樣。包絡保留每桶局部極值，但有限螢幕解析度不保證區分全部原始局部峰；精確摘要不變。",
+  ja: "有界の Histogram と Profile データを ECharts で再サンプリングしません。各バケットの極値は保持しますが、有限の画面解像度で全ての元の局所ピークを区別できるとは限りません。正確な統計値は変わりません。",
+  es: "ECharts no remuestrea los datos acotados de Histogram ni Profile. La envolvente conserva extremos por bucket, pero la resolución de pantalla no permite distinguir todos los picos originales. Los resúmenes exactos no cambian.",
+  fr: "ECharts ne rééchantillonne pas les données bornées Histogram et Profile. L’enveloppe garde les extrema de chaque bucket, mais la résolution finie ne permet pas de distinguer tous les pics initiaux. Les résumés exacts restent inchangés.",
+  de: "ECharts tastet die begrenzten Histogramm- und Profildaten nicht erneut ab. Die Hüllkurve erhält die Extrema jedes Buckets; die begrenzte Bildschirmauflösung trennt jedoch nicht jeden ursprünglichen lokalen Peak. Exakte Kennwerte bleiben unverändert.",
+};
+
 const ZH_CN_UI: HelpUiText = {
   manualTitle: "使用手册",
   subtitle: "技术参考 · 简体中文",
@@ -634,7 +644,8 @@ export function getHelpCatalog(locale: ResolvedLocale): HelpCatalog {
     sections.splice(index, 0, createCliHelpSection(locale));
     return { ...catalog, sections: sections.map((section) => {
       const note = ["remosaic", "export", "cli"].includes(section.id) ? REORDER_BOUNDARY_NOTES[locale]
-        : section.id === "inspection" ? ORIGINAL_DN_NOTES[locale] : "";
+        : section.id === "inspection" ? ORIGINAL_DN_NOTES[locale]
+        : section.id === "charts" ? CHART_SAMPLING_NOTES[locale] : "";
       return note ? { ...section, body: `<div class="help-prose"><p>${note}</p></div>${section.body}` } : section;
     }) };
   };

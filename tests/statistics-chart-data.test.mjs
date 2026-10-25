@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ts from "typescript";
+import * as echarts from "echarts";
 
 const source = await readFile(new URL("../src/statistics-chart-data.ts", import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(source, {
@@ -83,4 +84,32 @@ test("profile markers appear only when real samples are sparse enough on screen"
   assert.equal(chartData.shouldShowProfileMarkers(zoomed, { start: 0, end: 400 }, 1100), true);
   assert.equal(chartData.shouldShowProfileMarkers([[120, 10]], { start: 100, end: 140 }, 800), true);
   assert.equal(chartData.shouldShowProfileMarkers([], { start: 0, end: 400 }, 800), false);
+});
+
+test("actual ECharts keeps bounded profile extrema and histogram buckets across narrow widths and resize", () => {
+  const points=Array.from({length:25000},(_,coordinate)=>profilePoint(coordinate,1000));
+  points[900].mean=60000; points[990].mean=55000;
+  const envelope=chartData.profileSeriesData(points,"mean",{start:0,end:24999});
+  const histogram=chartData.histogramSeriesData(Array.from({length:65536},(_,i)=>i%19));
+  for(const width of [280,400,1100]) {
+    const chart=echarts.init(null,null,{renderer:"svg",ssr:true,width,height:300});
+    try {
+      for(const [data,domain] of [[envelope,24999],[histogram,65535]]) {
+        chart.setOption({animation:false,grid:{left:62,right:54},xAxis:{type:"value",min:0,max:domain},yAxis:{type:"value"},
+          series:Array.from({length:6},()=>({type:"line",data,sampling:chartData.STATISTICS_LINE_SAMPLING,showSymbol:false}))},{notMerge:true});
+        chart.resize({width:width+20,height:320});
+        for(let group=0;group<6;group++) {
+          const actual=chart.getModel().getSeriesByIndex(group).getData();
+          assert.equal(actual.count(),data.length);
+          if(data===envelope) {
+            const extrema=[];
+            for(let i=0;i<actual.count();i++)if(actual.get("y",i)>10000)extrema.push([actual.get("x",i),actual.get("y",i)]);
+            assert.deepEqual(extrema,[[900,60000],[990,55000]]);
+          }
+        }
+      }
+    } finally {chart.dispose();}
+  }
+  const source=readFile(new URL("../src/statistics-chart.ts",import.meta.url),"utf8");
+  return source.then(text=>assert.equal((text.match(/sampling: STATISTICS_LINE_SAMPLING/g)??[]).length,2));
 });

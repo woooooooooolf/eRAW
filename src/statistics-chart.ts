@@ -5,6 +5,7 @@ import type {
 } from "./types";
 import {
   histogramSeriesData,
+  STATISTICS_LINE_SAMPLING,
   maximumHistogramDisplayCount,
   profileSeriesData,
   profileValueDomain,
@@ -648,7 +649,7 @@ export class StatisticsCharts {
           type: "line",
           data: renderedGroups[index],
           showSymbol: false,
-          sampling: "lttb",
+          sampling: STATISTICS_LINE_SAMPLING,
           connectNulls: false,
           lineStyle: {
             width,
@@ -717,7 +718,7 @@ export class StatisticsCharts {
           type: "line",
           data,
           ...profileMarkerOption(data, renderedRange, plotWidth, color, markerFill),
-          sampling: "lttb",
+          sampling: STATISTICS_LINE_SAMPLING,
           connectNulls: true,
           lineStyle: {
             width,

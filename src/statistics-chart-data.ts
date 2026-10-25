@@ -2,6 +2,8 @@ import type { GroupStatistics, ProfilePoint } from "./types";
 import type { StatisticsAxisRange } from "./statistics-view-state";
 
 export const MAX_PROFILE_RENDER_POINTS = 4_096;
+// Payloads already preserve deliberate extrema or bucket sums within a bound.
+export const STATISTICS_LINE_SAMPLING = "none" as const;
 export const MAX_PROFILE_MARKER_POINTS = 512;
 export const MIN_PROFILE_MARKER_SPACING_PX = 5;
 
