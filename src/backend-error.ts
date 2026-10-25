@@ -14,6 +14,7 @@ export interface BackendError {
 }
 
 const ERROR_MESSAGES: Record<string, MessageKey> = {
+  update_open_failed: "backend.updateOpenFailed",
   repository_open_failed: "backend.repositoryOpenFailed",
   document_not_open: "backend.documentNotOpen",
   preview_cache_poisoned: "backend.previewCachePoisoned",

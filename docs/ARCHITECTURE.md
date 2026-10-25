@@ -30,6 +30,8 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 
 手动版本检查由独立 `update_check.rs` 提供，只有显式调用 `check_for_updates` 才创建 HTTP 客户端；启动不检查、不请求 GitHub API，也不解析发布 HTML。网络只读取固定仓库 Latest 与必要 ZIP 请求的响应头，重定向及稳定标签经过校验。连接超时为 3 秒，一次完整检查截止为 8 秒；系统代理/证书客户端初始化放在阻塞工作线程，再由异步截止时间约束等待，HTTP 请求不持有文档会话锁。结果和服务端限流冷却只保存在当前进程；下载目标由 Rust 保存，`open_update_target` 仅接受目标种类，不接受前端 URL。关闭关于页不是取消检查的条件，状态随请求完成更新。
 
+前端 `ManualUpdateChecker` 由 `ErawApp` 持有，不由对话框创建/销毁；构造和渲染不发起请求，进行中点击复用同一 Promise，关闭对话框不取消定时器或 RPC。IPC 另有 10 秒兜底截止，避免异常通信令按钮永久停在检查中，兜底后到达的旧结果不能覆盖已完成的失败状态。语言变化只重新呈现当前状态，不重新检查；该状态不进入应用设置或 WebView 存储。
+
 界面样式不打包或下载字体文件；常规正文、手册正文和等宽内容分别使用 `system-ui`、`ui-serif` 与 `ui-monospace` 通用系统字体族，具体字形由用户系统与 WebView2 回退机制提供。技术手册通过 MIT 许可的 KaTeX 将 LaTeX 源直接转换为原生 MathML，不加载 KaTeX CSS 或字体资源。
 
 ## 模块职责

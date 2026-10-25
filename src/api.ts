@@ -1,6 +1,7 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { t } from "./i18n";
+import type { UpdateResult } from "./update-check";
 import type {
   AnalysisRequest,
   AnalysisResult,
@@ -23,6 +24,14 @@ export function takeStartupDocument(): Promise<StartupDocument | null> {
 
 export function openProjectRepository(): Promise<void> {
   return invoke("open_project_repository");
+}
+
+export function checkForUpdates(): Promise<UpdateResult> {
+  return invoke("check_for_updates");
+}
+
+export function openUpdateTarget(target: "download" | "release" | "latest"): Promise<void> {
+  return invoke("open_update_target", { target });
 }
 
 export async function chooseRawFile(): Promise<string | null> {

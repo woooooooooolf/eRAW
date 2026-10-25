@@ -51,6 +51,7 @@ pub enum UpdateResult {
 pub enum UpdateLink {
     Download,
     Release,
+    Latest,
 }
 
 #[derive(Clone, Debug)]
@@ -79,6 +80,7 @@ impl UpdateCheckState {
                     .unwrap_or(LATEST_URL)
                     .into(),
             ),
+            UpdateLink::Latest => Some(LATEST_URL.into()),
         }
     }
 }

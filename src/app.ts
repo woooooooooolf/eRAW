@@ -6,6 +6,7 @@ import erawIconUrl from "./assets/eraw-icon.svg";
 import { unsupportedReorderEdges } from "./remosaic-boundary";
 import { localizeReorderBoundary } from "./backend-error";
 import type { CaptureJob } from "./image-capture-session";
+import { LATEST_RELEASE_URL, ManualUpdateChecker, updateCheckMessage } from "./update-check";
 import {
   analyzeRawImage,
   calculateRawDisplayRange,
@@ -16,6 +17,8 @@ import {
   closeDocument,
   openDocument,
   openProjectRepository,
+  checkForUpdates,
+  openUpdateTarget,
   updateDescriptor,
 } from "./api";
 import {
@@ -272,6 +275,7 @@ function loadProcessingSettings(): ProcessingSettings {
 }
 
 export class ErawApp {
+  private readonly updateChecker = new ManualUpdateChecker(checkForUpdates, () => this.renderUpdateCheck());
   private readonly root: HTMLElement;
   private readonly viewport: RawViewport;
   private readonly exportDialog: ExportDialog;
@@ -930,7 +934,7 @@ export class ErawApp {
     text("#open-source-components strong", "about.components");
     text("#open-source-components .about-entry-detail", "about.thirdPartyLicenses");
     attribute("#open-source-components", "title", "about.componentsHint");
-    text("#about-dialog footer button", "common.done");
+    text("#about-done", "common.done");
     texts("#open-source-dialog header small, #open-source-dialog header h2", ["about.componentsEyebrow", "about.componentsTitle"]);
     text("#open-source-dialog .open-source-body > p:first-child", "about.componentsIntro");
     texts("#open-source-dialog .component-list > div > span", ["about.desktopFramework", "about.fileDialog", "about.serialization", "about.memoryMap", "about.buildTool", "about.typeSystem", "about.charting", "about.mathTypesetting", "about.browserOpener"]);
@@ -1055,7 +1059,14 @@ export class ErawApp {
         <button id="about-license" type="button" class="about-entry" aria-haspopup="dialog"><strong>软件许可证</strong><span class="about-entry-detail">GPL-3.0-or-later</span><b aria-hidden="true">›</b></button>
         <button id="open-source-components" type="button" class="about-entry" aria-haspopup="dialog"><strong>开源组件</strong><span class="about-entry-detail">第三方许可证</span><b aria-hidden="true">›</b></button>
       </div>
-      <footer><button value="cancel" class="primary-button">完成</button></footer>
+      <div id="update-check-result" class="about-update-result" role="status" aria-live="polite" hidden>
+        <span id="update-check-message"></span>
+        <div class="about-update-links">
+          <a id="update-download" data-i18n="update.download" target="_blank" rel="noopener noreferrer" hidden>下载 ZIP ↗</a>
+          <a id="update-release" data-i18n="update.release" href="${LATEST_RELEASE_URL}" target="_blank" rel="noopener noreferrer" hidden>前往 GitHub ↗</a>
+        </div>
+      </div>
+      <footer><button id="check-updates" type="button" class="secondary-button">${t("update.check")}</button><button id="about-done" value="cancel" class="primary-button">完成</button></footer>
     </form></dialog>
     <dialog id="license-dialog" class="modal license-modal"><form method="dialog">
       <header><div><small>软件许可证</small><h2>GNU GPL 第 3 版或后续版本</h2></div><button value="cancel" class="dialog-close">×</button></header>
@@ -1252,6 +1263,15 @@ export class ErawApp {
       event.preventDefault();
       void openProjectRepository().catch((error) => this.reportRuntimeError(error, undefined, 5000, "repository"));
     });
+    this.get("check-updates").addEventListener("click", () => { void this.updateChecker.check(); });
+    for (const target of ["download", "release"] as const) {
+      this.get(`update-${target}`).addEventListener("click", (event) => {
+        if (!isTauri()) return;
+        event.preventDefault();
+        const destination = target === "release" && this.updateChecker.state.status !== "available" ? "latest" : target;
+        void openUpdateTarget(destination).catch((error) => this.reportRuntimeError(error, undefined, 5000, "update-link"));
+      });
+    }
     this.get("about-license").addEventListener("click", () => { void this.openLicenseDialog(); });
     this.get("back-from-license").addEventListener("click", () => {
       this.get<HTMLDialogElement>("license-dialog").close();
@@ -1919,7 +1939,26 @@ export class ErawApp {
     this.updateZoomStatus(this.viewport.getZoom());
     this.syncStatisticsState();
     void this.emitHelpState();
+    this.renderUpdateCheck();
     this.setLanguageMenuOpen(false);
+  }
+
+  private renderUpdateCheck(): void {
+    const state = this.updateChecker.state;
+    const checking = state.status === "checking";
+    const button = this.get<HTMLButtonElement>("check-updates");
+    button.disabled = checking;
+    button.textContent = t(checking ? "update.checking" : "update.check");
+    this.get("update-check-result").hidden = state.status === "idle";
+    const message = updateCheckMessage(state);
+    this.get("update-check-message").textContent = t(message.key, message.values);
+    const download = this.get<HTMLAnchorElement>("update-download");
+    const release = this.get<HTMLAnchorElement>("update-release");
+    download.hidden = state.status !== "available" || !state.downloadAvailable || !state.downloadUrl;
+    if (state.status === "available" && state.downloadAvailable && state.downloadUrl) download.href = state.downloadUrl;
+    else download.removeAttribute("href");
+    release.hidden = state.status !== "available" && state.status !== "failed";
+    release.href = state.status === "available" ? state.releaseUrl : LATEST_RELEASE_URL;
   }
 
   private setLanguageMenuOpen(open: boolean): void {
