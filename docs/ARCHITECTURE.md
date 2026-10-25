@@ -116,7 +116,7 @@ RawDocument
 - 前端 `inFlight` 记录 revision，旧任务结束时不会误删同键的新任务。
 - 导出同时校验来源路径和 `sourceGeneration`，防止对过期配置写文件。
 - RAW 导出另有单调递增的 `exportRevision`；后台逐行检查 revision，并通过 Tauri `Channel` 回传已完成行数。取消只终止当前任务、删除临时文件，不替换已有目标文件。
-- 完整预览抓拍同时携带文档世代与渲染 revision；帧、显示或处理状态变化后，旧瓦片结果不会被拼入输出。
+- 抓拍使用独立 `ImageCaptureSession` 和后端 `capture_revision`，与视口 `preview_revision` 分离；同一渲染核心按内容复用缓存，缓存命中也检查任务有效性。文档、帧、处理及呈现语义变化使未提交抓拍失效，纯视口 LOD 切换不取消完整预览。前端在异步返回及输出准备后复核；开始原生文件/剪贴板输出后不承诺回滚。
 - 图像统计另有 `analysisRevision`；文件、描述符、frame、ROI 或显式取消发生变化后，旧扫描协作退出并返回 `stale_analysis`。
 
 ## 缓存与数据传递

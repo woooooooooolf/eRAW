@@ -1,4 +1,5 @@
-import { renderTile } from "./api";
+import { cancelRawCapture, renderCaptureTile, renderTile } from "./api";
+import { ImageCaptureSession, type CaptureJob } from "./image-capture-session";
 import { backendErrorCode } from "./backend-error";
 import {
   channelTint,
@@ -171,6 +172,9 @@ function createProgram(gl: WebGL2RenderingContext): WebGLProgram {
 }
 
 export class RawViewport {
+  private readonly captureSession = new ImageCaptureSession((revision) => {
+    void cancelRawCapture(revision).catch(() => { /* Local checks still prevent stale output. */ });
+  });
   private readonly container: HTMLElement;
   private readonly canvas: HTMLCanvasElement;
   private readonly pixelCanvas: HTMLCanvasElement;
@@ -366,6 +370,7 @@ export class RawViewport {
   }
 
   setDocument(document: DocumentInfo, preserveView = false): void {
+    if (this.document?.generation !== document.generation) this.captureSession.invalidate();
     const dimensionsChanged = !this.document
       || document.descriptor.width !== this.document.descriptor.width
       || document.descriptor.height !== this.document.descriptor.height;
@@ -381,6 +386,7 @@ export class RawViewport {
   }
 
   clearDocument(): void {
+    this.captureSession.invalidate();
     this.abortSelectionGesture();
     this.document = null;
     this.frame = 0;
@@ -412,6 +418,7 @@ export class RawViewport {
 
   setFrame(frame: number): void {
     if (!this.document) return;
+    if (this.frame !== Math.max(0, Math.min(frame, Math.max(0, this.document.layout.frameCount - 1)))) this.captureSession.invalidate();
     this.frame = Math.max(0, Math.min(frame, Math.max(0, this.document.layout.frameCount - 1)));
     this.updatePointerPosition(null);
     this.clearTextures();
@@ -427,6 +434,7 @@ export class RawViewport {
       && settings.processing.remosaic.sameColorReconstruction
         === this.settings.processing.remosaic.sameColorReconstruction
     ) return;
+    this.captureSession.invalidate();
     this.settings = settings;
     this.clearTextures();
     this.requestDraw();
@@ -440,6 +448,7 @@ export class RawViewport {
 
   setChannelRendering(mode: ChannelRenderingMode): void {
     if (mode === this.channelRendering) return;
+    this.captureSession.invalidate();
     this.channelRendering = mode;
     this.requestDraw();
   }
@@ -447,6 +456,7 @@ export class RawViewport {
   setDisplayExposure(exposure: number): void {
     const normalized = normalizeDisplayExposure(exposure);
     if (normalized === this.displayExposure) return;
+    this.captureSession.invalidate();
     this.displayExposure = normalized;
     this.requestDraw();
   }
@@ -456,6 +466,7 @@ export class RawViewport {
       appearance.pattern === this.missingPixelAppearance.pattern
       && appearance.color === this.missingPixelAppearance.color
     ) return;
+    this.captureSession.invalidate();
     this.missingPixelAppearance = { ...appearance };
     this.requestDraw();
   }
@@ -504,8 +515,14 @@ export class RawViewport {
     return output;
   }
 
-  captureFullPreview(): Promise<HTMLCanvasElement> {
-    return renderPreviewCanvas(this.captureSnapshot());
+  beginImageCapture(): CaptureJob {
+    if (!this.document) throw new Error("document_not_open");
+    return this.captureSession.begin();
+  }
+
+  captureFullPreview(job: CaptureJob): Promise<HTMLCanvasElement> {
+    job.check();
+    return renderPreviewCanvas(this.captureSnapshot(), (request) => renderCaptureTile(request, job.revision), job);
   }
 
   private captureSnapshot(): PreviewCaptureSnapshot {

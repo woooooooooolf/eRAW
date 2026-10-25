@@ -72,6 +72,15 @@ export async function renderTile(request: TileRequest): Promise<Uint8Array> {
   return new Uint8Array(result);
 }
 
+export async function renderCaptureTile(request: TileRequest, captureRevision: number): Promise<Uint8Array> {
+  const result = await invoke<ArrayBuffer | Uint8Array | number[]>("render_raw_tile", { request, captureRevision });
+  return result instanceof Uint8Array ? result : new Uint8Array(result);
+}
+
+export function cancelRawCapture(captureRevision: number): Promise<void> {
+  return invoke("cancel_raw_capture", { captureRevision });
+}
+
 export async function inspectPixels(request: PixelInspectionRequest): Promise<Uint8Array> {
   const result = await invoke<ArrayBuffer | Uint8Array | number[]>("inspect_raw_pixels", { request });
   if (result instanceof ArrayBuffer) return new Uint8Array(result);

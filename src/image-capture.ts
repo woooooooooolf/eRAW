@@ -1,4 +1,5 @@
 import { renderTile } from "./api";
+import type { CaptureJob } from "./image-capture-session";
 import {
   channelTint,
   type ChannelRenderingMode,
@@ -135,7 +136,9 @@ export function applyPreviewPresentation(
 export async function renderPreviewCanvas(
   snapshot: PreviewCaptureSnapshot,
   renderer: TileRenderer = renderTile,
+  job?: CaptureJob,
 ): Promise<HTMLCanvasElement> {
+  job?.check();
   const dimensions = previewDimensions(snapshot.imageWidth, snapshot.imageHeight);
   const canvas = document.createElement("canvas");
   canvas.width = dimensions.width;
@@ -149,48 +152,46 @@ export async function renderPreviewCanvas(
     for (let x = 0; x < columns; x += 1) coordinates.push({ x, y });
   }
   let next = 0;
+  let failed = false;
   const worker = async () => {
-    while (next < coordinates.length) {
-      const coordinate = coordinates[next];
-      next += 1;
-      const bytes = await renderer({
-        generation: snapshot.generation,
-        renderRevision: snapshot.renderRevision,
-        frame: snapshot.frame,
-        level: dimensions.level,
-        tileX: coordinate.x,
-        tileY: coordinate.y,
-        tileSize: CAPTURE_TILE_SIZE,
-        mode: snapshot.mode,
-        processing: snapshot.processing,
-        displayWindow: snapshot.displayWindow,
-      });
-      applyPreviewPresentation(
-        bytes,
-        coordinate.x,
-        coordinate.y,
-        snapshot.mode,
-        snapshot.channelRendering,
-        snapshot.missingPixelAppearance,
-        snapshot.displayExposure,
-      );
-      context.putImageData(
-        new ImageData(
-          new Uint8ClampedArray(bytes),
-          CAPTURE_TILE_SIZE,
-          CAPTURE_TILE_SIZE,
-        ),
-        coordinate.x * CAPTURE_TILE_SIZE,
-        coordinate.y * CAPTURE_TILE_SIZE,
-      );
+    try {
+      while (!failed && next < coordinates.length) {
+        job?.check();
+        const coordinate = coordinates[next];
+        next += 1;
+        const bytes = await renderer({
+          generation: snapshot.generation,
+          renderRevision: snapshot.renderRevision,
+          frame: snapshot.frame,
+          level: dimensions.level,
+          tileX: coordinate.x,
+          tileY: coordinate.y,
+          tileSize: CAPTURE_TILE_SIZE,
+          mode: snapshot.mode,
+          processing: snapshot.processing,
+          displayWindow: snapshot.displayWindow,
+        });
+        job?.check();
+        if (failed) return;
+        applyPreviewPresentation(
+          bytes, coordinate.x, coordinate.y, snapshot.mode, snapshot.channelRendering,
+          snapshot.missingPixelAppearance, snapshot.displayExposure,
+        );
+        context.putImageData(
+          new ImageData(new Uint8ClampedArray(bytes), CAPTURE_TILE_SIZE, CAPTURE_TILE_SIZE),
+          coordinate.x * CAPTURE_TILE_SIZE, coordinate.y * CAPTURE_TILE_SIZE,
+        );
+      }
+    } catch (error) {
+      failed = true;
+      job?.cancel();
+      throw error;
     }
   };
   await Promise.all(
-    Array.from(
-      { length: Math.min(PREVIEW_CONCURRENCY, coordinates.length) },
-      () => worker(),
-    ),
+    Array.from({ length: Math.min(PREVIEW_CONCURRENCY, coordinates.length) }, () => worker()),
   );
+  job?.check();
   return canvas;
 }
 

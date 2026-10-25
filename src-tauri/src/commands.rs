@@ -162,6 +162,7 @@ pub struct AppState {
     document: Mutex<Option<RawDocument>>,
     generation_clock: Arc<AtomicU64>,
     preview_revision: Arc<AtomicU64>,
+    capture_revision: Arc<AtomicU64>,
     analysis_revision: Arc<AtomicU64>,
     display_range_revision: Arc<AtomicU64>,
     export_revision: Arc<AtomicU64>,
@@ -174,6 +175,7 @@ impl Default for AppState {
             document: Mutex::new(None),
             generation_clock: Arc::new(AtomicU64::new(0)),
             preview_revision: Arc::new(AtomicU64::new(0)),
+            capture_revision: Arc::new(AtomicU64::new(0)),
             analysis_revision: Arc::new(AtomicU64::new(0)),
             display_range_revision: Arc::new(AtomicU64::new(0)),
             export_revision: Arc::new(AtomicU64::new(0)),
@@ -343,14 +345,10 @@ fn close_document_state(state: &AppState) -> Result<(), CommandError> {
 #[tauri::command]
 pub async fn render_raw_tile(
     request: TileRequest,
+    capture_revision: Option<u64>,
     state: State<'_, AppState>,
 ) -> Result<Response, CommandError> {
-    let previous_revision = state
-        .preview_revision
-        .fetch_max(request.render_revision, Ordering::AcqRel);
-    if previous_revision > request.render_revision {
-        return Err(CommandError::new("stale_render"));
-    }
+    let task = claim_render_task(&state, request.render_revision, capture_revision)?;
     let (map, descriptor, layout, generation) = {
         let guard = lock_document(&state)?;
         let document = guard
@@ -385,10 +383,10 @@ pub async fn render_raw_tile(
         .map_err(|_| CommandError::new("preview_cache_poisoned"))?
         .get(&cache_key)
     {
+        task.check()?;
         return Ok(Response::new(bytes));
     }
     let generation_clock = state.generation_clock.clone();
-    let preview_revision = state.preview_revision.clone();
     let preview_cache = state.preview_cache.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let bytes: &[u8] = match map.as_ref() {
@@ -397,15 +395,13 @@ pub async fn render_raw_tile(
         };
         let rendered = render_tile_cancellable(bytes, &descriptor, &layout, &request, || {
             generation_clock.load(Ordering::Acquire) == request.generation
-                && preview_revision.load(Ordering::Acquire) == request.render_revision
+                && task.clock.load(Ordering::Acquire) == task.revision
         })
         .map_err(CommandError::from)?;
         if generation_clock.load(Ordering::Acquire) != request.generation {
             return Err(CommandError::new("stale_generation"));
         }
-        if preview_revision.load(Ordering::Acquire) != request.render_revision {
-            return Err(CommandError::new("stale_render"));
-        }
+        task.check()?;
         preview_cache
             .lock()
             .map_err(|_| CommandError::new("preview_cache_poisoned"))?
@@ -414,6 +410,76 @@ pub async fn render_raw_tile(
     })
     .await
     .map_err(|error| CommandError::new("tile_task_failed").with_cause(error))?
+}
+
+struct RenderTask {
+    clock: Arc<AtomicU64>,
+    revision: u64,
+    stale_code: &'static str,
+}
+
+#[cfg(test)]
+mod render_task_tests {
+    use super::*;
+    #[test]
+    fn capture_and_viewport_clocks_are_independent_and_old_cache_responses_are_rejected() {
+        let state = AppState::default();
+        let capture = claim_render_task(&state, 7, Some(1)).unwrap();
+        let preview = claim_render_task(&state, 7, None).unwrap();
+        let next_preview = claim_render_task(&state, 8, None).unwrap();
+        assert!(preview.check().is_err());
+        capture.check().unwrap();
+        next_preview.check().unwrap();
+        state.capture_revision.fetch_max(2, Ordering::AcqRel);
+        assert_eq!(capture.check().unwrap_err().code, "stale_capture");
+        assert!(claim_render_task(&state, 8, Some(1)).is_err());
+        next_preview.check().unwrap();
+        claim_render_task(&state, 8, Some(3))
+            .unwrap()
+            .check()
+            .unwrap();
+    }
+}
+
+impl RenderTask {
+    fn check(&self) -> Result<(), CommandError> {
+        if self.clock.load(Ordering::Acquire) != self.revision {
+            Err(CommandError::new(self.stale_code))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+fn claim_render_task(
+    state: &AppState,
+    render_revision: u64,
+    capture_revision: Option<u64>,
+) -> Result<RenderTask, CommandError> {
+    let (clock, revision, stale_code) = match capture_revision {
+        Some(revision) => (state.capture_revision.clone(), revision, "stale_capture"),
+        None => (
+            state.preview_revision.clone(),
+            render_revision,
+            "stale_render",
+        ),
+    };
+    let previous = clock.fetch_max(revision, Ordering::AcqRel);
+    if previous > revision {
+        return Err(CommandError::new(stale_code));
+    }
+    Ok(RenderTask {
+        clock,
+        revision,
+        stale_code,
+    })
+}
+
+#[tauri::command]
+pub fn cancel_raw_capture(capture_revision: u64, state: State<'_, AppState>) {
+    state
+        .capture_revision
+        .fetch_max(capture_revision, Ordering::AcqRel);
 }
 
 #[tauri::command]

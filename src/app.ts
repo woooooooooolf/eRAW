@@ -5,6 +5,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import erawIconUrl from "./assets/eraw-icon.svg";
 import { unsupportedReorderEdges } from "./remosaic-boundary";
 import { localizeReorderBoundary } from "./backend-error";
+import type { CaptureJob } from "./image-capture-session";
 import {
   analyzeRawImage,
   calculateRawDisplayRange,
@@ -2507,10 +2508,12 @@ export class ErawApp {
     }
     this.imageCaptureInProgress = true;
     this.updateCaptureMenuAvailability();
+    let captureJob: CaptureJob | undefined;
     try {
       await this.flushDescriptor();
       const generation = this.document?.generation;
       if (generation === undefined) return;
+      captureJob = this.viewport.beginImageCapture();
       this.showToast(
         t(kind === "current" ? "capture.generatingCurrent" : "capture.generatingPreview"),
         "busy",
@@ -2518,28 +2521,31 @@ export class ErawApp {
       );
       const canvas = kind === "current"
         ? this.viewport.captureCurrentView()
-        : await this.viewport.captureFullPreview();
+        : await this.viewport.captureFullPreview(captureJob);
+      captureJob.check();
       if (this.document?.generation !== generation) {
         this.showToast(t("capture.stale"), "error");
         return;
       }
       if (destination === "save" && path) {
-        await saveCanvasPng(canvas, path);
+        await saveCanvasPng(canvas, path, captureJob);
         this.clearRuntimeDiagnostic("capture");
         this.showToast(t("capture.saved"), "success");
       } else {
-        await copyCanvasImage(canvas);
+        await copyCanvasImage(canvas, captureJob);
         this.clearRuntimeDiagnostic("capture");
         this.showToast(t("capture.copied"), "success");
       }
     } catch (error) {
       const code = backendErrorCode(error);
-      if (code === "stale_generation" || code === "stale_render") {
+      if (code === "stale_generation" || code === "stale_render" || code === "stale_capture" || code === "capture_cancelled") {
         this.showToast(t("capture.stale"), "error");
       } else {
         this.reportRuntimeError(error, "capture.failed", 5000, "capture");
       }
     } finally {
+      captureJob?.cancel();
+      captureJob?.finish();
       this.imageCaptureInProgress = false;
       this.updateCaptureMenuAvailability();
     }

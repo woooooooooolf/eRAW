@@ -625,6 +625,16 @@ const CHART_SAMPLING_NOTES: Readonly<Record<ResolvedLocale, string>> = {
   de: "ECharts tastet die begrenzten Histogramm- und Profildaten nicht erneut ab. Die Hüllkurve erhält die Extrema jedes Buckets; die begrenzte Bildschirmauflösung trennt jedoch nicht jeden ursprünglichen lokalen Peak. Exakte Kennwerte bleiben unverändert.",
 };
 
+const CAPTURE_LIFECYCLE_NOTES: Readonly<Record<ResolvedLocale, string>> = {
+  "zh-CN": "抓拍在参数提交与路径确认后冻结图像状态。提交输出前改变文件、帧、显示模式、处理选项、黑白点、EV、通道着色或缺失外观，会取消任务；仅缩放、平移或改变 ROI 不打断完整预览。写文件或剪贴板前作最后校验，已开始提交的输出不再撤回。",
+  en: "Capture freezes image state after parameter submission and path confirmation. Before output commit, changes to the document, frame, mode, processing, black/white points, EV, channel tint, or missing appearance cancel it. Zoom, pan, and ROI changes do not interrupt full preview. The final check precedes native file/clipboard output; committed output is not rolled back.",
+  "zh-TW": "抓拍在參數提交及路徑確認後凍結影像狀態。提交輸出前改變檔案、影格、顯示模式、處理選項、黑白點、EV、通道著色或缺失外觀，會取消任務；僅縮放、平移或改變 ROI 不打斷完整預覽。原生檔案或剪貼簿輸出前進行最後校驗，已提交的輸出不撤回。",
+  ja: "パラメーター送信とパス確認後に画像状態を固定します。出力確定前に文書、フレーム、表示、処理、黒白点、EV、チャンネル色、欠損表示が変わると取り消します。全体プレビューはズーム、移動、ROI 変更で中断しません。ファイル・クリップボード出力直前に再確認し、確定済み出力は巻き戻しません。",
+  es: "La captura fija el estado tras confirmar parámetros y ruta. Antes de confirmar la salida, cambiar documento, frame, modo, procesamiento, puntos negro/blanco, EV, color de canal o apariencia ausente cancela la tarea. Zoom, desplazamiento y ROI no interrumpen la vista completa. La última comprobación precede a la escritura nativa; una salida confirmada no se revierte.",
+  fr: "La capture fige l’image après validation des paramètres et du chemin. Avant l’envoi de la sortie, un changement de document, frame, mode, traitement, points noir/blanc, EV, teinte ou apparence des données absentes l’annule. Zoom, déplacement et ROI n’interrompent pas l’aperçu complet. Le dernier contrôle précède l’écriture native ; une sortie engagée n’est pas annulée rétroactivement.",
+  de: "Die Aufnahme fixiert den Bildzustand nach Parameter- und Pfadbestätigung. Vor der Ausgabe brechen Änderungen an Dokument, Frame, Modus, Verarbeitung, Schwarz-/Weißpunkten, EV, Kanalfarbe oder Fehlstellenanzeige sie ab. Zoom, Verschieben und ROI ändern die Vollvorschau nicht. Die letzte Prüfung erfolgt vor der nativen Datei-/Zwischenablageausgabe; bestätigte Ausgaben werden nicht zurückgerollt.",
+};
+
 const ZH_CN_UI: HelpUiText = {
   manualTitle: "使用手册",
   subtitle: "技术参考 · 简体中文",
@@ -645,7 +655,8 @@ export function getHelpCatalog(locale: ResolvedLocale): HelpCatalog {
     return { ...catalog, sections: sections.map((section) => {
       const note = ["remosaic", "export", "cli"].includes(section.id) ? REORDER_BOUNDARY_NOTES[locale]
         : section.id === "inspection" ? ORIGINAL_DN_NOTES[locale]
-        : section.id === "charts" ? CHART_SAMPLING_NOTES[locale] : "";
+        : section.id === "charts" ? CHART_SAMPLING_NOTES[locale]
+        : section.id === "rendering" ? CAPTURE_LIFECYCLE_NOTES[locale] : "";
       return note ? { ...section, body: `<div class="help-prose"><p>${note}</p></div>${section.body}` } : section;
     }) };
   };

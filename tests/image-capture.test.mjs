@@ -119,9 +119,9 @@ test("native context menus are suppressed globally and the canvas menu exposes o
 });
 
 test("save and clipboard actions consume the same captured canvas", () => {
-  assert.match(appSource, /const canvas = kind === "current"[\s\S]*?this\.viewport\.captureFullPreview\(\)/);
-  assert.match(appSource, /saveCanvasPng\(canvas, path\)/);
-  assert.match(appSource, /copyCanvasImage\(canvas\)/);
+  assert.match(appSource, /const canvas = kind === "current"[\s\S]*?this\.viewport\.captureFullPreview\(captureJob\)/);
+  assert.match(appSource, /saveCanvasPng\(canvas, path, captureJob\)/);
+  assert.match(appSource, /copyCanvasImage\(canvas, captureJob\)/);
   assert.match(apiSource, /invoke\("save_png", \{ path, png \}\)/);
   assert.match(outputSource, /canvasToPngBlob\(canvas\)/);
   assert.match(outputSource, /Image\.new\(canvasRgba\(canvas\), canvas\.width, canvas\.height\)/);

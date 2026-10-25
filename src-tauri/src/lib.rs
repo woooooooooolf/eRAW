@@ -6,9 +6,9 @@ mod raw;
 
 use commands::{
     AppState, analyze_raw_image, calculate_raw_display_range, cancel_raw_analysis,
-    cancel_raw_display_range, cancel_raw_export, close_document, export_document,
-    inspect_raw_pixels, open_document, open_project_repository, render_raw_tile, sample_raw_pixel,
-    save_png, update_descriptor,
+    cancel_raw_capture, cancel_raw_display_range, cancel_raw_export, close_document,
+    export_document, inspect_raw_pixels, open_document, open_project_repository, render_raw_tile,
+    sample_raw_pixel, save_png, update_descriptor,
 };
 use serde::Serialize;
 use std::{
@@ -123,6 +123,7 @@ pub fn run() {
             update_descriptor,
             close_document,
             render_raw_tile,
+            cancel_raw_capture,
             inspect_raw_pixels,
             analyze_raw_image,
             cancel_raw_analysis,
