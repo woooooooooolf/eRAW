@@ -257,6 +257,25 @@ pub fn open_project_repository(app: tauri::AppHandle) -> Result<(), CommandError
 }
 
 #[tauri::command]
+pub async fn open_update_target(
+    target: crate::update_check::UpdateLink,
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    state: State<'_, crate::update_check::UpdateCheckState>,
+) -> Result<(), CommandError> {
+    if window.label() != "main" {
+        return Err(CommandError::new("update_open_failed"));
+    }
+    let url = state
+        .target_url(target)
+        .ok_or_else(|| CommandError::new("update_open_failed"))?;
+    tauri::async_runtime::spawn_blocking(move || app.opener().open_url(url, None::<&str>))
+        .await
+        .map_err(|error| CommandError::new("update_open_failed").with_cause(error))?
+        .map_err(|error| CommandError::new("update_open_failed").with_cause(error))
+}
+
+#[tauri::command]
 pub fn open_document(
     path: String,
     descriptor: RawDescriptor,

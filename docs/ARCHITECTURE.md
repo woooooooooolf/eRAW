@@ -28,6 +28,8 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 
 关于页的仓库链接通过无参数命令 `open_project_repository` 交给 Tauri Opener 的 Rust API，地址固定取自 `CARGO_PKG_REPOSITORY`。关闭 Opener 的自动 JS 链接拦截，也不授予前端通用 URL/文件打开权限。三个关于入口共用 `about-entry` 紧凑行样式，许可证入口只展示 `GPL-3.0-or-later`，七语概览移入许可证阅读窗口；全文按需从仓库 `LICENSE?raw` 构建为内嵌资源，使用 `textContent` 放入可选择、可滚动的原文阅读器，不依赖网络或外置文件。
 
+手动版本检查由独立 `update_check.rs` 提供，只有显式调用 `check_for_updates` 才创建 HTTP 客户端；启动不检查、不请求 GitHub API，也不解析发布 HTML。网络只读取固定仓库 Latest 与必要 ZIP 请求的响应头，重定向及稳定标签经过校验。连接超时为 3 秒，一次完整检查截止为 8 秒；系统代理/证书客户端初始化放在阻塞工作线程，再由异步截止时间约束等待，HTTP 请求不持有文档会话锁。结果和服务端限流冷却只保存在当前进程；下载目标由 Rust 保存，`open_update_target` 仅接受目标种类，不接受前端 URL。关闭关于页不是取消检查的条件，状态随请求完成更新。
+
 界面样式不打包或下载字体文件；常规正文、手册正文和等宽内容分别使用 `system-ui`、`ui-serif` 与 `ui-monospace` 通用系统字体族，具体字形由用户系统与 WebView2 回退机制提供。技术手册通过 MIT 许可的 KaTeX 将 LaTeX 源直接转换为原生 MathML，不加载 KaTeX CSS 或字体资源。
 
 ## 模块职责
