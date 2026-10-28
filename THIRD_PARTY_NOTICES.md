@@ -10,36 +10,36 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 
 | Package | Version | Scope | Declared license |
 | --- | --- | --- | --- |
-| @oxc-project/types | 0.152.0 | development | MIT |
-| @rolldown/binding-android-arm-eabi | 1.2.12 | development | MIT |
-| @rolldown/binding-android-arm64 | 1.2.12 | development | MIT |
-| @rolldown/binding-darwin-arm64 | 1.2.12 | development | MIT |
-| @rolldown/binding-darwin-x64 | 1.2.12 | development | MIT |
-| @rolldown/binding-freebsd-x64 | 1.2.12 | development | MIT |
-| @rolldown/binding-linux-arm-gnueabihf | 1.2.12 | development | MIT |
-| @rolldown/binding-linux-arm64-gnu | 1.2.12 | development | MIT |
-| @rolldown/binding-linux-arm64-musl | 1.2.12 | development | MIT |
-| @rolldown/binding-linux-ppc64-gnu | 1.2.12 | development | MIT |
-| @rolldown/binding-linux-s390x-gnu | 1.2.12 | development | MIT |
-| @rolldown/binding-linux-x64-gnu | 1.2.12 | development | MIT |
-| @rolldown/binding-linux-x64-musl | 1.2.12 | development | MIT |
-| @rolldown/binding-openharmony-arm64 | 1.2.12 | development | MIT |
-| @rolldown/binding-win32-arm64-msvc | 1.2.12 | development | MIT |
-| @rolldown/binding-win32-x64-msvc | 1.2.12 | development | MIT |
+| @oxc-project/types | 0.155.0 | development | MIT |
+| @rolldown/binding-android-arm-eabi | 1.2.15 | development | MIT |
+| @rolldown/binding-android-arm64 | 1.2.15 | development | MIT |
+| @rolldown/binding-darwin-arm64 | 1.2.15 | development | MIT |
+| @rolldown/binding-darwin-x64 | 1.2.15 | development | MIT |
+| @rolldown/binding-freebsd-x64 | 1.2.15 | development | MIT |
+| @rolldown/binding-linux-arm-gnueabihf | 1.2.15 | development | MIT |
+| @rolldown/binding-linux-arm64-gnu | 1.2.15 | development | MIT |
+| @rolldown/binding-linux-arm64-musl | 1.2.15 | development | MIT |
+| @rolldown/binding-linux-ppc64-gnu | 1.2.15 | development | MIT |
+| @rolldown/binding-linux-s390x-gnu | 1.2.15 | development | MIT |
+| @rolldown/binding-linux-x64-gnu | 1.2.15 | development | MIT |
+| @rolldown/binding-linux-x64-musl | 1.2.15 | development | MIT |
+| @rolldown/binding-openharmony-arm64 | 1.2.15 | development | MIT |
+| @rolldown/binding-win32-arm64-msvc | 1.2.15 | development | MIT |
+| @rolldown/binding-win32-x64-msvc | 1.2.15 | development | MIT |
 | @rolldown/pluginutils | 1.0.1 | development | MIT |
 | @tauri-apps/api | 2.12.4 | runtime | Apache-2.0 OR MIT |
-| @tauri-apps/cli | 2.12.3 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-darwin-arm64 | 2.12.3 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-darwin-x64 | 2.12.3 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-arm-gnueabihf | 2.12.3 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-arm64-gnu | 2.12.3 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-arm64-musl | 2.12.3 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-riscv64-gnu | 2.12.3 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-x64-gnu | 2.12.3 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-x64-musl | 2.12.3 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-win32-arm64-msvc | 2.12.3 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-win32-ia32-msvc | 2.12.3 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-win32-x64-msvc | 2.12.3 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli | 2.12.4 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-darwin-arm64 | 2.12.4 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-darwin-x64 | 2.12.4 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-arm-gnueabihf | 2.12.4 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-arm64-gnu | 2.12.4 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-arm64-musl | 2.12.4 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-riscv64-gnu | 2.12.4 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-x64-gnu | 2.12.4 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-x64-musl | 2.12.4 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-win32-arm64-msvc | 2.12.4 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-win32-ia32-msvc | 2.12.4 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-win32-x64-msvc | 2.12.4 | development | Apache-2.0 OR MIT |
 | @tauri-apps/plugin-clipboard-manager | 2.5.0 | runtime | MIT OR Apache-2.0 |
 | @tauri-apps/plugin-dialog | 2.8.3 | runtime | MIT OR Apache-2.0 |
 | commander | 15.0.0 | runtime | MIT |
@@ -47,7 +47,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | echarts | 6.1.0 | runtime | Apache-2.0 |
 | fdir | 6.5.0 | development | MIT |
 | fsevents | 2.3.3 | development | MIT |
-| katex | 0.19.0 | runtime | MIT |
+| katex | 0.19.1 | runtime | MIT |
 | lightningcss | 1.33.0 | development | MPL-2.0 |
 | lightningcss-android-arm64 | 1.33.0 | development | MPL-2.0 |
 | lightningcss-darwin-arm64 | 1.33.0 | development | MPL-2.0 |
@@ -63,13 +63,13 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | nanoid | 3.3.20 | development | MIT |
 | picocolors | 1.1.1 | development | ISC |
 | picomatch | 4.0.7 | development | MIT |
-| postcss | 8.5.29 | development | MIT |
-| rolldown | 1.2.12 | development | MIT |
+| postcss | 8.5.31 | development | MIT |
+| rolldown | 1.2.15 | development | MIT |
 | source-map-js | 1.2.2 | development | BSD-3-Clause |
 | tinyglobby | 0.2.17 | development | MIT |
 | tslib | 2.3.0 | runtime | 0BSD |
 | typescript | 6.0.3 | development | Apache-2.0 |
-| vite | 8.3.4 | development | MIT |
+| vite | 8.3.5 | development | MIT |
 | zrender | 6.1.0 | runtime | BSD-3-Clause |
 
 ## Cargo dependencies (518)
