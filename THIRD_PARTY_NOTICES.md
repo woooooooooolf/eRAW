@@ -41,7 +41,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | @tauri-apps/cli-win32-ia32-msvc | 2.12.4 | development | Apache-2.0 OR MIT |
 | @tauri-apps/cli-win32-x64-msvc | 2.12.4 | development | Apache-2.0 OR MIT |
 | @tauri-apps/plugin-clipboard-manager | 2.5.0 | runtime | MIT OR Apache-2.0 |
-| @tauri-apps/plugin-dialog | 2.8.3 | runtime | MIT OR Apache-2.0 |
+| @tauri-apps/plugin-dialog | 2.8.4 | runtime | MIT OR Apache-2.0 |
 | commander | 15.0.0 | runtime | MIT |
 | detect-libc | 2.1.2 | development | Apache-2.0 |
 | echarts | 6.1.0 | runtime | Apache-2.0 |
