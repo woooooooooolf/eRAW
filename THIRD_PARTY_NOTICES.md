@@ -369,7 +369,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | regex-automata | 0.4.16 | MIT OR Apache-2.0 |
 | regex-syntax | 0.8.11 | MIT OR Apache-2.0 |
 | reqwest | 0.13.5 | MIT OR Apache-2.0 |
-| rfd | 0.16.0 | MIT |
+| rfd | 0.17.2 | MIT |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
 | rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
@@ -434,7 +434,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | tauri-macros | 2.7.4 | Apache-2.0 OR MIT |
 | tauri-plugin | 2.7.2 | Apache-2.0 OR MIT |
 | tauri-plugin-clipboard-manager | 2.5.0 | Apache-2.0 OR MIT |
-| tauri-plugin-dialog | 2.8.3 | Apache-2.0 OR MIT |
+| tauri-plugin-dialog | 2.8.4 | Apache-2.0 OR MIT |
 | tauri-plugin-fs | 2.7.1 | Apache-2.0 OR MIT |
 | tauri-plugin-opener | 2.7.2 | Apache-2.0 OR MIT |
 | tauri-runtime | 2.12.2 | Apache-2.0 OR MIT |
