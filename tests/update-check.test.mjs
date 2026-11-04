@@ -23,7 +23,7 @@ const appClass = sourceFile.statements.find(node => ts.isClassDeclaration(node) 
 const method = name => appClass.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(sourceFile) === name).getText(sourceFile);
 const viewSource = `
 const LATEST_RELEASE_URL = ${JSON.stringify(LATEST_RELEASE_URL)};
-const VERSION = "0.8.0", BUILD_TIME_SOURCE = "test", erawIconUrl = "icon.svg";
+const VERSION = "0.9.0", BUILD_TIME_SOURCE = "test", erawIconUrl = "icon.svg";
 const formatDateTime = value => value;
 const updateCheckMessage = globalThis.__updateTestMessage;
 const t = (key, values) => key + (values?.version ? ":" + values.version : "");
