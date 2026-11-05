@@ -11,11 +11,10 @@
 - Dependabot 漏洞提醒和自动安全更新已启用；npm、Cargo 与 GitHub Actions 每周检查更新。
 - 仓库保持维护优先：鼓励缺陷、兼容性、安全、测试和文档改进，不主动扩张架构、处理语义和用户行为。
 
-### 已知依赖告警
+### 依赖安全修复记录
 
 - 公开前 RustSec 审计发现 `plist 1.8.0` 引入的 `quick-xml 0.38.4` 受到高危告警 `RUSTSEC-2026-0194` 和 `RUSTSEC-2026-0195` 影响。锁文件已将 `plist` 更新到 `1.10.0`，并统一使用已修复的 `quick-xml 0.41.0`；后续依赖更新不得重新引入 `quick-xml 0.38.x`。
-- `glib 0.18.5` 的中危告警 `GHSA-wrw7-89jp-8q8g` 保持开启。该依赖由 Tauri 的 Linux GTK 运行时链路引入，不进入官方 Windows x64 Release；当前 Tauri 约束为 `gtk ^0.18`，无法单独升级到已修复的 `glib >= 0.20.0`。
-- 不关闭或忽略该告警；持续跟踪 Tauri 上游依赖更新。在提供任何 Linux Release 前，必须重新评估并消除该风险。
+- `glib 0.18.5` 的 `GHSA-wrw7-89jp-8q8g` 已通过仓库内源码回移上游最小补丁修复，依赖链由 Cargo patch 统一接入，并由 Linux Debug/Release 回归和源码完整性校验持续验证。来源、验证方式和维护规则见 [第三方依赖补丁](DEPENDENCY_PATCHES.md)。此项不再列为待解决告警或 Linux 发布阻碍；不改变后续依赖安全审计要求。
 
 ## 切换为公开后立即执行
 

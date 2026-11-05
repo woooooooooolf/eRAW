@@ -45,6 +45,7 @@ const rustPackages = cargoMetadata.packages
     version: metadata.version,
     license: metadata.license ?? "NOASSERTION",
     scope: "locked dependency",
+    local: metadata.source === null,
     directory: dirname(metadata.manifest_path),
     licenseFile: metadata.license_file,
   }))
@@ -67,9 +68,13 @@ const markdown = [
   "",
   `## Cargo dependencies (${rustPackages.length})`,
   "",
+  ...(rustPackages.some(entry => entry.local) ? [
+    "Local source dependencies include reviewed repository patches; see [dependency patch provenance](docs/DEPENDENCY_PATCHES.md).",
+    "",
+  ] : []),
   "| Crate | Version | Declared license |",
   "| --- | --- | --- |",
-  ...rustPackages.map((entry) => `| ${escapeCell(entry.name)} | ${escapeCell(entry.version)} | ${escapeCell(entry.license)} |`),
+  ...rustPackages.map((entry) => `| ${escapeCell(entry.name)} | ${escapeCell(entry.version)}${entry.local ? " (local source)" : ""} | ${escapeCell(entry.license)} |`),
   "",
 ].join("\n");
 

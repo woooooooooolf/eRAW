@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { validateReleaseNotes } from "../scripts/validate-release-notes.mjs";
 
@@ -132,7 +133,36 @@ test("workflows pin actions and protect build and release integrity", () => {
   assert.match(publicationSource, /Secret scanning/);
   assert.match(publicationSource, /enforce_admins=false/);
   assert.match(publicationSource, /GHSA-wrw7-89jp-8q8g/);
-  assert.match(publicationSource, /不关闭或忽略该告警/);
+  assert.match(publicationSource, /DEPENDENCY_PATCHES\.md/);
+});
+
+test("glib security backport is pinned to the verified local source and intact", async () => {
+  assert.match(cargoSource, /\[patch\.crates-io\][\s\S]*glib = \{ path = "vendor\/glib" \}/);
+  const glibLock = cargoLockSource.split("[[package]]").find(section => /\nname = "glib"\r?\n/.test(section));
+  assert.ok(glibLock);
+  assert.match(glibLock, /version = "0\.18\.5"/);
+  assert.doesNotMatch(glibLock, /source\s*=|checksum\s*=/);
+  const manifest = JSON.parse(await read("src-tauri/vendor/glib-integrity.json"));
+  assert.equal(manifest.crateSha256, "233daaf6e83ae6a12a52055f568f9d7cf4671dabb78ff9560ab6da230ce00ee5");
+  assert.equal(manifest.upstreamFix, "05dff0ee696f9bcd8617cd48c4b812d046d440cb");
+  const directory = new URL("src-tauri/vendor/glib/", root);
+  const actualPaths = [];
+  async function walk(prefix = "") {
+    for (const item of await readdir(new URL(prefix, directory), { withFileTypes: true })) {
+      const path = prefix + item.name;
+      if (item.isDirectory()) await walk(path + "/");
+      else actualPaths.push(path);
+    }
+  }
+  await walk();
+  assert.deepEqual(actualPaths.sort(), manifest.files.map(file => file.path).sort());
+  for (const file of manifest.files) {
+    const bytes = await readFile(new URL(file.path, directory));
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), file.sha256, file.path);
+  }
+  const patchedSource = await read("src-tauri/vendor/glib/src/variant_iter.rs");
+  assert.match(patchedSource, /let mut p: \*mut libc::c_char = std::ptr::null_mut\(\);/);
+  assert.match(patchedSource, /\n\s*&mut p,/);
 });
 
 test("release notes accept Chinese lists and reject titles, missing sections and generated prose", () => {

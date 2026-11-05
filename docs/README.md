@@ -15,6 +15,7 @@
 | [WORKFLOW.md](WORKFLOW.md) | 需求评审、分支、提交、版本、构建与发布流程 |
 | [FONT_POLICY.md](FONT_POLICY.md) | 字体选择与不分发字体文件的许可策略 |
 | [PUBLICATION.md](PUBLICATION.md) | 仓库公开前检查与公开后 GitHub 安全配置 |
+| [DEPENDENCY_PATCHES.md](DEPENDENCY_PATCHES.md) | 第三方依赖安全补丁的来源、验证及维护规则 |
 
 ## 当前工程快照
 

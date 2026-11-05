@@ -28,3 +28,10 @@ tauri = { version = "2.12", features = [] }
 tauri-plugin-clipboard-manager = "2.5"
 tauri-plugin-dialog = "2.8"
 tauri-plugin-opener = "2.7"
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+glib = "0.18.5"
+
+# Upstream gtk-rs-core#1343 backport; see docs/DEPENDENCY_PATCHES.md.
+[patch.crates-io]
+glib = { path = "vendor/glib" }

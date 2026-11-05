@@ -74,6 +74,8 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 
 ## Cargo dependencies (519)
 
+Local source dependencies include reviewed repository patches; see [dependency patch provenance](docs/DEPENDENCY_PATCHES.md).
+
 | Crate | Version | Declared license |
 | --- | --- | --- |
 | adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 |
@@ -216,7 +218,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | getrandom | 0.4.3 | MIT OR Apache-2.0 |
 | gio | 0.18.4 | MIT |
 | gio-sys | 0.18.1 | MIT |
-| glib | 0.18.5 | MIT |
+| glib | 0.18.5 (local source) | MIT |
 | glib-macros | 0.18.5 | MIT |
 | glib-sys | 0.18.1 | MIT |
 | glob | 0.3.4 | MIT OR Apache-2.0 |
