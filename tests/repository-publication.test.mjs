@@ -55,7 +55,7 @@ const packageJson = JSON.parse(packageSource);
 const tauriConfig = JSON.parse(tauriSource);
 
 test("public package metadata and application versions stay synchronized", () => {
-  assert.equal(packageJson.version, "0.9.0");
+  assert.equal(packageJson.version, "1.0.0");
   assert.equal(packageJson.license, "GPL-3.0-or-later");
   assert.equal(packageJson.repository.url, "git+https://github.com/woooooooooolf/eRAW.git");
   assert.equal(tauriConfig.version, packageJson.version);

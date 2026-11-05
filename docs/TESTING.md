@@ -150,3 +150,10 @@ Rust 测试覆盖领域语义、文档会话与 CLI 契约，重点分为：
 - Windows EXE 构建、7 项 CLI/skill、站点构建，以及 Linux DEB/AppImage 构建、包内容/运行入口检查和 7 项 CLI/skill 通过。删除未支持平台的图标未影响 Windows/Linux 构建。
 - WSLg 和 Xvfb 真实 WebView 冒烟均通过，新增设置打开/取消、关于页初始状态、离线许可证打开与返回验证；已有帧切换、七语机制的英文/德文抽查、独立手册及关闭文档检查继续通过。上述结果不扩大原生 GNOME、多 GPU、文件对话框和剪贴板的验收范围。
 - 共享 Linux 安装助手通过 bash 语法检查，WebDriver 子命令实际执行成功；CI/Release 经 actionlint 校验。统计报告预留模块和完整 glib 补丁源码未修改。
+
+## V1.0.0 发布前验证（2026-11-06）
+
+- 版本标识同步为 `1.0.0`，包含 npm/Cargo 锁文件、Tauri 配置、关于页和七语内置手册；中文发布说明通过 Changed/Fixed/Docs 格式校验。
+- Windows 73 项 Rust、149 项前端分组测试、TypeScript、第三方清单一致性、Release EXE 构建和 7 项真实 CLI/skill 测试通过。
+- Ubuntu 24.04 WSL 的 72 项应用 Rust 测试、3 项 glib 集成测试、DEB/AppImage 构建、包元数据/入口验证和 7 项 CLI/skill 通过；Xvfb 原生 WebView 验证 RAW 渲染、帧切换、英文/德文、设置、关于/离线许可证、手册和关闭文档通过。
+- 发布提交仍须经远端 CI 验证，再推送 V1.0.0 标签由 Release 工作流构建与发布；最终以远端发布产物的名称、哈希与来源证明核验为准。原生 GNOME、多 GPU、系统文件对话框和图像剪贴板的既有验证边界继续保留。
