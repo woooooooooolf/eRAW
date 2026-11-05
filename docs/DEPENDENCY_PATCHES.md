@@ -22,6 +22,6 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml
 cargo test --locked --release --manifest-path src-tauri/Cargo.toml --test glib_variant_str_iter
 ```
 
-该项在当前源码中按已修复维护，不再作为待解决缺陷或 Linux 发布阻碍。GitHub 的版本范围识别未必能理解本地回移；若需人工关闭告警，应说明实际回移、提交与测试依据，不称其为误报，也不宣称注册表原版 0.18.5 已修复。不配置全局审计忽略规则，不关闭后续漏洞提醒。
+该项在当前源码中按已修复维护，不再作为待解决缺陷或 Linux 发布阻碍。修复提交 [`178fc54`](https://github.com/woooooooooolf/eRAW/commit/178fc549ba345af8033019dc8fab84d0110cf16c) 推送后，GitHub 于 2026-11-05 自动将[告警 #2](https://github.com/woooooooooolf/eRAW/security/dependabot/2) 标记为 `fixed`，无需人工 dismiss。注册表原版 0.18.5 仍受影响；实际修复依据是回移代码及 Debug/Release 回归，不能仅凭告警状态证明安全。不配置全局审计忽略规则，不关闭后续漏洞提醒。
 
 未来升级 GTK/Tauri 时复核补丁解析和安全公告；只有上游兼容版本包含同等修复且回归通过后，才移除本地副本、完整性清单和补丁配置。新发现的漏洞仍需单独评估，不能以本补丁覆盖。

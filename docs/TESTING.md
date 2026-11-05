@@ -133,3 +133,4 @@ Rust 测试覆盖领域语义、文档会话与 CLI 契约，重点分为：
 - 负对照使用独立临时测试工程，对未修复的注册表原版运行同一组 Release 回归；原版在字符串迭代时以 `SIGSEGV`（signal 11，测试命令退出 101）失败，证明用例能实际暴露缺陷。负对照未修改应用锁文件或正式补丁配置。
 - Windows 上 72 项 Rust、144 项前端和 7 项真实 Release EXE CLI/skill 测试通过；TypeScript、前端构建、独立 Tauri Release EXE 构建和第三方清单校验通过。
 - Linux CI 持续运行相同 Debug/Release 验证。上述验证不代表已完成 Linux 图形桌面、GPU、安装包或多发行版验收，也不创建正式 Linux Release。
+- 修复提交推送后，GitHub 自动将对应 Dependabot 告警 #2 标记为 `fixed`；旧发布说明中的“仍未解决”标记同步更新为后续源码已修复，历史发布资产未替换。
