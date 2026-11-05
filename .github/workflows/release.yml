@@ -83,6 +83,10 @@ jobs:
       - name: Run Rust tests
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml
 
+      - name: Run optimized Linux regression
+        if: matrix.platform == 'linux'
+        run: cargo test --locked --release --manifest-path src-tauri/Cargo.toml --test glib_variant_str_iter
+
       - name: Build release artifacts
         run: ${{ matrix.command }}
 
@@ -93,10 +97,9 @@ jobs:
         if: matrix.platform == 'linux'
         run: node scripts/verify-linux-packages.mjs
 
-      - name: Verify optimized Linux regression and real WebView
+      - name: Verify real Linux WebView
         if: matrix.platform == 'linux'
         run: |
-          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --test glib_variant_str_iter
           bash scripts/setup-linux.sh webdriver
           ERAW_TEST_OUTPUT=/tmp/eraw-linux-smoke xvfb-run -a node tests/linux-webdriver.mjs
 

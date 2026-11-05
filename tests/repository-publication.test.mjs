@@ -109,6 +109,10 @@ test("workflows pin actions and protect build and release integrity", () => {
   assert.match(ciSource, /npm\.cmd run build:site/);
   assert.ok(ciSource.indexOf("run: npm.cmd run release") < ciSource.indexOf("run: npm.cmd run test:cli"));
   assert.ok(releaseSource.indexOf("name: Build release artifacts") < releaseSource.indexOf("run: npm run test:cli"));
+  const buildStep = releaseSource.indexOf("name: Build release artifacts");
+  assert.ok(releaseSource.indexOf("name: Run optimized Linux regression") < buildStep);
+  assert.ok(buildStep < releaseSource.indexOf("name: Verify real Linux WebView"));
+  assert.ok(releaseSource.lastIndexOf("cargo test ") < buildStep, "Cargo integration tests must not replace the production binary after bundling");
   assert.match(releaseSource, /platform: windows/);
   assert.match(releaseSource, /platform: linux/);
   assert.match(releaseSource, /runner: ubuntu-24\.04/);
