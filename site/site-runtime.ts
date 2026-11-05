@@ -47,17 +47,17 @@ async function resolveWindowsPackageDownload(): Promise<void> {
     if (response.ok) {
       const release = await response.json() as GitHubRelease;
       const assets = release.assets ?? [];
-      const packageAsset = assets.find((candidate) => (
+      const legacyPackageAsset = assets.find((candidate) => (
         typeof candidate.name === "string"
         && /windows-x64\.zip$/i.test(candidate.name)
         && typeof candidate.browser_download_url === "string"
       ));
-      const legacyExecutableAsset = assets.find((candidate) => (
+      const executableAsset = assets.find((candidate) => (
         typeof candidate.name === "string"
         && /windows-x64\.exe$/i.test(candidate.name)
         && typeof candidate.browser_download_url === "string"
       ));
-      const asset = packageAsset ?? legacyExecutableAsset;
+      const asset = executableAsset ?? legacyPackageAsset;
       if (asset && typeof asset.browser_download_url === "string") {
         downloadUrl = asset.browser_download_url;
       }

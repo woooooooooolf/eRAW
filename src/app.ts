@@ -1062,7 +1062,7 @@ export class ErawApp {
       <div id="update-check-result" class="about-update-result" role="status" aria-live="polite" hidden>
         <span id="update-check-message"></span>
         <div class="about-update-links">
-          <a id="update-download" data-i18n="update.download" target="_blank" rel="noopener noreferrer" hidden>下载 ZIP ↗</a>
+          <a id="update-download" data-i18n="update.download" target="_blank" rel="noopener noreferrer" hidden>下载 EXE ↗</a>
           <a id="update-release" data-i18n="update.release" href="${LATEST_RELEASE_URL}" target="_blank" rel="noopener noreferrer" hidden>前往 GitHub ↗</a>
         </div>
       </div>

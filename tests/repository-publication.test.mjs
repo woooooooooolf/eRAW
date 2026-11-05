@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import { validateReleaseNotes } from "../scripts/validate-release-notes.mjs";
 
 const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
@@ -110,15 +111,16 @@ test("workflows pin actions and protect build and release integrity", () => {
     assert.match(workflow, /run: npm\.cmd run test:cli/);
     assert.equal([...workflow.matchAll(/run: npm\.cmd run test:cli/g)].length, 1);
   }
-  assert.match(releaseSource, /SHA256SUMS/);
-  assert.match(releaseSource, /dependency-graph\/sbom/);
-  assert.match(releaseSource, /THIRD_PARTY_LICENSES\.txt/);
-  assert.match(releaseSource, /eRAW-\$tag-windows-x64\.zip/);
-  assert.match(releaseSource, /Compress-Archive/);
-  assert.match(releaseSource, /gh release (?:upload|create) \$tag \$env:RELEASE_PACKAGE/);
-  assert.doesNotMatch(releaseSource, /gh release (?:upload|create) \$tag \$env:RELEASE_(?:ASSET|CHECKSUMS|SBOM|LICENSES)/);
+  assert.match(releaseSource, /eRAW-\$tag-windows-x64\.exe/);
+  assert.match(releaseSource, /\$checksumPath = "\$executablePath\.sha256"/);
+  assert.match(releaseSource, /Get-FileHash -Algorithm SHA256/);
+  assert.match(releaseSource, /gh release upload \$tag \$env:RELEASE_EXECUTABLE \$env:RELEASE_CHECKSUM/);
+  assert.match(releaseSource, /gh release create \$tag \$env:RELEASE_EXECUTABLE \$env:RELEASE_CHECKSUM/);
+  assert.match(releaseSource, /--notes-file \$notesPath/);
+  assert.match(releaseSource, /node scripts\/validate-release-notes\.mjs/);
+  assert.doesNotMatch(releaseSource, /Compress-Archive|\.zip|dependency-graph\/sbom|THIRD_PARTY_LICENSES|--generate-notes/);
   assert.match(releaseSource, /attest-build-provenance@[0-9a-f]{40}/);
-  assert.match(releaseSource, /subject-path:\s*\$\{\{ env\.RELEASE_PACKAGE \}\}/);
+  assert.match(releaseSource, /subject-path:\s*\$\{\{ env\.RELEASE_EXECUTABLE \}\}/);
   assert.match(releaseSource, /repository\.visibility == 'public'/);
   assert.match(pagesSource, /pages:\s*write/);
   assert.match(pagesSource, /id-token:\s*write/);
@@ -131,4 +133,19 @@ test("workflows pin actions and protect build and release integrity", () => {
   assert.match(publicationSource, /enforce_admins=false/);
   assert.match(publicationSource, /GHSA-wrw7-89jp-8q8g/);
   assert.match(publicationSource, /不关闭或忽略该告警/);
+});
+
+test("release notes accept Chinese lists and reject titles, missing sections and generated prose", () => {
+  const valid = "### Changed\n\n- 调整 EXE 发布方式。\n\n### Fixed\n\n- 无。\n\n### Docs\n\n- 更新 CLI 文档。\n";
+  assert.doesNotThrow(() => validateReleaseNotes(valid));
+  assert.doesNotThrow(() => validateReleaseNotes("\uFEFF" + valid.replaceAll("\n", "\r\n")));
+  for (const invalid of [
+    "", "# eRAW V1.0.0\n" + valid, "更新说明\n" + valid,
+    valid.replace("### Fixed\n\n- 无。\n\n", ""),
+    valid.replace("- 无。", ""),
+    valid.replace("### Fixed", "### Docs"),
+    valid.replace("- 无。", "No fixes."),
+    valid.replace("- 无。", "- No fixes."),
+    valid + "\n完整变更：https://example.com\n",
+  ]) assert.throws(() => validateReleaseNotes(invalid));
 });

@@ -117,7 +117,7 @@ test("an unresponsive IPC request has a deadline and late completion cannot revi
 test("available links reflect verified targets and disappear during an explicit new check", async () => {
   const result = { status: "available", version: "V0.9.0", downloadAvailable: true,
     releaseUrl: "https://github.com/woooooooooolf/eRAW/releases/tag/V0.9.0",
-    downloadUrl: "https://github.com/woooooooooolf/eRAW/releases/download/V0.9.0/eRAW-V0.9.0-windows-x64.zip" };
+    downloadUrl: "https://github.com/woooooooooolf/eRAW/releases/download/V0.9.0/eRAW-V0.9.0-windows-x64.exe" };
   const about = view();
   let next = Promise.resolve(result);
   about.updateChecker = new ManualUpdateChecker(() => next, () => about.renderUpdateCheck());

@@ -119,7 +119,7 @@ test("both locales use replaceable theme captures and a release-resolved x64 dow
   assert.match(runtimeSource, /api\.github\.com\/repos\/woooooooooolf\/eRAW\/releases\/latest/);
   assert.match(runtimeSource, /windows-x64\\\.zip/);
   assert.match(runtimeSource, /windows-x64\\\.exe/);
-  assert.match(runtimeSource, /packageAsset \?\? legacyExecutableAsset/);
+  assert.match(runtimeSource, /executableAsset \?\? legacyPackageAsset/);
   assert.match(`${zhHtmlSource}\n${enHtmlSource}`, /data-download-package/);
   assert.match(runtimeSource, /LATEST_RELEASE_URL/);
   assert.match(styleSource, /perspective: 1800px/);

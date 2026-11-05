@@ -159,7 +159,7 @@ impl HeaderTransport for HttpTransport {
                 retry_after: Some(retry_after),
             });
         }
-        // Never consume HTML, release descriptions, or ZIP bytes.
+        // Never consume HTML, release descriptions, or executable bytes.
         Ok(Headers {
             status,
             location: response
@@ -268,13 +268,15 @@ async fn latest_version(
     Err(FailureReason::InvalidResponse.into())
 }
 
-async fn zip_available(transport: &impl HeaderTransport, url: &Url) -> Result<bool, Failure> {
+async fn executable_available(transport: &impl HeaderTransport, url: &Url) -> Result<bool, Failure> {
     let response = request_headers(transport, url).await?;
     if response.status == StatusCode::OK {
         return Ok(response.content_type.is_some_and(|value| {
             matches!(
                 value.split(';').next().unwrap_or("").trim(),
-                "application/zip" | "application/octet-stream"
+                "application/vnd.microsoft.portable-executable"
+                    | "application/x-msdownload"
+                    | "application/octet-stream"
             )
         }));
     }
@@ -309,12 +311,12 @@ async fn discover(
     let candidate = platform.map(|platform| {
         let mut url = release.clone();
         url.set_path(&format!(
-            "{REPOSITORY_PATH}releases/download/{tag}/eRAW-{tag}-{platform}.zip"
+            "{REPOSITORY_PATH}releases/download/{tag}/eRAW-{tag}-{platform}.exe"
         ));
         url
     });
     let (download, retry_after) = if let Some(ref url) = candidate {
-        match tokio::time::timeout_at(deadline, zip_available(transport, url)).await {
+        match tokio::time::timeout_at(deadline, executable_available(transport, url)).await {
             Ok(Ok(true)) => (candidate, None),
             Ok(Err(error)) => (None, error.retry_after),
             _ => (None, None),
@@ -488,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    fn newer_numeric_version_checks_exact_zip_without_fetching_html_cdn_or_api() {
+    fn newer_numeric_version_checks_exact_executable_without_fetching_html_cdn_or_api() {
         let transport = ScriptedTransport::new(vec![
             redirect(&format!("{REPOSITORY_PATH}releases/tag/V0.10.0")),
             redirect(
@@ -497,7 +499,7 @@ mod tests {
         ]);
         let (result, target, _) = discover_test(&transport, "0.9.9").unwrap();
         let target = target.unwrap();
-        let expected = "https://github.com/woooooooooolf/eRAW/releases/download/V0.10.0/eRAW-V0.10.0-windows-x64.zip";
+        let expected = "https://github.com/woooooooooolf/eRAW/releases/download/V0.10.0/eRAW-V0.10.0-windows-x64.exe";
         assert_eq!(target.download.unwrap().as_str(), expected);
         assert!(matches!(
             result,
@@ -699,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    fn native_transport_returns_headers_without_waiting_for_html_or_zip_body() {
+    fn native_transport_returns_headers_without_waiting_for_html_or_executable_body() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let (done, finish) = mpsc::channel();

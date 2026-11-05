@@ -99,9 +99,39 @@ npm.cmd run release
 - `.github/workflows/ci.yml` 在 `master` 推送、面向 `master` 的 Pull Request 和手动触发时运行前后端检查、测试、生产构建、独立 Release EXE 构建与 CLI 进程测试；发布工作流在打包前同样验证 CLI。
 - 发布标签使用 `Vx.y.z` 格式，并且必须与仓库中的软件版本严格一致。
 - 推送发布标签后，`.github/workflows/release.yml` 自动运行完整检查和 Tauri Release 构建，创建对应的 GitHub Release。
-- 后续 Windows x64 Release 只上传 `eRAW-Vx.y.z-windows-x64.zip`；包内根目录包含同名 EXE、SHA-256 清单、SPDX SBOM 与第三方许可证文本。V0.6.0 及更早版本的现有资产保持不变。
+- Release 资产和正文必须遵循下方的发布资产与说明约定；已发布版本保留原样。
 - 普通提交和未推送的本地标签不会创建 GitHub Release。
 - 测试构建通过不代表已发布；正式发布需用户明确授权，并按累计变更确定版本、更新说明和发布标签。
+
+## 发布资产与说明约定
+
+以下规则从下一次发布起生效，后续迭代和新增平台均须遵循；不重打包历史 Release，也不为这项流程调整单独升版或创建发布。
+
+- 每个平台/架构仅发布两类成果物：原始可分发文件，以及对应的 SHA-256 校验文件；不打包 ZIP、TAR 等压缩包，不附加 SBOM、许可证文本或来源证明文件作为 Release 下载资产。
+- 原始成果物命名为 `名称-版本-平台-架构.后缀`，版本沿用包含 `V` 的标签；校验文件在完整文件名后追加 `.sha256`，即 `名称-版本-平台-架构.后缀.sha256`。
+- 当前 Windows x64 的两个资产为 `eRAW-Vx.y.z-windows-x64.exe` 和 `eRAW-Vx.y.z-windows-x64.exe.sha256`。校验文件使用 ASCII，内容格式为“小写 SHA-256、两个空格、成果物文件名”，不包含目录。
+- GitHub 自动提供的 Source code 下载入口不属于平台构建资产；GitHub 构建来源证明附着于原始成果物，不额外上传文件。仓库中的第三方许可证清单及其构建校验继续保留。
+- 准备发布时，汇总相对上一正式版本的累计变更，编写 `docs/releases/Vx.y.z.md`。Release 工作流校验并通过 `--notes-file` 原样读取该文件，禁止使用 GitHub 自动生成说明。
+- 正文不含主标题、开场段落、附加章节或多语言版本；只按顺序使用 `### Changed`、`### Fixed`、`### Docs` 三个小标题，标题下使用 Markdown 无序列表。每条以 `- ` 开头且独占一行；没有对应变更时写 `- 无。`。
+- 列表正文统一简体中文；eRAW、GitHub、CLI、RAW 等关键名称、缩写及代码标识保持英文，无须翻译成其他语言。GUI 和 CLI 的语言规则不受此约定影响。
+- 发布前执行 `node scripts/validate-release-notes.mjs docs/releases/Vx.y.z.md`；缺失文件、缺失或乱序章节、主标题、非列表正文以及不含中文的条目会阻断发布。简繁体和内容准确性由发布前人工审核确认。
+- GitHub Release 自身的名称仍使用 `eRAW Vx.y.z`，与正文不含主标题的要求相互独立。
+
+发布说明格式示例（按实际变更替换条目）：
+
+```markdown
+### Changed
+
+- 调整 Windows 发布成果物为独立 EXE 和对应的 `.exe.sha256`。
+
+### Fixed
+
+- 修复 CLI 参数校验问题。
+
+### Docs
+
+- 更新发布流程文档。
+```
 
 ## 发布验收
 

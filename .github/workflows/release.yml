@@ -46,6 +46,12 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      - name: Validate release notes
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/validate-release-notes.mjs "docs/releases/$env:RELEASE_TAG.md"
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
@@ -83,51 +89,29 @@ jobs:
       - name: Verify Release CLI feedback and exit status
         run: npm.cmd run test:cli
 
-      - name: Prepare release package
+      - name: Prepare release assets
         shell: pwsh
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           $tag = $env:RELEASE_TAG
           $assetDirectory = "artifacts"
-          $packageDirectory = "$assetDirectory/package"
-          $packagePath = "$assetDirectory/eRAW-$tag-windows-x64.zip"
-          $executablePath = "$packageDirectory/eRAW-$tag-windows-x64.exe"
-          $licensePath = "$packageDirectory/THIRD_PARTY_LICENSES.txt"
-          $sbomPath = "$packageDirectory/eRAW-$tag.spdx.json"
-          $checksumPath = "$packageDirectory/eRAW-$tag-SHA256SUMS.txt"
+          $executablePath = "$assetDirectory/eRAW-$tag-windows-x64.exe"
+          $checksumPath = "$executablePath.sha256"
 
-          New-Item -ItemType Directory -Force -Path $packageDirectory | Out-Null
+          New-Item -ItemType Directory -Force -Path $assetDirectory | Out-Null
           Copy-Item -LiteralPath "src-tauri/target/release/eraw.exe" -Destination $executablePath
-          npm.cmd run notices -- --licenses $licensePath
-          if ($LASTEXITCODE -ne 0) {
-            throw "Third-party license collection failed."
-          }
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $executablePath).Hash.ToLowerInvariant()
+          "$hash  $(Split-Path -Leaf $executablePath)" | Set-Content -LiteralPath $checksumPath -Encoding ascii
 
-          $sbomResponse = gh api "repos/$env:GITHUB_REPOSITORY/dependency-graph/sbom" | ConvertFrom-Json
-          if ($LASTEXITCODE -ne 0 -or $null -eq $sbomResponse.sbom) {
-            throw "GitHub dependency SBOM export failed."
-          }
-          $sbomResponse.sbom | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $sbomPath -Encoding utf8
+          "RELEASE_EXECUTABLE=$executablePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_CHECKSUM=$checksumPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-          @($executablePath, $licensePath, $sbomPath) | ForEach-Object {
-            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_).Hash.ToLowerInvariant()
-            "$hash  $(Split-Path -Leaf $_)"
-          } | Set-Content -LiteralPath $checksumPath -Encoding ascii
-
-          Compress-Archive -Path "$packageDirectory/*" -DestinationPath $packagePath -CompressionLevel Optimal -Force
-          if (-not (Test-Path -LiteralPath $packagePath)) {
-            throw "Release package creation failed."
-          }
-
-          "RELEASE_PACKAGE=$packagePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Attest release package
+      - name: Attest release executable
         if: github.event.repository.visibility == 'public'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: ${{ env.RELEASE_PACKAGE }}
+          subject-path: ${{ env.RELEASE_EXECUTABLE }}
 
       - name: Create GitHub release
         shell: pwsh
@@ -136,16 +120,26 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           $tag = $env:RELEASE_TAG
-          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          $notesPath = "docs/releases/$tag.md"
+          $existing = gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets
 
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $env:RELEASE_PACKAGE --clobber --repo $env:GITHUB_REPOSITORY
+            $expectedNames = @((Split-Path -Leaf $env:RELEASE_EXECUTABLE), (Split-Path -Leaf $env:RELEASE_CHECKSUM))
+            $unexpected = ($existing | ConvertFrom-Json).assets | Where-Object { $_.name -cnotin $expectedNames }
+            if ($unexpected) {
+              throw "Existing release contains unexpected assets; published releases must not be repackaged."
+            }
+            gh release edit $tag --notes-file $notesPath --repo $env:GITHUB_REPOSITORY
+            if ($LASTEXITCODE -ne 0) {
+              throw "GitHub release notes update failed."
+            }
+            gh release upload $tag $env:RELEASE_EXECUTABLE $env:RELEASE_CHECKSUM --clobber --repo $env:GITHUB_REPOSITORY
           } else {
-            gh release create $tag $env:RELEASE_PACKAGE `
+            gh release create $tag $env:RELEASE_EXECUTABLE $env:RELEASE_CHECKSUM `
               --repo $env:GITHUB_REPOSITORY `
               --verify-tag `
               --title "eRAW $tag" `
-              --generate-notes
+              --notes-file $notesPath
           }
 
           if ($LASTEXITCODE -ne 0) {
