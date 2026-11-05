@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/woooooooooolf/eRAW/actions/workflows/ci.yml"><img src="https://github.com/woooooooooolf/eRAW/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-2ea44f?style=flat-square" alt="授權條款"></a>
-  <img src="https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows / Linux">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&amp;logo=tauri&amp;logoColor=white" alt="Tauri 2"></a>
 </p>
 
@@ -66,7 +66,7 @@ Release EXE 目前未使用 Authenticode 簽章，Windows 可能顯示 SmartScre
 & '.\eRAW.exe' --skill
 ```
 
-在關於頁左下提供「檢查更新」。只有點擊才於背景讀取 GitHub Latest 的重新導向標頭，不使用 GitHub API 或解析發佈 HTML；啟動、開啟 RAW 及關於頁均不自動檢查。關閉關於後檢查繼續，重新開啟保留進行中或最終結果，僅在目前行程有效。網路逾時會結束檢查，不阻塞影像操作；確認相容 ZIP 後由使用者點擊，交給預設瀏覽器下載。
+在關於頁左下提供「檢查更新」。只有點擊才於背景讀取 GitHub Latest 的重新導向標頭，不使用 GitHub API 或解析發佈 HTML；啟動、開啟 RAW 及關於頁均不自動檢查。關閉關於後檢查繼續，重新開啟保留進行中或最終結果，僅在目前行程有效。網路逾時會結束檢查，不阻塞影像操作；確認相容發佈套件 後由使用者點擊，交給預設瀏覽器下載。
 
 僅重排的可逆性要求完整座標域對置換封閉、樣本全部可讀且沒有裁剪或有損位深映射；不保證還原原始檔案位元組。部分尺寸和 Phase 會在邊緣請求影像外像素。預覽及 CLI 預檢仍可使用並顯示處理邊界警告，預檢退出碼仍為 0；相關 Remosaic/RGB48 匯出拒絕不支援的範圍。請明確選擇內部裁剪或同色重建，程式不會自動改參數。同色重建屬於插值，仍需要所需顏色站點存在。
 
@@ -125,3 +125,7 @@ npm.cmd run release
 ## 授權條款
 
 eRAW 依 [GNU General Public License v3.0 or later](LICENSE) 發布。
+
+## Linux 支援
+
+Linux 首版面向 Ubuntu 24.04 LTS x64（GNOME），同時提供 DEB 和 AppImage，各自附帶同名 `.sha256`。DEB 安裝後使用 `eraw`；AppImage 執行前須設定執行權限。建置、安裝、WSL／自動化驗證與原生桌面驗收邊界見 [Linux 支援說明](docs/LINUX.md)。

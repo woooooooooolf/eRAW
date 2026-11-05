@@ -268,7 +268,7 @@ async fn latest_version(
     Err(FailureReason::InvalidResponse.into())
 }
 
-async fn executable_available(transport: &impl HeaderTransport, url: &Url) -> Result<bool, Failure> {
+async fn asset_available(transport: &impl HeaderTransport, url: &Url) -> Result<bool, Failure> {
     let response = request_headers(transport, url).await?;
     if response.status == StatusCode::OK {
         return Ok(response.content_type.is_some_and(|value| {
@@ -277,6 +277,8 @@ async fn executable_available(transport: &impl HeaderTransport, url: &Url) -> Re
                 "application/vnd.microsoft.portable-executable"
                     | "application/x-msdownload"
                     | "application/octet-stream"
+                    | "application/vnd.debian.binary-package"
+                    | "application/x-debian-package"
             )
         }));
     }
@@ -299,7 +301,7 @@ async fn executable_available(transport: &impl HeaderTransport, url: &Url) -> Re
 async fn discover(
     transport: &impl HeaderTransport,
     current: &Version,
-    platform: Option<&str>,
+    asset: Option<&str>,
     deadline: tokio::time::Instant,
 ) -> Result<(UpdateResult, Option<UpdateTarget>, Option<Duration>), Failure> {
     let (release, tag, version) = tokio::time::timeout_at(deadline, latest_version(transport))
@@ -308,15 +310,15 @@ async fn discover(
     if version <= *current {
         return Ok((UpdateResult::Current, None, None));
     }
-    let candidate = platform.map(|platform| {
+    let candidate = asset.map(|asset| {
         let mut url = release.clone();
         url.set_path(&format!(
-            "{REPOSITORY_PATH}releases/download/{tag}/eRAW-{tag}-{platform}.exe"
+            "{REPOSITORY_PATH}releases/download/{tag}/eRAW-{tag}-{asset}"
         ));
         url
     });
     let (download, retry_after) = if let Some(ref url) = candidate {
-        match tokio::time::timeout_at(deadline, executable_available(transport, url)).await {
+        match tokio::time::timeout_at(deadline, asset_available(transport, url)).await {
             Ok(Ok(true)) => (candidate, None),
             Ok(Err(error)) => (None, error.retry_after),
             _ => (None, None),
@@ -334,6 +336,19 @@ async fn discover(
         Some(UpdateTarget { release, download }),
         retry_after,
     ))
+}
+
+fn asset_for_target(os: &str, arch: &str, appimage: bool) -> Option<&'static str> {
+    match (os, arch, appimage) {
+        ("windows", "x86_64", _) => Some("windows-x64.exe"),
+        ("linux", "x86_64", true) => Some("linux-x64.AppImage"),
+        ("linux", "x86_64", false) => Some("linux-x64.deb"),
+        _ => None,
+    }
+}
+
+fn current_asset() -> Option<&'static str> {
+    asset_for_target(std::env::consts::OS, std::env::consts::ARCH, std::env::var_os("APPIMAGE").is_some())
 }
 
 async fn perform_check(state: &UpdateCheckState) -> UpdateResult {
@@ -364,9 +379,7 @@ async fn perform_check(state: &UpdateCheckState) -> UpdateResult {
     let result = match transport {
         Ok(Ok(Ok(transport))) => {
             let current = Version::parse(env!("CARGO_PKG_VERSION")).expect("application version");
-            let platform =
-                cfg!(all(target_os = "windows", target_arch = "x86_64")).then_some("windows-x64");
-            discover(&transport, &current, platform, deadline).await
+            discover(&transport, &current, current_asset(), deadline).await
         }
         Err(_) => Err(FailureReason::Timeout.into()),
         _ => Err(FailureReason::Network.into()),
@@ -461,6 +474,26 @@ mod tests {
         }
     }
 
+    #[test]
+    fn supported_targets_choose_the_matching_distribution_format() {
+        assert_eq!(asset_for_target("windows", "x86_64", false), Some("windows-x64.exe"));
+        assert_eq!(asset_for_target("linux", "x86_64", false), Some("linux-x64.deb"));
+        assert_eq!(asset_for_target("linux", "x86_64", true), Some("linux-x64.AppImage"));
+        assert_eq!(asset_for_target("linux", "aarch64", false), None);
+        assert_eq!(asset_for_target("macos", "x86_64", false), None);
+        for asset in ["linux-x64.deb", "linux-x64.AppImage"] {
+            let transport = ScriptedTransport::new(vec![
+                redirect(&format!("{REPOSITORY_PATH}releases/tag/V0.10.0")),
+                redirect("https://release-assets.githubusercontent.com/example"),
+            ]);
+            let (_, target, _) = tauri::async_runtime::block_on(discover(
+                &transport, &Version::parse("0.9.0").unwrap(), Some(asset),
+                tokio::time::Instant::now() + Duration::from_secs(1),
+            )).unwrap();
+            assert!(target.unwrap().download.unwrap().path().ends_with(asset));
+        }
+    }
+
     fn discover_test(
         transport: &impl HeaderTransport,
         current: &str,
@@ -468,7 +501,7 @@ mod tests {
         tauri::async_runtime::block_on(discover(
             transport,
             &Version::parse(current).unwrap(),
-            Some("windows-x64"),
+            Some("windows-x64.exe"),
             tokio::time::Instant::now() + Duration::from_secs(1),
         ))
     }
@@ -631,7 +664,7 @@ mod tests {
             let result = discover(
                 &transport,
                 &Version::parse("0.8.0").unwrap(),
-                Some("windows-x64"),
+                Some("windows-x64.exe"),
                 tokio::time::Instant::now() + Duration::from_millis(30),
             )
             .await;

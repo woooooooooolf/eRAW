@@ -6,51 +6,51 @@ on:
       - "V*.*.*"
 
 permissions:
-  contents: write
-  id-token: write
-  attestations: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build Windows x64 release
-    runs-on: windows-latest
-
+  build:
+    name: Build ${{ matrix.platform }} x64 release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-latest
+            command: npm run release
+          - platform: linux
+            runner: ubuntu-24.04
+            command: npm run release:linux
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_PLATFORM: ${{ matrix.platform }}
+      APPIMAGE_EXTRACT_AND_RUN: "1"
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Require a version tag
-        shell: pwsh
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-          RELEASE_REF_TYPE: ${{ github.ref_type }}
-        run: |
-          if ($env:RELEASE_REF_TYPE -ne "tag") {
-            throw "Release must run from a pushed tag."
-          }
-
-          $tag = $env:RELEASE_TAG
-          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if ($tag -cne "V$packageVersion") {
-            throw "Tag $tag does not match package version V$packageVersion."
-          }
 
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: package-lock.json
 
-      - name: Validate release notes
-        shell: pwsh
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: node scripts/validate-release-notes.mjs "docs/releases/$env:RELEASE_TAG.md"
+      - name: Require matching version tag and Chinese release notes
+        run: |
+          node -e 'const p=require("./package.json"); if(process.env.RELEASE_TAG !== "V"+p.version) throw Error("Tag must match package version")'
+          node scripts/validate-release-notes.mjs "docs/releases/$RELEASE_TAG.md"
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
@@ -62,86 +62,90 @@ jobs:
         with:
           workspaces: "src-tauri -> target"
 
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential pkg-config libdbus-1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2t64 xvfb xauth webkit2gtk-driver
+
       - name: Install frontend dependencies
-        run: npm.cmd ci
+        run: npm ci
 
       - name: Verify third-party dependency notices
-        shell: pwsh
         run: |
-          npm.cmd run notices
-          if ($LASTEXITCODE -ne 0) {
-            throw "Third-party notice generation failed."
-          }
+          npm run notices
           git diff --exit-code -- THIRD_PARTY_NOTICES.md
 
       - name: Check TypeScript
-        run: npm.cmd run check
+        run: npm run check
 
       - name: Run frontend tests
-        run: npm.cmd run test:frontend
+        run: npm run test:frontend
 
       - name: Run Rust tests
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml
 
-      - name: Build release executable
-        run: npm.cmd run release
+      - name: Build release artifacts
+        run: ${{ matrix.command }}
 
       - name: Verify Release CLI feedback and exit status
-        run: npm.cmd run test:cli
+        run: npm run test:cli
+
+      - name: Verify Linux packages
+        if: matrix.platform == 'linux'
+        run: node scripts/verify-linux-packages.mjs
+
+      - name: Verify optimized Linux regression and real WebView
+        if: matrix.platform == 'linux'
+        run: |
+          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --test glib_variant_str_iter
+          cargo install tauri-driver --version 2.1.0 --locked
+          ERAW_TEST_OUTPUT=/tmp/eraw-linux-smoke xvfb-run -a node tests/linux-webdriver.mjs
 
       - name: Prepare release assets
-        shell: pwsh
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          $tag = $env:RELEASE_TAG
-          $assetDirectory = "artifacts"
-          $executablePath = "$assetDirectory/eRAW-$tag-windows-x64.exe"
-          $checksumPath = "$executablePath.sha256"
+        run: node scripts/release-assets.mjs --platform "$RELEASE_PLATFORM"
 
-          New-Item -ItemType Directory -Force -Path $assetDirectory | Out-Null
-          Copy-Item -LiteralPath "src-tauri/target/release/eraw.exe" -Destination $executablePath
-          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $executablePath).Hash.ToLowerInvariant()
-          "$hash  $(Split-Path -Leaf $executablePath)" | Set-Content -LiteralPath $checksumPath -Encoding ascii
-
-          "RELEASE_EXECUTABLE=$executablePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "RELEASE_CHECKSUM=$checksumPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Attest release executable
+      - name: Attest release assets
         if: github.event.repository.visibility == 'public'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: ${{ env.RELEASE_EXECUTABLE }}
+          subject-path: |
+            artifacts/*.exe
+            artifacts/*.deb
+            artifacts/*.AppImage
 
-      - name: Create GitHub release
-        shell: pwsh
+      - name: Transfer verified release assets
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-${{ matrix.platform }}
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish complete release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Collect all verified assets
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: release-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          $tag = $env:RELEASE_TAG
-          $notesPath = "docs/releases/$tag.md"
-          $existing = gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets
-
-          if ($LASTEXITCODE -eq 0) {
-            $expectedNames = @((Split-Path -Leaf $env:RELEASE_EXECUTABLE), (Split-Path -Leaf $env:RELEASE_CHECKSUM))
-            $unexpected = ($existing | ConvertFrom-Json).assets | Where-Object { $_.name -cnotin $expectedNames }
-            if ($unexpected) {
-              throw "Existing release contains unexpected assets; published releases must not be repackaged."
-            }
-            gh release edit $tag --notes-file $notesPath --repo $env:GITHUB_REPOSITORY
-            if ($LASTEXITCODE -ne 0) {
-              throw "GitHub release notes update failed."
-            }
-            gh release upload $tag $env:RELEASE_EXECUTABLE $env:RELEASE_CHECKSUM --clobber --repo $env:GITHUB_REPOSITORY
-          } else {
-            gh release create $tag $env:RELEASE_EXECUTABLE $env:RELEASE_CHECKSUM `
-              --repo $env:GITHUB_REPOSITORY `
-              --verify-tag `
-              --title "eRAW $tag" `
-              --notes-file $notesPath
-          }
-
-          if ($LASTEXITCODE -ne 0) {
-            throw "GitHub release creation failed."
-          }
+        run: node scripts/publish-release.mjs

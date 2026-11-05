@@ -15,12 +15,13 @@
 | [WORKFLOW.md](WORKFLOW.md) | 需求评审、分支、提交、版本、构建与发布流程 |
 | [FONT_POLICY.md](FONT_POLICY.md) | 字体选择与不分发字体文件的许可策略 |
 | [PUBLICATION.md](PUBLICATION.md) | 仓库公开前检查与公开后 GitHub 安全配置 |
+| [LINUX.md](LINUX.md) | Linux 支持范围、构建、安装、验证和已知边界 |
 | [DEPENDENCY_PATCHES.md](DEPENDENCY_PATCHES.md) | 第三方依赖安全补丁的来源、验证及维护规则 |
 
 ## 当前工程快照
 
 - 当前开发版本：`V0.9.0`
-- 目标平台：Windows 优先；不受平台约束的部分尽量保持 Linux 兼容
+- 目标平台：Windows x64、Ubuntu 24.04 LTS x64（GNOME；Linux 首版提供 DEB/AppImage）
 - 桌面框架：Tauri 2
 - 前端：TypeScript、WebGL2、Canvas 2D、Apache ECharts、原生 HTML/CSS
 - 后端：Rust、只读内存映射、二进制 Tauri IPC

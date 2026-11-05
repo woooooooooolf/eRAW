@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-site/
+artifacts/
 .vite/
 src-tauri/target/
 src-tauri/gen/

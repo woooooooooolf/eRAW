@@ -72,7 +72,7 @@ Exit status:
   3  File or layout preflight failed
 
 Preflight checks parameters, file access, mapping and layout. It does not prove
-WebView2/WebGL availability, pixel correctness, or completed rendering.
+WebView/WebGL availability, pixel correctness, or completed rendering.
 A normal viewer stays running until closed; its exit status is not a ready signal.
 
 Examples:

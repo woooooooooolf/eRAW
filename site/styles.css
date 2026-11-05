@@ -106,3 +106,6 @@ kbd { padding: 2px 5px; border: 1px solid #afb8c1; border-bottom-width: 2px; bor
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: 0.01ms !important; }
 }
+
+.linux-downloads { margin: 16px 0 0; font-size: 14px; }
+.linux-downloads a { color: inherit; text-underline-offset: 3px; }

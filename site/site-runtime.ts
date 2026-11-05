@@ -35,11 +35,12 @@ export function configureSite(screenshots: {
     element.textContent = String(new Date().getFullYear());
   });
 
-  void resolveWindowsPackageDownload();
+  void resolveReleaseDownloads();
 }
 
-async function resolveWindowsPackageDownload(): Promise<void> {
+async function resolveReleaseDownloads(): Promise<void> {
   let downloadUrl = LATEST_RELEASE_URL;
+  const linuxUrls: Record<string, string> = {};
   try {
     const response = await fetch(LATEST_RELEASE_API, {
       headers: { Accept: "application/vnd.github+json" },
@@ -47,6 +48,12 @@ async function resolveWindowsPackageDownload(): Promise<void> {
     if (response.ok) {
       const release = await response.json() as GitHubRelease;
       const assets = release.assets ?? [];
+      for (const format of ["deb", "AppImage"]) {
+        const asset = assets.find(candidate => typeof candidate.name === "string"
+          && candidate.name.endsWith(`-linux-x64.${format}`)
+          && typeof candidate.browser_download_url === "string");
+        if (asset && typeof asset.browser_download_url === "string") linuxUrls[format] = asset.browser_download_url;
+      }
       const legacyPackageAsset = assets.find((candidate) => (
         typeof candidate.name === "string"
         && /windows-x64\.zip$/i.test(candidate.name)
@@ -67,6 +74,7 @@ async function resolveWindowsPackageDownload(): Promise<void> {
   }
 
   document.querySelectorAll<HTMLAnchorElement>("[data-download-package]").forEach((link) => {
-    link.href = downloadUrl;
+    const format = link.dataset.downloadPackage;
+    link.href = format === "deb" || format === "AppImage" ? linuxUrls[format] ?? LATEST_RELEASE_URL : downloadUrl;
   });
 }

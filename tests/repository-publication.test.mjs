@@ -107,21 +107,19 @@ test("workflows pin actions and protect build and release integrity", () => {
   assert.match(ciSource, /Verify third-party dependency notices/);
   assert.match(ciSource, /npm\.cmd run check:site/);
   assert.match(ciSource, /npm\.cmd run build:site/);
-  for (const workflow of [ciSource, releaseSource]) {
-    assert.ok(workflow.indexOf("run: npm.cmd run release") < workflow.indexOf("run: npm.cmd run test:cli"));
-    assert.match(workflow, /run: npm\.cmd run test:cli/);
-    assert.equal([...workflow.matchAll(/run: npm\.cmd run test:cli/g)].length, 1);
-  }
-  assert.match(releaseSource, /eRAW-\$tag-windows-x64\.exe/);
-  assert.match(releaseSource, /\$checksumPath = "\$executablePath\.sha256"/);
-  assert.match(releaseSource, /Get-FileHash -Algorithm SHA256/);
-  assert.match(releaseSource, /gh release upload \$tag \$env:RELEASE_EXECUTABLE \$env:RELEASE_CHECKSUM/);
-  assert.match(releaseSource, /gh release create \$tag \$env:RELEASE_EXECUTABLE \$env:RELEASE_CHECKSUM/);
-  assert.match(releaseSource, /--notes-file \$notesPath/);
+  assert.ok(ciSource.indexOf("run: npm.cmd run release") < ciSource.indexOf("run: npm.cmd run test:cli"));
+  assert.ok(releaseSource.indexOf("name: Build release artifacts") < releaseSource.indexOf("run: npm run test:cli"));
+  assert.match(releaseSource, /platform: windows/);
+  assert.match(releaseSource, /platform: linux/);
+  assert.match(releaseSource, /runner: ubuntu-24\.04/);
+  assert.match(releaseSource, /needs: build/);
+  assert.match(releaseSource, /node scripts\/release-assets\.mjs/);
+  assert.match(releaseSource, /node scripts\/publish-release\.mjs/);
+  assert.match(releaseSource, /node scripts\/verify-linux-packages\.mjs/);
   assert.match(releaseSource, /node scripts\/validate-release-notes\.mjs/);
   assert.doesNotMatch(releaseSource, /Compress-Archive|\.zip|dependency-graph\/sbom|THIRD_PARTY_LICENSES|--generate-notes/);
   assert.match(releaseSource, /attest-build-provenance@[0-9a-f]{40}/);
-  assert.match(releaseSource, /subject-path:\s*\$\{\{ env\.RELEASE_EXECUTABLE \}\}/);
+  assert.match(releaseSource, /artifacts\/\*\.AppImage/);
   assert.match(releaseSource, /repository\.visibility == 'public'/);
   assert.match(pagesSource, /pages:\s*write/);
   assert.match(pagesSource, /id-token:\s*write/);

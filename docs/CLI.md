@@ -131,10 +131,10 @@ calling console. It does not create an extra console window when launched normal
 Callers that need reliable output capture and exit status should use a process API
 with redirected streams. A shell may return immediately for a GUI executable.
 
-Preflight success does not prove WebView2/WebGL availability, image correctness,
+Preflight success does not prove WebView/WebGL availability, image correctness,
 completed rendering, or user acceptance. A successful normal launch stays running
 until the user closes it; its process exit is not a readiness signal. `--check`
-does not initialize WebView2. If a caller runs `--check` and then starts the viewer,
+does not initialize a WebView. If a caller runs `--check` and then starts the viewer,
 the viewer checks the file again, since it may have changed between invocations.
 
 ## Bundled AI skill
@@ -143,7 +143,7 @@ Run the actual distributed executable with `--skill` to print a self-contained
 English skill in Markdown with YAML frontmatter. It covers the input contract,
 preflight/correction workflow, asynchronous invocation, source-file lifetime,
 and readiness evidence. This standalone query takes no image parameters, opens
-no window, does not initialize WebView2, and changes no preferences or AI
+no window, does not initialize a WebView, and changes no preferences or AI
 configuration. Do not combine it with `--check` or other options.
 
 ```powershell
@@ -210,8 +210,9 @@ npm.cmd run release
 npm.cmd run test:cli
 ```
 
-Windows is the validated target. Portable parsing and non-Windows console handling
-remain platform-neutral; this iteration does not establish Linux desktop support.
+Windows x64 and Ubuntu 24.04 x64 use the same arguments and exit codes. On Linux,
+run `eraw` after DEB installation, or `./eRAW-Vx.y.z-linux-x64.AppImage` after
+`chmod +x`. See [Linux support](LINUX.md) for installation and validation boundaries.
 
 ## Processing-boundary warnings
 

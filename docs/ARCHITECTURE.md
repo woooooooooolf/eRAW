@@ -28,11 +28,13 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 
 关于页的仓库链接通过无参数命令 `open_project_repository` 交给 Tauri Opener 的 Rust API，地址固定取自 `CARGO_PKG_REPOSITORY`。关闭 Opener 的自动 JS 链接拦截，也不授予前端通用 URL/文件打开权限。三个关于入口共用 `about-entry` 紧凑行样式，许可证入口只展示 `GPL-3.0-or-later`，七语概览移入许可证阅读窗口；全文按需从仓库 `LICENSE?raw` 构建为内嵌资源，使用 `textContent` 放入可选择、可滚动的原文阅读器，不依赖网络或外置文件。
 
-手动版本检查由独立 `update_check.rs` 提供，只有显式调用 `check_for_updates` 才创建 HTTP 客户端；启动不检查、不请求 GitHub API，也不解析发布 HTML。网络只读取固定仓库 Latest 与必要 EXE 请求的响应头，重定向及稳定标签经过校验。连接超时为 3 秒，一次完整检查截止为 8 秒；系统代理/证书客户端初始化放在阻塞工作线程，再由异步截止时间约束等待，HTTP 请求不持有文档会话锁。结果和服务端限流冷却只保存在当前进程；下载目标由 Rust 保存，`open_update_target` 仅接受目标种类，不接受前端 URL。关闭关于页不是取消检查的条件，状态随请求完成更新。
+手动版本检查由独立 `update_check.rs` 提供，只有显式调用 `check_for_updates` 才创建 HTTP 客户端；启动不检查、不请求 GitHub API，也不解析发布 HTML。网络只读取固定仓库 Latest 与必要发布包请求的响应头，重定向及稳定标签经过校验。连接超时为 3 秒，一次完整检查截止为 8 秒；系统代理/证书客户端初始化放在阻塞工作线程，再由异步截止时间约束等待，HTTP 请求不持有文档会话锁。结果和服务端限流冷却只保存在当前进程；下载目标由 Rust 保存，`open_update_target` 仅接受目标种类，不接受前端 URL。关闭关于页不是取消检查的条件，状态随请求完成更新。
+
+Windows x64 的更新下载目标为 EXE；Linux x64 默认为 DEB，AppImage 运行时根据 `APPIMAGE` 环境选择 AppImage；其他目标仅提供发布页回退。下载 URL 仍由后端构造、校验，前端统一展示“发布包”，不增加自动安装或自动下载。
 
 前端 `ManualUpdateChecker` 由 `ErawApp` 持有，不由对话框创建/销毁；构造和渲染不发起请求，进行中点击复用同一 Promise，关闭对话框不取消定时器或 RPC。IPC 另有 10 秒兜底截止，避免异常通信令按钮永久停在检查中，兜底后到达的旧结果不能覆盖已完成的失败状态。语言变化只重新呈现当前状态，不重新检查；该状态不进入应用设置或 WebView 存储。
 
-HTTP 客户端使用系统原生 TLS 校验证书，并启用系统手动代理、代理环境变量与 SOCKS 支持；浏览器插件、PAC 和企业认证代理不保证兼容，失败后给出关于页内反馈及官方发布页入口，不自动切换镜像或降低证书验证。Windows 使用 Schannel，无需额外 OpenSSL DLL；Linux 源码构建需安装 OpenSSL 开发依赖。更新检查只确认 GitHub 侧版本与 EXE 入口，浏览器后续的 CDN 访问及文件保存由浏览器负责，不将入口确认报告为下载完成。
+HTTP 客户端使用系统原生 TLS 校验证书，并启用系统手动代理、代理环境变量与 SOCKS 支持；浏览器插件、PAC 和企业认证代理不保证兼容，失败后给出关于页内反馈及官方发布页入口，不自动切换镜像或降低证书验证。Windows 使用 Schannel，无需额外 OpenSSL DLL；Linux 源码构建需安装 OpenSSL 开发依赖。更新检查只确认 GitHub 侧版本与发布包入口，浏览器后续的 CDN 访问及文件保存由浏览器负责，不将入口确认报告为下载完成。
 
 界面样式不打包或下载字体文件；常规正文、手册正文和等宽内容分别使用 `system-ui`、`ui-serif` 与 `ui-monospace` 通用系统字体族，具体字形由用户系统与 WebView2 回退机制提供。技术手册通过 MIT 许可的 KaTeX 将 LaTeX 源直接转换为原生 MathML，不加载 KaTeX CSS 或字体资源。
 
@@ -69,7 +71,7 @@ HTTP 客户端使用系统原生 TLS 校验证书，并启用系统手动代理�
 | `src/pixel-overlay.ts` / `src/pixel-value-display.ts` / `src/pixel-grid-rendering.ts` | 高倍率像素网格、颜色校验，以及与当前显示模式一致的原始、单通道或 RGB 数值叠加 |
 | `src/api.ts` / `src/types.ts` | Tauri 调用封装及前后端共享数据契约 |
 | `src-tauri/src/commands.rs` | 当前文档会话、内存映射、缓存、任务快照和命令边界 |
-| `src-tauri/src/update_check.rs` | 固定仓库的 Latest 重定向与稳定版本校验、有界异步请求、EXE 确认、进程内限流冷却和受控链接目标 |
+| `src-tauri/src/update_check.rs` | 固定仓库的 Latest 重定向与稳定版本校验、有界异步请求、发布包确认、进程内限流冷却和受控链接目标 |
 | `src-tauri/src/raw/mod.rs` | 布局、packing、CFA、预览、Remosaic、Demosaic、检查、RAW 导出与原子输出写入 |
 | `src-tauri/src/analysis/mod.rs` | L0 CFA DN 摘要、精确 Histogram、Row/Column Profile 和 QCFA 原子平面 |
 

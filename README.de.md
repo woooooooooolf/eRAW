@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/woooooooooolf/eRAW/actions/workflows/ci.yml"><img src="https://github.com/woooooooooolf/eRAW/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-2ea44f?style=flat-square" alt="Lizenz"></a>
-  <img src="https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows / Linux">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&amp;logo=tauri&amp;logoColor=white" alt="Tauri 2"></a>
 </p>
 
@@ -66,7 +66,7 @@ Terminal, Skript oder KI-Werkzeug können RAW-Datei, Maße, Format, Bittiefe, CF
 & '.\eRAW.exe' --skill
 ```
 
-eRAW bietet unten links im Infofenster eine Updateprüfung. Nur ein Klick prüft im Hintergrund die Weiterleitungsheader von GitHub Latest, ohne GitHub-API oder HTML-Auswertung. Start, RAW-Öffnen und Öffnen des Infofensters prüfen nicht automatisch. Das Schließen unterbricht die Anfrage nicht; beim erneuten Öffnen bleibt ihr laufender oder abgeschlossener Zustand nur für diesen Prozess erhalten. Netzwerkzeitlimits verhindern eine Blockierung der Bildarbeit. Eine bestätigte passende ZIP-Datei öffnet sich erst nach einem Klick im Standardbrowser.
+eRAW bietet unten links im Infofenster eine Updateprüfung. Nur ein Klick prüft im Hintergrund die Weiterleitungsheader von GitHub Latest, ohne GitHub-API oder HTML-Auswertung. Start, RAW-Öffnen und Öffnen des Infofensters prüfen nicht automatisch. Das Schließen unterbricht die Anfrage nicht; beim erneuten Öffnen bleibt ihr laufender oder abgeschlossener Zustand nur für diesen Prozess erhalten. Netzwerkzeitlimits verhindern eine Blockierung der Bildarbeit. Ein bestätigtes passendes Paket öffnet sich erst nach einem Klick im Standardbrowser.
 
 Reines Umordnen ist nur auf einem vollständigen, unter der Permutation abgeschlossenen Koordinatenbereich mit lesbaren Samples ohne Zuschnitt oder verlustbehaftete Bittiefenabbildung umkehrbar; es stellt nicht alle ursprünglichen Dateibytes wieder her. Manche Größen und Phasen benötigen Pixel außerhalb des Bildes. Vorschau und CLI-Vorprüfung bleiben mit einer Verarbeitungswarnung und Rückgabecode 0 nutzbar; Remosaic/RGB48-Exporte lehnen nicht unterstützte Bereiche ab. Wählen Sie ausdrücklich einen inneren Zuschnitt oder die Rekonstruktion gleicher Farbe. Parameter werden nicht automatisch geändert. Die Rekonstruktion interpoliert und benötigt die erforderlichen Farbsamples.
 
@@ -125,3 +125,7 @@ Umfang und Ablauf beschreibt [CONTRIBUTING.md](CONTRIBUTING.md); Sicherheitslüc
 ## Lizenz
 
 eRAW wird unter der [GNU General Public License v3.0 or later](LICENSE) veröffentlicht.
+
+## Linux-Unterstützung
+
+Das erste Linux-Ziel ist Ubuntu 24.04 LTS x64 (GNOME), mit DEB und AppImage sowie einer eigenen `.sha256`-Datei für jedes Paket. Nach der DEB-Installation verwenden Sie `eraw`; das AppImage benötigt Ausführungsrechte. Hinweise zu Build, Installation, WSL/automatisierten Tests und den Grenzen der nativen Desktop-Prüfung stehen im [Linux-Leitfaden](docs/LINUX.md).

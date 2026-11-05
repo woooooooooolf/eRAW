@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/woooooooooolf/eRAW/actions/workflows/ci.yml"><img src="https://github.com/woooooooooolf/eRAW/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-2ea44f?style=flat-square" alt="License"></a>
-  <img src="https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows / Linux">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&amp;logo=tauri&amp;logoColor=white" alt="Tauri 2"></a>
 </p>
 
@@ -25,7 +25,7 @@
 
 Download the latest Windows x64 build and read its release notes from [GitHub Releases](https://github.com/woooooooooolf/eRAW/releases/latest).
 
-Future Releases provide the EXE, SHA-256 manifest, SPDX SBOM, and third-party licenses in one Windows x64 ZIP; V0.6.0 and earlier retain their existing standalone assets. EXEs are not Authenticode-signed, so Windows may show a SmartScreen warning. Download only from the Latest Release and verify the extracted files against the manifest inside the package.
+Future Releases provide a standalone Windows EXE and its `.exe.sha256`; Linux provides DEB and AppImage with individual checksums. Existing published assets remain unchanged. EXEs are not Authenticode-signed, so Windows may show a SmartScreen warning. Download only from the Latest Release and verify each file using its matching SHA-256 file.
 
 ## Highlights
 
@@ -66,7 +66,7 @@ A terminal, script, or AI tool can supply the RAW file, dimensions, storage form
 & '.\eRAW.exe' --skill
 ```
 
-eRAW provides Check for updates at the bottom left of About. Only a click starts a background check of GitHub Latest redirect headers; it uses neither the GitHub API nor release HTML parsing. Startup, RAW opening and About opening do not check automatically. Closing About leaves the request running, and reopening retains its pending or completed state for this process only. Network deadlines end stalled checks without blocking image work. A confirmed compatible ZIP opens in the default browser only when clicked.
+eRAW provides Check for updates at the bottom left of About. Only a click starts a background check of GitHub Latest redirect headers; it uses neither the GitHub API nor release HTML parsing. Startup, RAW opening and About opening do not check automatically. Closing About leaves the request running, and reopening retains its pending or completed state for this process only. Network deadlines end stalled checks without blocking image work. A confirmed compatible package opens in the default browser only when clicked.
 
 Only-reorder is reversible only on a closed full-image coordinate domain with readable samples and no crop or lossy depth mapping; it does not restore the original file bytes. Some dimensions and phases require pixels outside the image. Preview and CLI preflight remain available with a processing-boundary warning and preflight status 0; related Remosaic/RGB48 exports reject unsupported ranges. Explicitly choose an interior crop or same-color reconstruction; parameters are never changed automatically. Reconstruction is interpolation and still requires the necessary color sites.
 
@@ -125,3 +125,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for scope and workflow. Follow [SECURITY.
 ## License
 
 eRAW is released under the [GNU General Public License v3.0 or later](LICENSE).
+
+## Linux support
+
+The first Linux target is Ubuntu 24.04 LTS x64 (GNOME), with both DEB and AppImage plus a separate `.sha256` for each. After DEB installation use `eraw`; give the AppImage execute permission before running it. See [Linux support](docs/LINUX.md) for builds, installation, WSL/automated verification and native desktop validation limits.

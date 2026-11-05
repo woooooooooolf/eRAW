@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import ts from "typescript";
 
 const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
@@ -30,6 +31,31 @@ const [
 ]);
 
 const packageJson = JSON.parse(packageSource);
+
+test("site resolves Windows, DEB and AppImage separately without selecting checksum assets", async () => {
+  const executable = ts.transpileModule(runtimeSource.replace(/^import erawIconUrl.*$/m, 'const erawIconUrl = "icon.svg";')
+    + "\nexport { resolveReleaseDownloads };", {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const { resolveReleaseDownloads } = await import(`data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`);
+  const previousFetch = globalThis.fetch;
+  const previousDocument = globalThis.document;
+  const links = ["", "deb", "AppImage"].map(format => ({ dataset: { downloadPackage: format }, href: "" }));
+  globalThis.document = { querySelectorAll: () => links };
+  const base = "https://github.com/woooooooooolf/eRAW/releases/download/V0.10.0/";
+  const names = ["windows-x64.exe", "linux-x64.deb", "linux-x64.AppImage"];
+  try {
+    globalThis.fetch = async () => ({ ok: true, json: async () => ({ assets: names.flatMap(suffix => [
+      { name: `eRAW-V0.10.0-${suffix}.sha256`, browser_download_url: base + suffix + ".sha256" },
+      { name: `eRAW-V0.10.0-${suffix}`, browser_download_url: base + suffix },
+    ]) }) });
+    await resolveReleaseDownloads();
+    assert.deepEqual(links.map(link => link.href), names.map(name => base + name));
+    globalThis.fetch = async () => { throw new Error("offline"); };
+    await resolveReleaseDownloads();
+    assert.ok(links.every(link => link.href.endsWith("/releases/latest")));
+  } finally { globalThis.fetch = previousFetch; globalThis.document = previousDocument; }
+});
 
 test("the bilingual project site builds independently of the application version", () => {
   assert.equal(packageJson.scripts["dev:site"], "vite --config vite.pages.config.ts");

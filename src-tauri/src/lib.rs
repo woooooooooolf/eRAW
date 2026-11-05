@@ -150,6 +150,9 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|_| {
+            #[cfg(target_os = "linux")]
+            print_output("eRAW: viewer startup failed.\n  Check GTK/WebKitGTK, the desktop session, and graphics support.\n", true);
+            #[cfg(not(target_os = "linux"))]
             print_output("eRAW: viewer startup failed.\n  Check WebView2, the desktop session, and graphics support.\n", true);
             std::process::exit(1);
         });

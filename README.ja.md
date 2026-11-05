@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/woooooooooolf/eRAW/actions/workflows/ci.yml"><img src="https://github.com/woooooooooolf/eRAW/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-2ea44f?style=flat-square" alt="ライセンス"></a>
-  <img src="https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows / Linux">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&amp;logo=tauri&amp;logoColor=white" alt="Tauri 2"></a>
 </p>
 
@@ -66,7 +66,7 @@ Release EXE は Authenticode 署名されていないため、Windows が SmartS
 & '.\eRAW.exe' --skill
 ```
 
-eRAW は「バージョン情報」の左下に更新確認ボタンを備えます。クリック時だけ GitHub Latest のリダイレクトヘッダーをバックグラウンドで確認し、GitHub API やリリース HTML 解析は使いません。起動、RAW や画面を開く操作では自動確認しません。画面を閉じても確認は続き、開き直すと実行中または完了した状態を保持します。状態は現在のプロセスだけに保存します。ネットワークのタイムアウトでも画像操作を妨げません。対応 ZIP はユーザーがクリックしたときに既定ブラウザーでダウンロードします。
+eRAW は「バージョン情報」の左下に更新確認ボタンを備えます。クリック時だけ GitHub Latest のリダイレクトヘッダーをバックグラウンドで確認し、GitHub API やリリース HTML 解析は使いません。起動、RAW や画面を開く操作では自動確認しません。画面を閉じても確認は続き、開き直すと実行中または完了した状態を保持します。状態は現在のプロセスだけに保存します。ネットワークのタイムアウトでも画像操作を妨げません。対応パッケージ はユーザーがクリックしたときに既定ブラウザーでダウンロードします。
 
 並べ替えの可逆性には、置換で閉じた画像全体の座標領域、読み取り可能な全サンプル、切り抜きや非可逆なビット深度変換がないことが必要です。元のファイルの全バイトは復元しません。サイズと Phase により画像外の画素が必要になります。プレビューと CLI 事前確認は処理境界の警告付きで利用でき、事前確認の終了コードは 0 のままです。該当する Remosaic/RGB48 出力は非対応範囲を拒否します。内側の切り抜きか同色再構成を明示的に選んでください。自動変更はしません。再構成は補間であり、必要な色のサンプルを要します。
 
@@ -125,3 +125,7 @@ npm.cmd run release
 ## ライセンス
 
 eRAW は [GNU General Public License v3.0 or later](LICENSE) の下で公開されています。
+
+## Linux サポート
+
+Linux の初期対象は Ubuntu 24.04 LTS x64（GNOME）です。DEB と AppImage、および各ファイルの `.sha256` を提供します。DEB のインストール後は `eraw` を使用し、AppImage には実行権限を付与してください。ビルド、インストール、WSL・自動テストとネイティブデスクトップ検証の範囲は [Linux の説明](docs/LINUX.md)を参照してください。

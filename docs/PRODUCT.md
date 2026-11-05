@@ -85,3 +85,7 @@ eRAW 面向 SoC Bring-up 和图像传感器适配工作，目标是以舒适、�
 - 图像统计不使用缩略瓦片、Remosaic/Demosaic 结果或屏幕着色；QCFA 底层按 16 个原子相位统计，首版界面合并显示 R/Gr/Gb/B。
 - Remosaic/Demosaic 算法接口允许后续扩展，但当前不为算法数量牺牲界面清晰度。
 - Remosaic 后的数据导出已经实现；通用批处理不属于查看器职责。
+
+## Linux 首版边界
+
+目标为 Ubuntu 24.04 LTS x64、GNOME，提供 DEB 与 AppImage 及各自的 SHA-256 校验文件。与 Windows 共用图像处理语义、CLI 和七语界面；新增平台不引入单实例路由或自动更新安装。按 [Linux 支持说明](LINUX.md) 执行构建、WSL/自动化及后续原生桌面验收。

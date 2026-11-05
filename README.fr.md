@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/woooooooooolf/eRAW/actions/workflows/ci.yml"><img src="https://github.com/woooooooooolf/eRAW/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-2ea44f?style=flat-square" alt="Licence"></a>
-  <img src="https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows / Linux">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&amp;logo=tauri&amp;logoColor=white" alt="Tauri 2"></a>
 </p>
 
@@ -66,7 +66,7 @@ Un terminal, script ou outil IA peut fournir fichier RAW, dimensions, format, pr
 & '.\eRAW.exe' --skill
 ```
 
-eRAW propose la recherche de mise à jour en bas à gauche de la fenêtre À propos. Seul un clic interroge en arrière-plan les en-têtes de redirection GitHub Latest, sans API GitHub ni analyse HTML. Aucun contrôle automatique au démarrage, à l’ouverture d’un RAW ou d’À propos. Fermer la fenêtre laisse la requête continuer ; sa réouverture conserve l’état en cours ou terminé uniquement pour ce processus. Les délais réseau évitent de bloquer le travail sur les images. Le ZIP compatible confirmé est ouvert dans le navigateur par défaut après un clic de l’utilisateur.
+eRAW propose la recherche de mise à jour en bas à gauche de la fenêtre À propos. Seul un clic interroge en arrière-plan les en-têtes de redirection GitHub Latest, sans API GitHub ni analyse HTML. Aucun contrôle automatique au démarrage, à l’ouverture d’un RAW ou d’À propos. Fermer la fenêtre laisse la requête continuer ; sa réouverture conserve l’état en cours ou terminé uniquement pour ce processus. Les délais réseau évitent de bloquer le travail sur les images. Le paquet compatible confirmé est ouvert dans le navigateur par défaut après un clic de l’utilisateur.
 
 La permutation est réversible uniquement sur un domaine complet fermé par cette permutation, avec des échantillons lisibles, sans recadrage ni conversion de profondeur avec perte ; elle ne restaure pas tous les octets initiaux. Certaines dimensions et phases exigent des pixels hors image. La prévisualisation et la vérification CLI restent disponibles avec un avertissement de limite du traitement et le code 0 ; les exports Remosaic/RGB48 refusent les plages non prises en charge. Choisissez explicitement un recadrage intérieur ou la reconstruction de même couleur, sans changement automatique. Cette reconstruction interpole et exige les échantillons de couleur nécessaires.
 
@@ -125,3 +125,7 @@ Consultez [CONTRIBUTING.md](CONTRIBUTING.md) pour le périmètre et le processus
 ## Licence
 
 eRAW est distribué sous la [GNU General Public License v3.0 or later](LICENSE).
+
+## Prise en charge de Linux
+
+La première cible Linux est Ubuntu 24.04 LTS x64 (GNOME), avec DEB et AppImage et un fichier `.sha256` pour chacun. Après installation du DEB, utilisez `eraw` ; accordez le droit d’exécution à l’AppImage. Consultez le [guide Linux](docs/LINUX.md) pour la compilation, l’installation, les tests WSL/automatisés et les limites de validation du bureau natif.

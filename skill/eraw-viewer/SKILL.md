@@ -13,7 +13,9 @@ network access are needed. It describes viewing, not automated image export.
 
 - Obtain the executable path from the user or the local deployment. Release
   filenames may include a version; `eRAW.exe` below is a placeholder. Query that
-  executable with `--help` or `--version` when needed.
+  executable with `--help` or `--version` when needed. On Ubuntu 24.04 x64, use
+  `eraw` from the DEB installation or the executable AppImage path; arguments and
+  exit codes are identical. Give an AppImage execute permission before launching it.
 - Take width, height, packing, effective bit depth, CFA, offsets and strides from
   the producing pipeline or known capture metadata. Ask for missing essentials;
   do not guess a format from the filename, extension, file size, or a plausible image.
@@ -104,7 +106,7 @@ print(f"Preflight passed; viewer launch requested. PID: {viewer.pid}")
 
 Preflight validates arguments, file access, mapping and layout without scanning
 pixels or initializing WebView2. It does not prove correct image interpretation,
-WebView2/WebGL availability, completed rendering, or user acceptance. A normal
+WebView/WebGL availability, completed rendering, or user acceptance. A normal
 viewer prints preflight feedback and stays running until closed; exit 0 after
 closure is not a ready signal. Exit 1 reports a native viewer startup failure.
 Report only the stage actually observed: preflight passed, process started, or

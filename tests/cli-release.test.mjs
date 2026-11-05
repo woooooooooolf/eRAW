@@ -6,7 +6,9 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
-const exe = resolve("src-tauri/target/release", process.platform === "win32" ? "eraw.exe" : "eraw");
+const exe = process.env.ERAW_TEST_BINARY
+  ? resolve(process.env.ERAW_TEST_BINARY)
+  : resolve(process.env.CARGO_TARGET_DIR ?? "src-tauri/target", "release", process.platform === "win32" ? "eraw.exe" : "eraw");
 const version = JSON.parse(readFileSync("package.json", "utf8")).version;
 const skill = readFileSync("skill/eraw-viewer/SKILL.md", "utf8");
 const directory = mkdtempSync(join(tmpdir(), "eraw-cli-release-"));
