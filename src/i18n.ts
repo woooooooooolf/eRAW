@@ -20,14 +20,14 @@ const CATALOG = {
   "update.progress": message("Checking GitHub release information…", "正在检查 GitHub 发布信息…", "正在檢查 GitHub 發佈資訊…", "GitHub のリリース情報を確認しています…", "Comprobando las publicaciones de GitHub…", "Vérification des versions publiées sur GitHub…", "GitHub-Veröffentlichungen werden geprüft…"),
   "update.current": message("No newer version found.", "未发现更新版本。", "未發現更新版本。", "新しいバージョンはありません。", "No hay una versión más reciente.", "Aucune version plus récente trouvée.", "Keine neuere Version gefunden."),
   "update.available": message("A new version is available: {version}.", "发现新版本 {version}。", "發現新版本 {version}。", "新しいバージョン {version} があります。", "Nueva versión disponible: {version}.", "Nouvelle version disponible : {version}.", "Eine neue Version ist verfügbar: {version}."),
-  "update.unconfirmed": message("New version {version} found; a compatible ZIP could not be confirmed. See GitHub for downloads.", "发现新版本 {version}，暂未确认适配的 ZIP，请前往 GitHub 查看。", "發現新版本 {version}，尚未確認相容 ZIP，請前往 GitHub 查看。", "新しいバージョン {version} がありますが、対応 ZIP は確認できませんでした。GitHub をご覧ください。", "Se encontró {version}, pero no se pudo confirmar un ZIP compatible. Consulte GitHub.", "Version {version} trouvée, mais le ZIP compatible n’a pas pu être confirmé. Consultez GitHub.", "Version {version} gefunden; eine passende ZIP-Datei konnte nicht bestätigt werden. Bitte auf GitHub nachsehen."),
+  "update.unconfirmed": message("New version {version} found; a compatible EXE could not be confirmed. See GitHub for downloads.", "发现新版本 {version}，暂未确认适配的 EXE，请前往 GitHub 查看。", "發現新版本 {version}，尚未確認相容 EXE，請前往 GitHub 查看。", "新しいバージョン {version} がありますが、対応 EXE は確認できませんでした。GitHub をご覧ください。", "Se encontró {version}, pero no se pudo confirmar un EXE compatible. Consulte GitHub.", "Version {version} trouvée, mais le fichier EXE compatible n’a pas pu être confirmé. Consultez GitHub.", "Version {version} gefunden; eine passende EXE-Datei konnte nicht bestätigt werden. Bitte auf GitHub nachsehen."),
   "update.failed.timeout": message("The update check timed out. Check your network and try again.", "检查更新超时，请检查网络后重试。", "檢查更新逾時，請檢查網路後重試。", "更新確認がタイムアウトしました。ネットワークを確認して再試行してください。", "La comprobación agotó el tiempo de espera. Revise la red e inténtelo de nuevo.", "La vérification a expiré. Vérifiez le réseau puis réessayez.", "Die Updateprüfung hat das Zeitlimit überschritten. Prüfen Sie das Netzwerk und versuchen Sie es erneut."),
   "update.failed.network": message("Unable to connect to GitHub. Check your network and try again.", "无法连接 GitHub，请检查网络后重试。", "無法連接 GitHub，請檢查網路後重試。", "GitHub に接続できません。ネットワークを確認して再試行してください。", "No se pudo conectar con GitHub. Revise la red e inténtelo de nuevo.", "Connexion à GitHub impossible. Vérifiez le réseau puis réessayez.", "Verbindung zu GitHub nicht möglich. Prüfen Sie das Netzwerk und versuchen Sie es erneut."),
   "update.failed.rateLimited": message("GitHub has temporarily limited access. Please try again later.", "GitHub 暂时限制访问，请稍后重试。", "GitHub 暫時限制存取，請稍後重試。", "GitHub がアクセスを一時制限しています。後でもう一度お試しください。", "GitHub ha limitado temporalmente el acceso. Inténtelo más tarde.", "GitHub limite temporairement l’accès. Réessayez plus tard.", "GitHub begrenzt den Zugriff vorübergehend. Versuchen Sie es später erneut."),
   "update.failed.noRelease": message("No available release could be found.", "未找到可用的正式发布。", "未找到可用的正式發佈。", "利用可能な正式リリースが見つかりません。", "No se encontró una publicación disponible.", "Aucune version publiée disponible trouvée.", "Keine verfügbare Veröffentlichung gefunden."),
   "update.failed.invalidResponse": message("Unable to identify the latest release. You can check the GitHub page.", "未能识别最新发布信息，可前往 GitHub 查看。", "未能識別最新發佈資訊，可前往 GitHub 查看。", "最新リリース情報を確認できません。GitHub のページをご覧ください。", "No se pudo identificar la última publicación. Puede consultar GitHub.", "Impossible d’identifier la dernière version. Consultez la page GitHub.", "Die neueste Veröffentlichung konnte nicht erkannt werden. Sie können auf GitHub nachsehen."),
   "update.failed.busy": message("An update check is already in progress.", "检查更新正在进行中。", "檢查更新正在進行中。", "更新確認は既に実行中です。", "Ya hay una comprobación en curso.", "Une vérification est déjà en cours.", "Eine Updateprüfung läuft bereits."),
-  "update.download": message("Download ZIP ↗", "下载 ZIP ↗", "下載 ZIP ↗", "ZIP をダウンロード ↗", "Descargar ZIP ↗", "Télécharger le ZIP ↗", "ZIP herunterladen ↗"),
+  "update.download": message("Download EXE ↗", "下载 EXE ↗", "下載 EXE ↗", "EXE をダウンロード ↗", "Descargar EXE ↗", "Télécharger le fichier EXE ↗", "EXE herunterladen ↗"),
   "update.release": message("View on GitHub ↗", "前往 GitHub ↗", "前往 GitHub ↗", "GitHub を開く ↗", "Ver en GitHub ↗", "Voir sur GitHub ↗", "Auf GitHub ansehen ↗"),
   "backend.updateOpenFailed": message("Unable to open the update link", "无法打开更新链接", "無法開啟更新連結", "更新リンクを開けません", "No se pudo abrir el enlace de actualización", "Impossible d’ouvrir le lien de mise à jour", "Der Update-Link konnte nicht geöffnet werden"),
   "common.cancel": message("Cancel", "取消", "取消", "キャンセル", "Cancelar", "Annuler", "Abbrechen"),
@@ -577,6 +577,7 @@ const LOCALE_NAMES: Record<ResolvedLocale, string> = {
 
 let preference: LanguagePreference = "system";
 let locale: ResolvedLocale = "en";
+let systemLanguages: readonly string[] | undefined;
 
 function normalizeLanguageTag(tag: string): ResolvedLocale | null {
   const normalized = tag.trim().replace(/_/g, "-").toLowerCase();
@@ -593,12 +594,18 @@ function normalizeLanguageTag(tag: string): ResolvedLocale | null {
   return null;
 }
 
-export function resolveSystemLocale(languages: readonly string[] = navigator.languages): ResolvedLocale {
+export function resolveSystemLocale(languages: readonly string[] = systemLanguages ?? navigator.languages): ResolvedLocale {
   for (const language of languages) {
     const resolved = normalizeLanguageTag(language);
     if (resolved) return resolved;
   }
   return "en";
+}
+
+/** An empty native result deliberately falls back to English, not WebView preferences. */
+export function setSystemLanguages(languages: readonly string[]): void {
+  systemLanguages = [...languages];
+  setLanguagePreference(preference);
 }
 
 export function isLanguagePreference(value: unknown): value is LanguagePreference {

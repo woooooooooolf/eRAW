@@ -22,6 +22,10 @@ export function takeStartupDocument(): Promise<StartupDocument | null> {
   return invoke("take_startup_document");
 }
 
+export function getSystemUiLanguages(): Promise<string[]> {
+  return invoke("get_system_ui_languages");
+}
+
 export function openProjectRepository(): Promise<void> {
   return invoke("open_project_repository");
 }

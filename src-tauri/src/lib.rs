@@ -30,6 +30,14 @@ struct StartupDocument {
 #[derive(Default)]
 struct StartupState(Mutex<Option<StartupDocument>>);
 
+// One native UI-language snapshot per process, shared by all WebViews.
+struct SystemUiLanguages(Vec<String>);
+
+#[tauri::command]
+fn get_system_ui_languages(state: tauri::State<'_, SystemUiLanguages>) -> Vec<String> {
+    state.0.clone()
+}
+
 #[tauri::command]
 fn take_startup_document(
     window: tauri::WebviewWindow,
@@ -112,6 +120,7 @@ pub fn run() {
         }
     }
     tauri::Builder::default()
+        .manage(SystemUiLanguages(sys_locale::get_locales().collect()))
         .manage(app_state)
         .manage(StartupState(Mutex::new(startup)))
         .manage(update_check::UpdateCheckState::default())
@@ -119,6 +128,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
         .invoke_handler(tauri::generate_handler![
+            get_system_ui_languages,
             take_startup_document,
             open_project_repository,
             update_check::check_for_updates,

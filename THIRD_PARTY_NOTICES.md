@@ -72,7 +72,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | vite | 8.3.5 | development | MIT |
 | zrender | 6.1.0 | runtime | BSD-3-Clause |
 
-## Cargo dependencies (518)
+## Cargo dependencies (519)
 
 | Crate | Version | Declared license |
 | --- | --- | --- |
@@ -422,6 +422,7 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | syn | 3.0.3 | MIT OR Apache-2.0 |
 | sync_wrapper | 1.0.2 | Apache-2.0 |
 | synstructure | 0.13.2 | MIT |
+| sys-locale | 0.3.2 | MIT OR Apache-2.0 |
 | system-configuration | 0.7.0 | MIT OR Apache-2.0 |
 | system-configuration-sys | 0.6.0 | MIT OR Apache-2.0 |
 | system-deps | 6.2.2 | MIT OR Apache-2.0 |

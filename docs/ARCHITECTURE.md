@@ -28,11 +28,11 @@ Tauri capability 采用最小授权：除 `core:default` 外，仅额外授予�
 
 关于页的仓库链接通过无参数命令 `open_project_repository` 交给 Tauri Opener 的 Rust API，地址固定取自 `CARGO_PKG_REPOSITORY`。关闭 Opener 的自动 JS 链接拦截，也不授予前端通用 URL/文件打开权限。三个关于入口共用 `about-entry` 紧凑行样式，许可证入口只展示 `GPL-3.0-or-later`，七语概览移入许可证阅读窗口；全文按需从仓库 `LICENSE?raw` 构建为内嵌资源，使用 `textContent` 放入可选择、可滚动的原文阅读器，不依赖网络或外置文件。
 
-手动版本检查由独立 `update_check.rs` 提供，只有显式调用 `check_for_updates` 才创建 HTTP 客户端；启动不检查、不请求 GitHub API，也不解析发布 HTML。网络只读取固定仓库 Latest 与必要 ZIP 请求的响应头，重定向及稳定标签经过校验。连接超时为 3 秒，一次完整检查截止为 8 秒；系统代理/证书客户端初始化放在阻塞工作线程，再由异步截止时间约束等待，HTTP 请求不持有文档会话锁。结果和服务端限流冷却只保存在当前进程；下载目标由 Rust 保存，`open_update_target` 仅接受目标种类，不接受前端 URL。关闭关于页不是取消检查的条件，状态随请求完成更新。
+手动版本检查由独立 `update_check.rs` 提供，只有显式调用 `check_for_updates` 才创建 HTTP 客户端；启动不检查、不请求 GitHub API，也不解析发布 HTML。网络只读取固定仓库 Latest 与必要 EXE 请求的响应头，重定向及稳定标签经过校验。连接超时为 3 秒，一次完整检查截止为 8 秒；系统代理/证书客户端初始化放在阻塞工作线程，再由异步截止时间约束等待，HTTP 请求不持有文档会话锁。结果和服务端限流冷却只保存在当前进程；下载目标由 Rust 保存，`open_update_target` 仅接受目标种类，不接受前端 URL。关闭关于页不是取消检查的条件，状态随请求完成更新。
 
 前端 `ManualUpdateChecker` 由 `ErawApp` 持有，不由对话框创建/销毁；构造和渲染不发起请求，进行中点击复用同一 Promise，关闭对话框不取消定时器或 RPC。IPC 另有 10 秒兜底截止，避免异常通信令按钮永久停在检查中，兜底后到达的旧结果不能覆盖已完成的失败状态。语言变化只重新呈现当前状态，不重新检查；该状态不进入应用设置或 WebView 存储。
 
-HTTP 客户端使用系统原生 TLS 校验证书，并启用系统手动代理、代理环境变量与 SOCKS 支持；浏览器插件、PAC 和企业认证代理不保证兼容，失败后给出关于页内反馈及官方发布页入口，不自动切换镜像或降低证书验证。Windows 使用 Schannel，无需额外 OpenSSL DLL；Linux 源码构建需安装 OpenSSL 开发依赖。更新检查只确认 GitHub 侧版本与 ZIP 入口，浏览器后续的 CDN 访问及文件保存由浏览器负责，不将入口确认报告为下载完成。
+HTTP 客户端使用系统原生 TLS 校验证书，并启用系统手动代理、代理环境变量与 SOCKS 支持；浏览器插件、PAC 和企业认证代理不保证兼容，失败后给出关于页内反馈及官方发布页入口，不自动切换镜像或降低证书验证。Windows 使用 Schannel，无需额外 OpenSSL DLL；Linux 源码构建需安装 OpenSSL 开发依赖。更新检查只确认 GitHub 侧版本与 EXE 入口，浏览器后续的 CDN 访问及文件保存由浏览器负责，不将入口确认报告为下载完成。
 
 界面样式不打包或下载字体文件；常规正文、手册正文和等宽内容分别使用 `system-ui`、`ui-serif` 与 `ui-monospace` 通用系统字体族，具体字形由用户系统与 WebView2 回退机制提供。技术手册通过 MIT 许可的 KaTeX 将 LaTeX 源直接转换为原生 MathML，不加载 KaTeX CSS 或字体资源。
 
@@ -69,7 +69,7 @@ HTTP 客户端使用系统原生 TLS 校验证书，并启用系统手动代理�
 | `src/pixel-overlay.ts` / `src/pixel-value-display.ts` / `src/pixel-grid-rendering.ts` | 高倍率像素网格、颜色校验，以及与当前显示模式一致的原始、单通道或 RGB 数值叠加 |
 | `src/api.ts` / `src/types.ts` | Tauri 调用封装及前后端共享数据契约 |
 | `src-tauri/src/commands.rs` | 当前文档会话、内存映射、缓存、任务快照和命令边界 |
-| `src-tauri/src/update_check.rs` | 固定仓库的 Latest 重定向与稳定版本校验、有界异步请求、ZIP 确认、进程内限流冷却和受控链接目标 |
+| `src-tauri/src/update_check.rs` | 固定仓库的 Latest 重定向与稳定版本校验、有界异步请求、EXE 确认、进程内限流冷却和受控链接目标 |
 | `src-tauri/src/raw/mod.rs` | 布局、packing、CFA、预览、Remosaic、Demosaic、检查、RAW 导出与原子输出写入 |
 | `src-tauri/src/analysis/mod.rs` | L0 CFA DN 摘要、精确 Histogram、Row/Column Profile 和 QCFA 原子平面 |
 
@@ -97,7 +97,9 @@ ROI 是主窗口级查看状态，不依赖统计视图是否打开。工具栏�
 
 应用外观与交互偏好按字段存入 `eraw.appSettings.v1.<field>`；旧的整对象仅作读取回退。实例只保存相对自身已保存快照发生变化的字段，初始化不写回，因此旧窗口调整侧栏不会覆盖其他窗口保存的新主题。相同字段最后一次保存生效，其他已打开实例不自动应用外部修改。RAW 描述符和处理配置仍分别作为完整关联组保存；多个实例对同组的用户修改以最后一次保存为准。
 
-- 应用设置保存语言、主题、交互、性能和画面呈现偏好；`system` 会按 BCP 47 语言族解析系统首选语言，不支持的语言回退英文。
+- 应用设置保存语言、主题、交互、性能和画面呈现偏好；`system` 表示跟随当前桌面用户的界面语言，而非区域格式或 WebView 语言。Rust 在 GUI 启动前用 `sys-locale` 获取首选 UI 语言列表并保存为进程快照，`get_system_ui_languages` 通过 Tauri IPC 供主窗口、统计窗口和手册窗口初始化使用；CLI 纯查询不读取该快照。
+- Windows 来源为 `GetUserPreferredUILanguages(MUI_LANGUAGE_NAME)`，macOS 为 `CFLocaleCopyPreferredLanguages`；Linux 沿用登录会话的 `LANGUAGE`、`LC_ALL`、`LC_MESSAGES`、`LANG` 环境变量（按库定义的顺序），不保证绕过启动器覆盖后的环境来查询桌面设置。按 BCP 47 语言族选取列表中首个受支持语言，全部不支持或读取失败时回退英文。桌面端不以浏览器语言替代系统结果；只有浏览器预览使用 `navigator.languages`。
+- 所有窗口在构建 UI 前等待原生语言初始化，IPC 最多等待 2 秒，超时后回退英文且忽略迟到结果；显式选择语言始终优先。系统语言快照不写入用户偏好，偏好仍保存 `system`；更改桌面系统语言后，完成系统要求的重新登录并重新启动应用后生效，不依赖 WebView 的 `languagechange` 事件实时刷新。
 - `i18n.ts` 的目录以英文、简体中文、繁体中文、日语、西班牙语、法语和德语形成完整类型约束。静态 DOM 通过显式 `data-i18n*` 语义键绑定，不再从任一语言的可见文字反向猜测键；动态状态直接通过 `t()` 生成。
 - 专业格式名、算法名、按键和单位（如 RAW、CFA、Packing、Demosaic、DN、MiB）保持行业惯用写法。
 - Rust 命令返回稳定 `code`、插值参数、可选原因和字段名；RAW 布局警告也携带结构化参数。前端不依赖中文后端字符串判断错误类型。

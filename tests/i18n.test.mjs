@@ -11,7 +11,13 @@ const { outputText } = ts.transpileModule(source, {
     target: ts.ScriptTarget.ES2022,
   },
 });
-const i18n = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
+const i18nUrl = `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`;
+const i18n = await import(i18nUrl);
+const bootstrapSource = await readFile(new URL("../src/system-language.ts", import.meta.url), "utf8");
+const bootstrapJs = ts.transpileModule(bootstrapSource, {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+}).outputText.replace('"./i18n"', JSON.stringify(i18nUrl));
+const { initializeSystemLanguage } = await import(`data:text/javascript;base64,${Buffer.from(bootstrapJs).toString("base64")}`);
 
 Object.defineProperty(globalThis, "document", {
   configurable: true,
@@ -97,4 +103,54 @@ test("menus and parameter help expose keyboard navigation", () => {
   assert.match(appSource, /event\.key === "Home"/);
   assert.match(appSource, /trigger\?\.focus/);
   assert.match(appSource, /target\.addEventListener\("focus", showAtTarget\)/);
+});
+
+test("browser previews resolve browser language without a native request", async () => {
+  await initializeSystemLanguage(null);
+  assert.equal(i18n.setLanguagePreference("system"), "en");
+});
+
+test("native UI languages override browser languages in system selection and menu labels", async () => {
+  await initializeSystemLanguage(async () => ["zh-Hant-TW", "en-US"]);
+  assert.equal(i18n.setLanguagePreference("system"), "zh-TW");
+  assert.equal(document.documentElement.lang, "zh-TW");
+  assert.match(i18n.getLanguageOptions()[0].label, /繁體中文/);
+  await initializeSystemLanguage(async () => ["ko-KR", "fr-FR"]);
+  assert.equal(i18n.getResolvedLocale(), "fr");
+});
+
+test("explicit language survives native initialization and switching back uses native UI language", async () => {
+  i18n.setLanguagePreference("de");
+  await initializeSystemLanguage(async () => ["ja-JP"]);
+  assert.equal(i18n.getResolvedLocale(), "de");
+  assert.equal(i18n.getLanguagePreference(), "de");
+  assert.equal(i18n.setLanguagePreference("system"), "ja");
+});
+
+test("native failure, malformed data and unsupported languages use English, never browser preferences", async () => {
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: { languages: ["zh-CN"] } });
+  for (const read of [
+    async () => { throw new Error("IPC unavailable"); },
+    async () => [], async () => ["ko-KR"], async () => null, async () => [42],
+  ]) {
+    await initializeSystemLanguage(read);
+    assert.equal(i18n.setLanguagePreference("system"), "en");
+  }
+});
+
+test("a stalled native request cannot block startup or change language after its timeout", async () => {
+  let finish;
+  await initializeSystemLanguage(() => new Promise(resolve => { finish = resolve; }), 15);
+  assert.equal(i18n.setLanguagePreference("system"), "en");
+  finish(["ja-JP"]);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(i18n.getResolvedLocale(), "en");
+});
+
+test("all desktop window routes initialize native language before creating their UI", async () => {
+  const entry = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  const initialize = entry.indexOf("await initializeSystemLanguage(");
+  for (const route of ['page.get("help")', 'page.get("statistics")', "new ErawApp("]) {
+    assert.ok(initialize >= 0 && initialize < entry.indexOf(route));
+  }
 });

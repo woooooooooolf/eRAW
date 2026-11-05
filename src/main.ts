@@ -3,7 +3,8 @@ import { ErawApp } from "./app";
 import { t } from "./i18n";
 import { StatisticsWindowApp } from "./statistics-window";
 import { isTauri } from "@tauri-apps/api/core";
-import { takeStartupDocument } from "./api";
+import { getSystemUiLanguages, takeStartupDocument } from "./api";
+import { initializeSystemLanguage } from "./system-language";
 
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error(t("error.rootMissing"));
@@ -22,7 +23,8 @@ function showFatalError(error: unknown): void {
   appRoot.replaceChildren(fatal);
 }
 
-try {
+async function start(): Promise<void> {
+  await initializeSystemLanguage(isTauri() ? getSystemUiLanguages : null);
   const page = new URLSearchParams(window.location.search);
   if (page.get("help") === "1") {
     void import("./help-window")
@@ -36,6 +38,6 @@ try {
       new ErawApp(appRoot, startup);
     })().catch(showFatalError);
   }
-} catch (error) {
-  showFatalError(error);
 }
+
+void start().catch(showFatalError);
