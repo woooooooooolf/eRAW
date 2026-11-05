@@ -176,6 +176,8 @@ test("successful image-format updates reset both docked and detached statistics 
   assert.match(panelSource, /resetStatisticsViewState\(this\.viewState, this\.layout\)/);
 });
 
+const aboutSource = await readFile(new URL("../src/about-dialog.ts", import.meta.url), "utf8");
+
 test("ROI is a main-window tool with inclusive coordinate entry and a high-contrast boundary", () => {
   assert.match(appSource, /id="roi-mouse-button"/);
   assert.match(appSource, /id="roi-coordinates-button"/);
@@ -197,7 +199,7 @@ test("ROI is a main-window tool with inclusive coordinate entry and a high-contr
   assert.match(rule, /rgb\(255 255 255/);
   assert.match(rule, /pointer-events:\s*none/);
   assert.match(appSource, /Boolean\(selection\) \|\| this\.viewport\.getInteractionMode\(\) === "select"/);
-  assert.match(appSource, /<strong>Apache ECharts<\/strong>[\s\S]*?<code>Apache-2\.0<\/code>/);
+  assert.match(aboutSource, /<strong>Apache ECharts<\/strong>[\s\S]*?<code>Apache-2\.0<\/code>/);
 });
 
 test("ROI, pixel, zoom, statistics and capture actions expose the agreed shortcuts", () => {

@@ -124,6 +124,8 @@ test("independent help and statistics windows suppress native context menus", ()
   assert.match(appSource, /document\.addEventListener\("contextmenu", \(event\) => this\.onContextMenu\(event\)\)/);
 });
 
+const aboutSource = await readFile(new URL("../src/about-dialog.ts", import.meta.url), "utf8");
+
 test("the application distributes no named font or font file", () => {
   assert.match(styleSource, /font-family: system-ui, sans-serif/);
   assert.match(styleSource, /--font-serif: ui-serif, serif/);
@@ -132,8 +134,8 @@ test("the application distributes no named font or font file", () => {
   assert.match(pixelOverlaySource, /ui-monospace, monospace/);
   assert.doesNotMatch(pixelOverlaySource, /Cascadia|Consolas|Segoe|Microsoft YaHei/);
   assert.equal(JSON.parse(packageSource).dependencies.katex, "^0.19.1");
-  assert.match(appSource, /<strong>KaTeX<\/strong>/);
-  assert.match(appSource, /<code>MIT<\/code>/);
+  assert.match(aboutSource, /<strong>KaTeX<\/strong>/);
+  assert.match(aboutSource, /<code>MIT<\/code>/);
   assert.match(fontPolicySource, /MathML/);
   assert.match(fontPolicySource, /不导入 KaTeX 的 CSS 或 Webfont/);
 });

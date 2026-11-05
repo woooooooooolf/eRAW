@@ -64,9 +64,7 @@ jobs:
 
       - name: Install Linux build dependencies
         if: matrix.platform == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential pkg-config libdbus-1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2t64 xvfb xauth webkit2gtk-driver
+        run: bash scripts/setup-linux.sh deps
 
       - name: Install frontend dependencies
         run: npm ci
@@ -99,7 +97,7 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           cargo test --locked --release --manifest-path src-tauri/Cargo.toml --test glib_variant_str_iter
-          cargo install tauri-driver --version 2.1.0 --locked
+          bash scripts/setup-linux.sh webdriver
           ERAW_TEST_OUTPUT=/tmp/eraw-linux-smoke xvfb-run -a node tests/linux-webdriver.mjs
 
       - name: Prepare release assets

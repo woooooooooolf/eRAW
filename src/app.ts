@@ -6,7 +6,9 @@ import erawIconUrl from "./assets/eraw-icon.svg";
 import { unsupportedReorderEdges } from "./remosaic-boundary";
 import { localizeReorderBoundary } from "./backend-error";
 import type { CaptureJob } from "./image-capture-session";
-import { LATEST_RELEASE_URL, ManualUpdateChecker, updateCheckMessage } from "./update-check";
+import { ManualUpdateChecker } from "./update-check";
+import { aboutDialogTemplate, renderUpdateCheck } from "./about-dialog";
+import { settingsDialogTemplate } from "./settings-dialog";
 import {
   analyzeRawImage,
   calculateRawDisplayRange,
@@ -635,9 +637,9 @@ export class ErawApp {
         ${this.pixelLocatorDialogTemplate()}
         ${this.zoomDialogTemplate()}
         ${this.roiCoordinateDialogTemplate()}
-        ${this.settingsDialogTemplate()}
+        ${settingsDialogTemplate()}
         ${this.shortcutsDialogTemplate()}
-        ${this.aboutDialogTemplate()}
+        ${aboutDialogTemplate(VERSION, BUILD_TIME_SOURCE, erawIconUrl)}
       </div>`;
   }
 
@@ -1046,54 +1048,6 @@ export class ErawApp {
     </form></dialog>`;
   }
 
-  private aboutDialogTemplate(): string {
-    return `<dialog id="about-dialog" class="modal about-modal"><form method="dialog">
-      <button value="cancel" class="dialog-close floating">×</button>
-      <div class="about-hero"><img src="${erawIconUrl}" alt="eRAW"/><div><h2 class="about-product-name">eRAW</h2><p>V${VERSION}</p><time id="about-build-time" datetime="${BUILD_TIME_SOURCE}">${t("about.builtAt", { time: formatDateTime(BUILD_TIME_SOURCE) })}</time></div></div>
-      <div class="about-copy">
-        <div class="about-credits">
-          <div><span>产品设计</span><strong>凌净清河</strong></div>
-          <div><span>工程实现</span><strong>Codex (GPT-5.6 Sol/GPT-6.1 Sol)</strong></div>
-        </div>
-        <a id="about-repository" class="about-entry" href="https://github.com/woooooooooolf/eRAW" target="_blank" rel="noopener noreferrer"><strong>GitHub</strong><span class="about-entry-detail">github.com/woooooooooolf/eRAW</span><b aria-hidden="true">↗</b></a>
-        <button id="about-license" type="button" class="about-entry" aria-haspopup="dialog"><strong>软件许可证</strong><span class="about-entry-detail">GPL-3.0-or-later</span><b aria-hidden="true">›</b></button>
-        <button id="open-source-components" type="button" class="about-entry" aria-haspopup="dialog"><strong>开源组件</strong><span class="about-entry-detail">第三方许可证</span><b aria-hidden="true">›</b></button>
-      </div>
-      <div id="update-check-result" class="about-update-result" role="status" aria-live="polite" hidden>
-        <span id="update-check-message"></span>
-        <div class="about-update-links">
-          <a id="update-download" data-i18n="update.download" target="_blank" rel="noopener noreferrer" hidden>下载发布包 ↗</a>
-          <a id="update-release" data-i18n="update.release" href="${LATEST_RELEASE_URL}" target="_blank" rel="noopener noreferrer" hidden>前往 GitHub ↗</a>
-        </div>
-      </div>
-      <footer><button id="check-updates" type="button" class="secondary-button">${t("update.check")}</button><button id="about-done" value="cancel" class="primary-button">完成</button></footer>
-    </form></dialog>
-    <dialog id="license-dialog" class="modal license-modal"><form method="dialog">
-      <header><div><small>软件许可证</small><h2>GNU GPL 第 3 版或后续版本</h2></div><button value="cancel" class="dialog-close">×</button></header>
-      <div class="license-body"><div class="license-context"><code>GPL-3.0-or-later</code><p class="license-summary">使用、研究、修改与再分发，遵循 GPL 条款；本软件不提供担保。</p><p class="license-scope">此许可证适用于 eRAW 软件。第三方组件保留各自的许可证。</p><p class="license-original">以下为随程序提供的英文许可证原文。</p></div><pre id="license-text" tabindex="0"></pre></div>
-      <footer><button id="back-from-license" type="button" class="secondary-button">返回关于</button><button value="cancel" class="primary-button">完成</button></footer>
-    </form></dialog>
-    <dialog id="open-source-dialog" class="modal open-source-modal"><form method="dialog">
-      <header><div><small>OPEN SOURCE ACKNOWLEDGEMENTS</small><h2>主要开源组件</h2></div><button value="cancel" class="dialog-close">×</button></header>
-      <div class="open-source-body">
-        <p>eRAW 使用以下主要开源组件。组件版权归各自权利人所有，使用与再分发遵循其各自许可证。本页用于快速查阅，不替代组件附带的完整许可文本。</p>
-        <div class="component-list">
-          <div><strong>Tauri 2 与 @tauri-apps/api</strong><span>桌面应用框架与前端接口</span><code>MIT OR Apache-2.0</code></div>
-          <div><strong>Tauri Dialog Plugin</strong><span>系统文件选择对话框</span><code>MIT OR Apache-2.0</code></div>
-          <div><strong>Serde 与 serde_json</strong><span>Rust 数据序列化</span><code>MIT OR Apache-2.0</code></div>
-          <div><strong>memmap2</strong><span>RAW 文件内存映射</span><code>MIT OR Apache-2.0</code></div>
-          <div><strong>Vite</strong><span>前端构建工具</span><code>MIT</code></div>
-          <div><strong>TypeScript</strong><span>前端类型系统与编译工具</span><code>Apache-2.0</code></div>
-          <div><strong>Apache ECharts</strong><span>交互式统计图表</span><code>Apache-2.0</code></div>
-          <div><strong>KaTeX</strong><span>LaTeX 解析与 MathML 公式排版</span><code>MIT</code></div>
-          <div><strong>Tauri Opener Plugin</strong><span>在系统浏览器打开仓库</span><code>MIT OR Apache-2.0</code></div>
-        </div>
-        <p class="open-source-note">完整依赖清单见源代码中的 THIRD_PARTY_NOTICES.md；完整许可文本随发布包中的 THIRD_PARTY_LICENSES.txt 提供。</p>
-      </div>
-      <footer><button id="back-to-about" type="button" class="secondary-button">返回关于</button><button value="cancel" class="primary-button">完成</button></footer>
-    </form></dialog>`;
-  }
-
   private async openLicenseDialog(): Promise<void> {
     try {
       const { default: license } = await import("../LICENSE?raw");
@@ -1106,28 +1060,6 @@ export class ErawApp {
     } catch (error) {
       this.reportRuntimeError(error, "about.licenseLoadFailed", 5000, "license");
     }
-  }
-
-  private settingsDialogTemplate(): string {
-    return `<dialog id="settings-dialog" class="modal settings-modal"><form method="dialog">
-      <header><div><small>APPLICATION PREFERENCES</small><h2>设置</h2></div><button value="cancel" class="dialog-close">×</button></header>
-      <div class="settings-body">
-        <section class="settings-group"><div class="settings-heading"><h3>外观</h3><p>调整界面文字与动态效果，不改变 RAW 图像的显示比例。</p></div>
-          <label class="settings-row"><div><strong>界面字号</strong><span>高分辨率显示器推荐使用“大”或“特大”</span></div><select id="setting-font-size"><option value="standard">标准</option><option value="large">大</option><option value="extraLarge">特大</option></select></label>
-          <label class="settings-row"><div><strong>参数栏位置</strong><span>将图像格式和布局参数放在窗口左侧或右侧</span></div><select id="setting-sidebar-position"><option value="left">左侧</option><option value="right">右侧</option></select></label>
-          <label class="settings-row toggle-row"><div><strong>减少动态效果</strong><span>关闭面板、弹窗和提示的过渡动画</span></div><input id="setting-reduce-motion" type="checkbox"/></label>
-        </section>
-        <section class="settings-group"><div class="settings-heading"><h3>操作</h3><p>控制打开文件和画布交互的默认行为。</p></div>
-          <label class="settings-row"><div><strong>打开图像时</strong><span>决定新文件的初始缩放方式</span></div><select id="setting-open-view"><option value="fit">适应窗口</option><option value="actual">100% 实际像素</option></select></label>
-          <label class="settings-row"><div><strong>滚轮缩放速度</strong><span>缩放始终以鼠标指向的图像位置为中心</span></div><select id="setting-wheel-speed"><option value="gentle">柔和</option><option value="standard">标准</option><option value="fast">快速</option></select></label>
-          <label class="settings-row toggle-row"><div><strong>记住 RAW 参数</strong><span>下次启动时恢复尺寸、packing、CFA 和对齐配置</span></div><input id="setting-remember-descriptor" type="checkbox"/></label>
-        </section>
-        <section class="settings-group"><div class="settings-heading"><h3>性能</h3><p>更大的 GPU 缓存可减少超大图像来回拖动时的瓦片重载。</p></div>
-          <label class="settings-row"><div><strong>GPU 瓦片缓存</strong><span>只缓存预览纹理，不复制完整 RAW 文件</span></div><select id="setting-tile-cache"><option value="compact">32 MiB</option><option value="balanced">64 MiB（推荐）</option><option value="large">128 MiB</option></select></label>
-        </section>
-      </div>
-      <footer><button id="reset-settings" type="button" class="text-button">恢复默认设置</button><span class="footer-spacer"></span><button value="cancel" class="secondary-button">取消</button><button id="confirm-settings" type="button" class="primary-button">应用</button></footer>
-    </form></dialog>`;
   }
 
   private bindEvents(): void {
@@ -1944,21 +1876,7 @@ export class ErawApp {
   }
 
   private renderUpdateCheck(): void {
-    const state = this.updateChecker.state;
-    const checking = state.status === "checking";
-    const button = this.get<HTMLButtonElement>("check-updates");
-    button.disabled = checking;
-    button.textContent = t(checking ? "update.checking" : "update.check");
-    this.get("update-check-result").hidden = state.status === "idle";
-    const message = updateCheckMessage(state);
-    this.get("update-check-message").textContent = t(message.key, message.values);
-    const download = this.get<HTMLAnchorElement>("update-download");
-    const release = this.get<HTMLAnchorElement>("update-release");
-    download.hidden = state.status !== "available" || !state.downloadAvailable || !state.downloadUrl;
-    if (state.status === "available" && state.downloadAvailable && state.downloadUrl) download.href = state.downloadUrl;
-    else download.removeAttribute("href");
-    release.hidden = state.status !== "available" && state.status !== "failed";
-    release.href = state.status === "available" ? state.releaseUrl : LATEST_RELEASE_URL;
+    renderUpdateCheck(this.root, this.updateChecker.state);
   }
 
   private setLanguageMenuOpen(open: boolean): void {

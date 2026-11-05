@@ -42,8 +42,7 @@ AppImage 不等于所有 Linux 通用：本轮仍以 Ubuntu 24.04 x64 为基线�
 使用 Node.js 22、稳定 Rust（至少 1.90）和 Ubuntu 24.04 系统依赖，在 Linux 文件系统中的独立源码目录执行，避免与 Windows 共用 `node_modules` 或 `target`：
 
 ```sh
-sudo apt-get update
-sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential pkg-config libdbus-1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2t64
+bash scripts/setup-linux.sh deps
 npm ci
 npm run check
 npm run test:frontend
@@ -63,8 +62,8 @@ node scripts/release-assets.mjs --platform linux --output-dir artifacts/linux
 原生 WebView 冒烟不需要新增应用插件、测试专用 IPC 或开发服务器：
 
 ```sh
-sudo apt-get install -y xvfb xauth webkit2gtk-driver
-cargo install tauri-driver --version 2.1.0 --locked
+bash scripts/setup-linux.sh deps
+bash scripts/setup-linux.sh webdriver
 xvfb-run -a node tests/linux-webdriver.mjs
 ```
 

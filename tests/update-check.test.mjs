@@ -17,25 +17,22 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-// Exercise the actual About template and renderer without a desktop or network.
+// Import the actual view module; only translations and date formatting are stubbed.
+const aboutSource = await readFile(new URL("../src/about-dialog.ts", import.meta.url), "utf8");
+const translations = moduleUrl(`export const t = (key, values) => key + (values?.version ? ":" + values.version : ""); export const formatDateTime = value => value;`);
+const aboutModule = await import(moduleUrl(compile(aboutSource)
+  .replace('"./i18n"', JSON.stringify(translations))
+  .replace('"./update-check"', JSON.stringify(moduleUrl(compile(modelSource))))));
+class AboutView {
+  aboutDialogTemplate() { return aboutModule.aboutDialogTemplate("0.9.0", "test", "icon.svg"); }
+  renderUpdateCheck() {
+    aboutModule.renderUpdateCheck({ querySelector: selector => this.elements[selector.slice(1)] }, this.updateChecker.state);
+  }
+}
+// Keep the static shortcut guard without cloning implementation methods into a test class.
 const sourceFile = ts.createSourceFile("app.ts", appSource, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
 const appClass = sourceFile.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "ErawApp");
 const method = name => appClass.members.find(node => ts.isMethodDeclaration(node) && node.name.getText(sourceFile) === name).getText(sourceFile);
-const viewSource = `
-const LATEST_RELEASE_URL = ${JSON.stringify(LATEST_RELEASE_URL)};
-const VERSION = "0.9.0", BUILD_TIME_SOURCE = "test", erawIconUrl = "icon.svg";
-const formatDateTime = value => value;
-const updateCheckMessage = globalThis.__updateTestMessage;
-const t = (key, values) => key + (values?.version ? ":" + values.version : "");
-export class AboutView {
-  get(id) { return this.elements[id]; }
-  ${method("aboutDialogTemplate")}
-  ${method("renderUpdateCheck")}
-}
-`;
-const { AboutView } = await import(moduleUrl(compile(viewSource.replace(
-  "const updateCheckMessage = globalThis.__updateTestMessage;", `const updateCheckMessage = ${updateCheckMessage.toString()};`,
-))));
 
 function view() {
   const result = new AboutView();

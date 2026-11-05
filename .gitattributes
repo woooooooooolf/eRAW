@@ -1,6 +1,6 @@
+# Shell helpers must remain executable by bash after a Windows checkout.
+*.sh text eol=lf
 # Preserve the verified upstream crate bytes across Windows and Linux checkouts.
 src-tauri/vendor/glib/** -text
-# Keep the original upstream license's EOF blank line byte-for-byte.
-src-tauri/vendor/glib/LICENSE whitespace=-blank-at-eof
 # Keep the original upstream license's EOF blank line byte-for-byte.
 src-tauri/vendor/glib/LICENSE whitespace=-blank-at-eof

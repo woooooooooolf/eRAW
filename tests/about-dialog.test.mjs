@@ -13,14 +13,16 @@ const [appSource, styleSource, i18nSource, packageSource, apiSource, commandsSou
   readFile(new URL("src-tauri/src/lib.rs", root), "utf8"),
 ]);
 
+const aboutSource = await readFile(new URL("src/about-dialog.ts", root), "utf8");
+
 test("About presents minimal branding and a localized repository link", () => {
   assert.doesNotMatch(appSource, /RAW SENSOR LAB|RAW 传感器实验室/);
   assert.doesNotMatch(i18nSource, /"about\.lab"/);
-  assert.match(appSource, /<h2 class="about-product-name">eRAW<\/h2>/);
+  assert.match(aboutSource, /<h2 class="about-product-name">eRAW<\/h2>/);
   assert.match(styleSource, /\.about-product-name\s*\{[^}]*linear-gradient\([^}]*background-clip:\s*text/s);
-  assert.match(appSource, /id="about-repository"[^>]*href="https:\/\/github\.com\/woooooooooolf\/eRAW"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/);
+  assert.match(aboutSource, /id="about-repository"[^>]*href="https:\/\/github\.com\/woooooooooolf\/eRAW"[^>]*target="_blank"[^>]*rel="noopener noreferrer"/);
   assert.match(appSource, /text\("#about-repository strong", "about\.repository"\)/);
-  assert.match(appSource, /Codex \(GPT-5\.6 Sol\/GPT-6\.1 Sol\)/);
+  assert.match(aboutSource, /Codex \(GPT-5\.6 Sol\/GPT-6\.1 Sol\)/);
   assert.doesNotMatch(appSource + i18nSource, /repositoryAvailability|以仓库实际公开情况为准/);
   assert.match(apiSource, /invoke\("open_project_repository"\)/);
   assert.match(commandsSource, /pub fn open_project_repository\(app: tauri::AppHandle\)/);

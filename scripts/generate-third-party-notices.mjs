@@ -56,7 +56,7 @@ const markdown = [
   "",
   "This file is generated from `package-lock.json` and `src-tauri/Cargo.lock` by `npm.cmd run notices`. Do not edit it manually.",
   "",
-  "It records the complete locked dependency inventory and each package's declared license expression. License and notice texts discoverable in the installed dependency sources are collected into `THIRD_PARTY_LICENSES.txt` for release artifacts.",
+  "It records the complete locked dependency inventory and each package's declared license expression. The optional `--licenses <path>` command collects available license texts from installed dependency sources for local review; this text is not uploaded as a Release asset.",
   "",
   "eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain with their respective owners.",
   "",

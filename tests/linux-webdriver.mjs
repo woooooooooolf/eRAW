@@ -61,6 +61,16 @@ try {
     const png = await request("GET", `/session/${session}/screenshot`);
     await writeFile(join(output, `linux-${language}-960.png`), Buffer.from(png, "base64"));
   }
+  await execute('document.querySelector("#settings-button").click()');
+  assert.equal(await execute('return document.querySelector("#settings-dialog").open'), true);
+  await execute('document.querySelector("#settings-dialog .secondary-button[value=cancel]").click()');
+  await waitFor(() => execute('return !document.querySelector("#settings-dialog").open'), "settings cancel");
+  await execute('document.querySelector("#about-button").click(); document.querySelector("#about-menu-item").click()');
+  assert.equal(await execute('return document.querySelector("#about-dialog").open && document.querySelector("#update-check-result").hidden'), true);
+  await execute('document.querySelector("#about-license").click()');
+  await waitFor(() => execute('return document.querySelector("#license-dialog").open && document.querySelector("#license-text").textContent.length > 1000'), "offline license dialog");
+  await execute('document.querySelector("#back-from-license").click(); document.querySelector("#about-done").click()');
+  await waitFor(() => execute('return !document.querySelector("#about-dialog").open'), "about close");
   await execute('document.querySelector("#next-frame").click()');
   await waitFor(() => execute('return document.querySelector("#frame-input").value === "2" && /0 loading/.test(document.querySelector("#render-status").textContent)'), "second RAW frame");
   await execute('window.dispatchEvent(new KeyboardEvent("keydown", {key:"F1", bubbles:true}))');
@@ -73,7 +83,7 @@ try {
   await request("POST", `/session/${session}/window`, { handle: mainWindow });
   await execute('document.querySelector("#open-button").click()');
   await waitFor(() => execute('return document.querySelector("#frame-total").textContent === "0"'), "close document");
-  console.log("Linux WebKitGTK: real RAW rendering, two frames, English/German, minimum window, help window and document close passed");
+  console.log("Linux WebKitGTK: RAW rendering, two frames, English/German, minimum window, settings, About/license, help window and document close passed");
 } finally {
   if (session) { try { await request("DELETE", `/session/${session}`); } catch {} }
   if (driver.pid) { try { process.kill(-driver.pid, "SIGTERM"); } catch {} }

@@ -51,6 +51,7 @@ HTTP 客户端使用系统原生 TLS 校验证书，并启用系统手动代理�
 | `src/app-settings.ts` | 应用设置类型、默认值、旧设置迁移、非法持久值回退和侧栏宽度约束 |
 | `src/theme-catalog.ts` | 九套主题的稳定标识、菜单预览元数据、合法性判断和本地化键映射 |
 | `src/descriptor-input.ts` | 数值参数的整数化、边界限制和空值默认规则 |
+| `src/about-dialog.ts` / `src/settings-dialog.ts` | 关于、许可证、组件和设置对话框模板，以及无状态的更新结果呈现；更新任务状态与设置提交仍由主应用持有 |
 | `src/export-dialog.ts` | 冻结导出快照、范围联动、字段校验和导出反馈 |
 | `src/image-capture.ts` / `src/image-output.ts` | 当前画面合成、完整预览瓦片拼接，以及共用的 PNG/剪贴板输出 |
 | `src/roi-selection.ts` | 主窗口 ROI 包含式坐标输入校验、右键拖动阈值，以及坐标到矩形的唯一转换规则 |
@@ -72,7 +73,7 @@ HTTP 客户端使用系统原生 TLS 校验证书，并启用系统手动代理�
 | `src/api.ts` / `src/types.ts` | Tauri 调用封装及前后端共享数据契约 |
 | `src-tauri/src/commands.rs` | 当前文档会话、内存映射、缓存、任务快照和命令边界 |
 | `src-tauri/src/update_check.rs` | 固定仓库的 Latest 重定向与稳定版本校验、有界异步请求、发布包确认、进程内限流冷却和受控链接目标 |
-| `src-tauri/src/raw/mod.rs` | 布局、packing、CFA、预览、Remosaic、Demosaic、检查、RAW 导出与原子输出写入 |
+| `src-tauri/src/raw/mod.rs` / `src-tauri/src/raw/tests.rs` | 布局、packing、CFA、预览、Remosaic、Demosaic、检查、RAW 导出与原子输出写入 |
 | `src-tauri/src/analysis/mod.rs` | L0 CFA DN 摘要、精确 Histogram、Row/Column Profile 和 QCFA 原子平面 |
 
 `raw/mod.rs` 是无 UI 的领域核心。新格式和算法应优先在这里形成可测试的纯逻辑；`app.ts` 不应承担像素语义。

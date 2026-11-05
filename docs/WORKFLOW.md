@@ -94,6 +94,15 @@ npm.cmd run release
 
 涉及 CLI 或启动流程的迭代，在 Release 构建后运行 `npm.cmd run test:cli`；采用重定向 stdout/stderr 的有限子进程验证 GUI 子系统 EXE 的英文反馈和退出码。CLI 文字统一使用英文，不随 GUI 七语目录切换；文件路径保持原文。多实例人工检查使用隔离的 WebView 测试目录，避免改写真实用户偏好。
 
+## 工程整理与测试入口
+
+- `src/`、`src-tauri/`、`site/` 分别维护桌面前端、Rust 后端及静态站点；`scripts/` 放置构建/发布辅助程序，`tests/` 放置 Node 与原生 WebView 测试。
+- `npm run test:frontend` 保留为汇总入口，依次运行 `test:ui`、`test:tooling`、`test:site`；三组分别覆盖桌面前端、仓库/发布工具、静态站点。`test:cli` 仍单独运行已构建的原生程序。
+- Linux 系统依赖和固定 WebDriver 安装由 `bash scripts/setup-linux.sh deps` / `webdriver` 维护，CI、Release 和本地构建共用。两套工作流继续独立管理验证顺序和发布权限。
+- `tmp/` 只用于可删除的临时文件并显式忽略；测试日志、截图和本地分发文件集中在已忽略的 `artifacts/`，例如 `artifacts/checks/`、`artifacts/linux-smoke/` 和 `artifacts/linux/`。不在仓库根目录堆放测试 RAW 或截图。
+- 仅维护 Windows/Linux 所需的图标。未来扩展新平台时重新生成对应图标，不长期保留当前未支持平台的预置资源。
+- RAW 单元测试独立放在 `raw/tests.rs`，使用同一子模块和私有实现访问；不为文件拆分改写算法。第三方补丁源码与其完整性清单保持完整，不参与业务代码精简。
+
 ## GitHub 自动化
 
 - `.github/workflows/ci.yml` 在 `master` 推送、面向 `master` 的 Pull Request 和手动触发时运行前后端检查、测试、生产构建、Windows 独立 EXE、Linux DEB/AppImage 构建与 CLI/安装包/原生 WebView 冒烟测试；发布工作流在打包前同样验证 CLI。

@@ -142,3 +142,11 @@ Rust 测试覆盖领域语义、文档会话与 CLI 契约，重点分为：
 - WSLg 与 Xvfb 下均通过原生 WebKitGTK WebDriver 启动真实 Release ELF，在隔离 XDG 目录中打开合成两帧 RAW；两帧加载、渲染状态归零、英文/德文切换、960×640 窗口截图、独立手册语言同步、关闭文件验证通过。截图位于本地 `artifacts/linux-smoke`。这是 WebView/程序交互证据，不是所有 GNOME 桌面场景的人工验收。
 - 149 项前端测试覆盖双格式成果物及校验、草稿发布顺序、损坏成果物拒绝和公开 Release 禁止覆盖、网站三种格式解析和离线回退；Windows 73 项 Rust 回归、7 项最终 EXE CLI/skill 检查及生产构建通过。
 - 原生 GNOME Wayland/X11、多 GPU/多显示器、系统文件对话框和真实图像剪贴板仍需目标桌面验收。WSLg/Xvfb 不替代这些环境；不因测试环境额外禁用正式程序 GPU 加速或沙箱。
+
+## 工程整理与局部拆分验证（2026-11-05）
+
+- RAW 实现主体逐字核对未变，原单元测试仅移至 `raw/tests.rs` 并调整缩进；Windows 73 项 Rust、Linux 72 项 Rust 和 3 项 glib 集成回归全部通过。
+- 汇总测试入口仍为 `test:frontend`，分为 UI 133 项、工具 11 项、站点 5 项，合计 149 项全部通过。更新检查回归直接导入关于页呈现模块，继续覆盖不自动请求、关闭/重开保留状态、去重、超时与受控链接。
+- Windows EXE 构建、7 项 CLI/skill、站点构建，以及 Linux DEB/AppImage 构建、包内容/运行入口检查和 7 项 CLI/skill 通过。删除未支持平台的图标未影响 Windows/Linux 构建。
+- WSLg 和 Xvfb 真实 WebView 冒烟均通过，新增设置打开/取消、关于页初始状态、离线许可证打开与返回验证；已有帧切换、七语机制的英文/德文抽查、独立手册及关闭文档检查继续通过。上述结果不扩大原生 GNOME、多 GPU、文件对话框和剪贴板的验收范围。
+- 共享 Linux 安装助手通过 bash 语法检查，WebDriver 子命令实际执行成功；CI/Release 经 actionlint 校验。统计报告预留模块和完整 glib 补丁源码未修改。

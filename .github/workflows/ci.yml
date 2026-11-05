@@ -103,9 +103,7 @@ jobs:
           workspaces: "src-tauri -> target"
 
       - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential pkg-config libdbus-1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2t64 xvfb xauth webkit2gtk-driver
+        run: bash scripts/setup-linux.sh deps
 
       - name: Verify vendored source and build frontend
         run: |
@@ -131,7 +129,7 @@ jobs:
           node scripts/release-assets.mjs --platform linux
 
       - name: Install fixed WebDriver
-        run: cargo install tauri-driver --version 2.1.0 --locked
+        run: bash scripts/setup-linux.sh webdriver
 
       - name: Exercise real Linux WebView
         run: xvfb-run -a node tests/linux-webdriver.mjs
