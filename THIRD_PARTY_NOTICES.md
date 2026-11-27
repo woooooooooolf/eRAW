@@ -6,42 +6,48 @@ It records the complete locked dependency inventory and each package's declared 
 
 eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain with their respective owners.
 
-## npm dependencies (61)
+## npm dependencies (71)
 
 | Package | Version | Scope | Declared license |
 | --- | --- | --- | --- |
+| @emnapi/core | 2.0.0-beta.2 | development | MIT |
+| @emnapi/runtime | 2.0.0-beta.2 | development | MIT |
+| @emnapi/wasi-threads | 2.2.0 | development | MIT |
+| @napi-rs/wasm-runtime | 1.2.6 | development | MIT |
 | @oxc-project/types | 0.156.0 | development | MIT |
-| @rolldown/binding-android-arm-eabi | 1.2.16 | development | MIT |
-| @rolldown/binding-android-arm64 | 1.2.16 | development | MIT |
-| @rolldown/binding-darwin-arm64 | 1.2.16 | development | MIT |
-| @rolldown/binding-darwin-x64 | 1.2.16 | development | MIT |
-| @rolldown/binding-freebsd-x64 | 1.2.16 | development | MIT |
-| @rolldown/binding-linux-arm-gnueabihf | 1.2.16 | development | MIT |
-| @rolldown/binding-linux-arm64-gnu | 1.2.16 | development | MIT |
-| @rolldown/binding-linux-arm64-musl | 1.2.16 | development | MIT |
-| @rolldown/binding-linux-ppc64-gnu | 1.2.16 | development | MIT |
-| @rolldown/binding-linux-s390x-gnu | 1.2.16 | development | MIT |
-| @rolldown/binding-linux-x64-gnu | 1.2.16 | development | MIT |
-| @rolldown/binding-linux-x64-musl | 1.2.16 | development | MIT |
-| @rolldown/binding-openharmony-arm64 | 1.2.16 | development | MIT |
-| @rolldown/binding-win32-arm64-msvc | 1.2.16 | development | MIT |
-| @rolldown/binding-win32-x64-msvc | 1.2.16 | development | MIT |
-| @rolldown/pluginutils | 1.0.1 | development | MIT |
-| @tauri-apps/api | 2.12.4 | runtime | Apache-2.0 OR MIT |
-| @tauri-apps/cli | 2.12.4 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-darwin-arm64 | 2.12.4 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-darwin-x64 | 2.12.4 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-arm-gnueabihf | 2.12.4 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-arm64-gnu | 2.12.4 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-arm64-musl | 2.12.4 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-riscv64-gnu | 2.12.4 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-x64-gnu | 2.12.4 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-linux-x64-musl | 2.12.4 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-win32-arm64-msvc | 2.12.4 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-win32-ia32-msvc | 2.12.4 | development | Apache-2.0 OR MIT |
-| @tauri-apps/cli-win32-x64-msvc | 2.12.4 | development | Apache-2.0 OR MIT |
+| @rolldown/binding-android-arm-eabi | 1.2.19 | development | MIT |
+| @rolldown/binding-android-arm64 | 1.2.19 | development | MIT |
+| @rolldown/binding-darwin-arm64 | 1.2.19 | development | MIT |
+| @rolldown/binding-darwin-x64 | 1.2.19 | development | MIT |
+| @rolldown/binding-freebsd-x64 | 1.2.19 | development | MIT |
+| @rolldown/binding-linux-arm-gnueabihf | 1.2.19 | development | MIT |
+| @rolldown/binding-linux-arm64-gnu | 1.2.19 | development | MIT |
+| @rolldown/binding-linux-arm64-musl | 1.2.19 | development | MIT |
+| @rolldown/binding-linux-ppc64-gnu | 1.2.19 | development | MIT |
+| @rolldown/binding-linux-s390x-gnu | 1.2.19 | development | MIT |
+| @rolldown/binding-linux-x64-gnu | 1.2.19 | development | MIT |
+| @rolldown/binding-linux-x64-musl | 1.2.19 | development | MIT |
+| @rolldown/binding-openharmony-arm64 | 1.2.19 | development | MIT |
+| @rolldown/binding-wasm32-wasi | 1.2.19 | development | MIT |
+| @rolldown/binding-win32-arm64-msvc | 1.2.19 | development | MIT |
+| @rolldown/binding-win32-x64-msvc | 1.2.19 | development | MIT |
+| @rolldown/pluginutils | 1.1.1 | development | MIT |
+| @tauri-apps/api | 2.12.5 | runtime | Apache-2.0 OR MIT |
+| @tauri-apps/cli | 2.12.6 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-darwin-arm64 | 2.12.6 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-darwin-x64 | 2.12.6 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-arm-gnueabihf | 2.12.6 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-arm64-gnu | 2.12.6 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-arm64-musl | 2.12.6 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-riscv64-gnu | 2.12.6 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-x64-gnu | 2.12.6 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-linux-x64-musl | 2.12.6 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-win32-arm64-msvc | 2.12.6 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-win32-ia32-msvc | 2.12.6 | development | Apache-2.0 OR MIT |
+| @tauri-apps/cli-win32-x64-msvc | 2.12.6 | development | Apache-2.0 OR MIT |
 | @tauri-apps/plugin-clipboard-manager | 2.5.0 | runtime | MIT OR Apache-2.0 |
 | @tauri-apps/plugin-dialog | 2.8.4 | runtime | MIT OR Apache-2.0 |
+| @tybys/wasm-util | 0.10.5 | development | MIT |
 | commander | 15.0.0 | runtime | MIT |
 | detect-libc | 2.1.2 | development | Apache-2.0 |
 | echarts | 6.1.0 | runtime | Apache-2.0 |
@@ -64,15 +70,19 @@ eRAW itself is distributed under GPL-3.0-or-later. Dependency copyrights remain 
 | picocolors | 1.1.1 | development | ISC |
 | picomatch | 4.0.7 | development | MIT |
 | postcss | 8.5.32 | development | MIT |
-| rolldown | 1.2.16 | development | MIT |
+| rolldown | 1.2.19 | development | MIT |
 | source-map-js | 1.2.2 | development | BSD-3-Clause |
 | tinyglobby | 0.2.17 | development | MIT |
 | tslib | 2.3.0 | runtime | 0BSD |
+| tslib | 2.9.1 | development | 0BSD |
+| tslib | 2.9.1 | development | 0BSD |
+| tslib | 2.9.1 | development | 0BSD |
+| tslib | 2.9.1 | development | 0BSD |
 | typescript | 6.0.3 | development | Apache-2.0 |
-| vite | 8.3.6 | development | MIT |
+| vite | 8.3.8 | development | MIT |
 | zrender | 6.1.0 | runtime | BSD-3-Clause |
 
-## Cargo dependencies (519)
+## Cargo dependencies (526)
 
 Local source dependencies include reviewed repository patches; see [dependency patch provenance](docs/DEPENDENCY_PATCHES.md).
 
@@ -107,6 +117,7 @@ Local source dependencies include reviewed repository patches; see [dependency p
 | bitflags | 1.3.2 | MIT/Apache-2.0 |
 | bitflags | 2.13.1 | MIT OR Apache-2.0 |
 | block-buffer | 0.10.4 | MIT OR Apache-2.0 |
+| block-buffer | 0.12.1 | MIT OR Apache-2.0 |
 | block2 | 0.6.2 | MIT |
 | blocking | 1.7.0 | Apache-2.0 OR MIT |
 | brotli | 9.0.0 | BSD-3-Clause AND MIT |
@@ -132,6 +143,7 @@ Local source dependencies include reviewed repository patches; see [dependency p
 | clipboard-win | 5.4.1 | BSL-1.0 |
 | combine | 4.6.7 | MIT |
 | concurrent-queue | 2.5.0 | Apache-2.0 OR MIT |
+| const-oid | 0.10.3 | Apache-2.0 OR MIT |
 | cookie | 0.18.1 | MIT OR Apache-2.0 |
 | core-foundation | 0.10.1 | MIT OR Apache-2.0 |
 | core-foundation | 0.9.4 | MIT OR Apache-2.0 |
@@ -139,11 +151,13 @@ Local source dependencies include reviewed repository patches; see [dependency p
 | core-graphics | 0.25.0 | MIT OR Apache-2.0 |
 | core-graphics-types | 0.2.0 | MIT OR Apache-2.0 |
 | cpufeatures | 0.2.17 | MIT OR Apache-2.0 |
+| cpufeatures | 0.3.1 | MIT OR Apache-2.0 |
 | crc32fast | 1.5.0 | MIT OR Apache-2.0 |
 | crossbeam-channel | 0.5.16 | MIT OR Apache-2.0 |
 | crossbeam-utils | 0.8.22 | MIT OR Apache-2.0 |
 | crunchy | 0.2.4 | MIT |
 | crypto-common | 0.1.7 | MIT OR Apache-2.0 |
+| crypto-common | 0.2.2 | MIT OR Apache-2.0 |
 | cssparser | 0.37.0 | MPL-2.0 |
 | cssparser-macros | 0.7.1 | MPL-2.0 |
 | ctor | 1.0.13 | Apache-2.0 OR MIT |
@@ -155,6 +169,7 @@ Local source dependencies include reviewed repository patches; see [dependency p
 | derive_more | 2.1.1 | MIT |
 | derive_more-impl | 2.1.1 | MIT |
 | digest | 0.10.7 | MIT OR Apache-2.0 |
+| digest | 0.11.3 | MIT OR Apache-2.0 |
 | dirs | 7.0.0 | MIT OR Apache-2.0 |
 | dirs-sys | 0.5.0 | MIT OR Apache-2.0 |
 | dispatch2 | 0.3.1 | Zlib OR Apache-2.0 OR MIT |
@@ -240,6 +255,7 @@ Local source dependencies include reviewed repository patches; see [dependency p
 | http-body-util | 0.1.4 | MIT |
 | httparse | 1.10.1 | MIT OR Apache-2.0 |
 | httpdate | 1.0.3 | MIT OR Apache-2.0 |
+| hybrid-array | 0.4.15 | MIT OR Apache-2.0 |
 | hyper | 1.11.0 | MIT |
 | hyper-tls | 0.6.0 | MIT/Apache-2.0 |
 | hyper-util | 0.1.20 | MIT |
@@ -403,6 +419,7 @@ Local source dependencies include reviewed repository patches; see [dependency p
 | serialize-to-javascript-impl | 0.1.2 | MIT OR Apache-2.0 |
 | servo_arc | 0.4.3 | MIT OR Apache-2.0 |
 | sha2 | 0.10.9 | MIT OR Apache-2.0 |
+| sha2 | 0.11.1 | MIT OR Apache-2.0 |
 | shlex | 2.0.1 | MIT OR Apache-2.0 |
 | signal-hook-registry | 1.4.8 | MIT OR Apache-2.0 |
 | simd-adler32 | 0.3.10 | MIT |
@@ -431,18 +448,18 @@ Local source dependencies include reviewed repository patches; see [dependency p
 | tao | 0.37.2 | Apache-2.0 |
 | tao-macros | 0.1.4 | MIT OR Apache-2.0 |
 | target-lexicon | 0.12.16 | Apache-2.0 WITH LLVM-exception |
-| tauri | 2.12.5 | Apache-2.0 OR MIT |
-| tauri-build | 2.7.4 | Apache-2.0 OR MIT |
-| tauri-codegen | 2.7.4 | Apache-2.0 OR MIT |
-| tauri-macros | 2.7.4 | Apache-2.0 OR MIT |
+| tauri | 2.12.7 | Apache-2.0 OR MIT |
+| tauri-build | 2.7.6 | Apache-2.0 OR MIT |
+| tauri-codegen | 2.7.6 | Apache-2.0 OR MIT |
+| tauri-macros | 2.7.6 | Apache-2.0 OR MIT |
 | tauri-plugin | 2.7.2 | Apache-2.0 OR MIT |
 | tauri-plugin-clipboard-manager | 2.5.0 | Apache-2.0 OR MIT |
 | tauri-plugin-dialog | 2.8.4 | Apache-2.0 OR MIT |
 | tauri-plugin-fs | 2.7.1 | Apache-2.0 OR MIT |
-| tauri-plugin-opener | 2.7.2 | Apache-2.0 OR MIT |
-| tauri-runtime | 2.12.2 | Apache-2.0 OR MIT |
-| tauri-runtime-wry | 2.12.3 | Apache-2.0 OR MIT |
-| tauri-utils | 2.10.2 | Apache-2.0 OR MIT |
+| tauri-plugin-opener | 2.7.3 | Apache-2.0 OR MIT |
+| tauri-runtime | 2.12.4 | Apache-2.0 OR MIT |
+| tauri-runtime-wry | 2.12.5 | Apache-2.0 OR MIT |
+| tauri-utils | 2.10.4 | Apache-2.0 OR MIT |
 | tauri-winres | 0.3.6 | MIT |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 |
 | tendril | 0.5.1 | MIT OR Apache-2.0 |
